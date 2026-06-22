@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cadora"
+version = "0.1.0"
+description = "An AI-DLC workflow conductor — drive the AWS AI-DLC method on a headless coding agent (Claude Code), with deterministic gates and run capture."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Yves Eychenne", email = "yeychenne@yahoo.fr" }]
+keywords = ["agents", "orchestration", "claude-code", "kiro", "ai-dlc", "dag", "workflow"]
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff"]
+
+[project.scripts]
+cadora = "cadora.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yeychenne/cadora"
+Repository = "https://github.com/yeychenne/cadora"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cadora"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

@@ -1,0 +1,35 @@
+# Cadora topology: the AWS AI-DLC method (awslabs/aidlc-workflows, rules v1.0.0)
+# run as a single autonomous session — the v0.1.0 shape (design decision A).
+#
+# This is what ships in v0.1.0: ONE node drives `claude -p` through the COMPLETE AI-DLC
+# lifecycle, validating the engine end-to-end (executor + build-test gate + run capture).
+# The per-stage DAG is the destination — see examples/aidlc-stages.topology.yaml.
+#
+# Prerequisites in the target workspace (Cadora's conductor sets these up):
+#   - CLAUDE.md            := aidlc-rules/aws-aidlc-rules/core-workflow.md  (auto-loaded by Claude Code)
+#   - .aidlc-rule-details/ := aidlc-rules/aws-aidlc-rule-details/*
+#   - vision.md            (your product vision; required input)
+#   - tech-env.md          (optional technical-environment input)
+#
+# Run:  cadora run examples/aidlc.topology.yaml --executor claude
+name: aidlc
+
+nodes:
+  - id: aidlc-run
+    role: aidlc-executor
+    prompt: |
+      Build the software described in `vision.md` by following the AI-DLC workflow from start
+      to finish. The workflow is already loaded as project memory (CLAUDE.md = the AI-DLC
+      core-workflow), with per-stage detail in `.aidlc-rule-details/` — read each stage's rule
+      before executing that stage.
+
+      Execute the full lifecycle: Inception (Workspace Detection → Requirements Analysis →
+      Workflow Planning → any conditional design stages) then Construction (Code Generation →
+      Build and Test). Write workflow artifacts under `aidlc-docs/` and application code in the
+      workspace; keep documentation and code separate. Write complete, working files — not stubs.
+
+      Run AUTONOMOUSLY: there is no human reviewer, so self-approve each stage and continue
+      immediately. Do NOT stop until Build and Test passes. Append actions to `aidlc-docs/audit.md`
+      and keep `aidlc-docs/aidlc-state.md` current.
+    tools: [Read, Write, Edit, Bash]
+    gate: build-test   # deterministic ShellGate (registered in the CLI) re-runs tests; blocks on failure

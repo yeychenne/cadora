@@ -1,0 +1,7 @@
+ai-dlc-rules: 1.0.0
+source: https://github.com/awslabs/aidlc-workflows
+commit: e273af0a310ef3968d3636acc7e0afec6f7dad22
+ref: main
+retrieved: 2026-06-19T15:29:29Z
+license: MIT-0 (see ./LICENSE)
+note: vendored by scripts/refresh-aidlc-rules.sh — do not edit by hand

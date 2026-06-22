@@ -1,0 +1,154 @@
+# Cadora topology: the AWS AI-DLC method (awslabs/aidlc-workflows, rules v1.0.0)
+# expressed as a per-stage DAG — Cadora's intended DESTINATION (design decision B).
+#
+# This is the architecture the topology engine exists for, and validates/topo-sorts TODAY,
+# but it does NOT fully run in v0.1.0: it needs the per-stage executor work (each node loads its
+# rule + reads upstream artifacts) and runtime per-unit fan-out. v0.1.0 ships the single-session
+# run in examples/aidlc.topology.yaml (A). See docs/ARCHITECTURE.md.
+#
+# Prerequisites in the target workspace (Cadora's conductor sets these up):
+#   - CLAUDE.md            := aidlc-rules/aws-aidlc-rules/core-workflow.md
+#   - .aidlc-rule-details/ := aidlc-rules/aws-aidlc-rule-details/*
+#   - vision.md            (your product vision; required input)
+#   - tech-env.md          (optional technical-environment input)
+#
+# Each node drives `claude -p` to: read its stage rule from .aidlc-rule-details/<path>,
+# read upstream artifacts from aidlc-docs/, perform the stage, and write its artifacts back
+# to aidlc-docs/ (appending audit.md, updating aidlc-state.md). The shared aidlc-docs/ tree
+# is the cross-node context. CONDITIONAL stages self-skip (write a justification + pass through).
+#
+# Scope: single-unit, greenfield backbone. Brownfield + multi-unit Construction fan-out are
+# roadmap (need runtime node expansion).
+name: aidlc-stages
+
+nodes:
+  # ── 🔵 INCEPTION ─────────────────────────────────────────────────────────────
+  - id: workspace-detection
+    role: analyst
+    prompt: |
+      AI-DLC stage: Workspace Detection (ALWAYS). Read and follow
+      `.aidlc-rule-details/inception/workspace-detection.md`. Scan the workspace, classify it
+      greenfield vs brownfield, and initialize `aidlc-docs/aidlc-state.md` and `aidlc-docs/audit.md`.
+    tools: [Read, Write, Bash]
+
+  - id: reverse-engineering
+    role: analyst
+    prompt: |
+      AI-DLC stage: Reverse Engineering (CONDITIONAL — brownfield only). Read and follow
+      `.aidlc-rule-details/inception/reverse-engineering.md`. SKIP IF greenfield: record a one-line
+      skip justification in aidlc-state.md/audit.md and pass through. Otherwise document the existing
+      system (architecture, components, APIs, dependencies) under aidlc-docs/inception/.
+    tools: [Read, Grep, Bash, Write]
+    depends_on: [workspace-detection]
+
+  - id: requirements-analysis
+    role: analyst
+    prompt: |
+      AI-DLC stage: Requirements Analysis (ALWAYS, adaptive depth). Read and follow
+      `.aidlc-rule-details/inception/requirements-analysis.md`. Read `vision.md` (+ reverse-engineering
+      artifacts if present). Produce `aidlc-docs/inception/requirements/requirements.md` and
+      `requirement-verification-questions.md`. Run autonomously: self-approve and continue.
+    tools: [Read, Write]
+    depends_on: [workspace-detection, reverse-engineering]
+
+  - id: user-stories
+    role: analyst
+    prompt: |
+      AI-DLC stage: User Stories (CONDITIONAL). Read and follow
+      `.aidlc-rule-details/inception/user-stories.md`. Perform the intelligent-assessment step; SKIP
+      (with justification) for pure internal/infra/doc changes. Otherwise produce
+      `aidlc-docs/inception/user-stories/stories.md` and `personas.md` from the requirements.
+    tools: [Read, Write]
+    depends_on: [requirements-analysis]
+
+  - id: workflow-planning
+    role: architect
+    prompt: |
+      AI-DLC stage: Workflow Planning (ALWAYS). Read and follow
+      `.aidlc-rule-details/inception/workflow-planning.md`. Decide which conditional stages run and at
+      what depth, then write `aidlc-docs/inception/plans/execution-plan.md` (the signal downstream
+      conditional nodes read) and `application-design-plan.md`. Validate any Mermaid before writing.
+    tools: [Read, Write]
+    depends_on: [requirements-analysis, user-stories]
+
+  - id: application-design
+    role: architect
+    prompt: |
+      AI-DLC stage: Application Design (CONDITIONAL). Read and follow
+      `.aidlc-rule-details/inception/application-design.md`. SKIP (with justification) if no new
+      components/methods are needed. Otherwise produce `aidlc-docs/inception/application-design/`:
+      components.md, component-methods.md, component-dependency.md, services.md.
+    tools: [Read, Write]
+    depends_on: [workflow-planning]
+
+  - id: units-generation
+    role: architect
+    prompt: |
+      AI-DLC stage: Units Generation (CONDITIONAL). Read and follow
+      `.aidlc-rule-details/inception/units-generation.md`. SKIP (with justification) if a single unit
+      suffices — v0.1.0 assumes ONE unit of work. Otherwise decompose into units under
+      aidlc-docs/inception/application-design/. (Multi-unit Construction fan-out is not yet executed.)
+    tools: [Read, Write]
+    depends_on: [application-design]
+
+  # ── 🟢 CONSTRUCTION (single unit) ────────────────────────────────────────────
+  - id: functional-design
+    role: engineer
+    prompt: |
+      AI-DLC stage: Functional Design (CONDITIONAL, per-unit). Read and follow
+      `.aidlc-rule-details/construction/functional-design.md`. SKIP (with justification) for simple
+      logic with no new business rules. Otherwise produce domain entities + business rules under
+      `aidlc-docs/construction/<unit>/functional-design/`.
+    tools: [Read, Write]
+    depends_on: [units-generation]
+
+  - id: nfr-requirements
+    role: engineer
+    prompt: |
+      AI-DLC stage: NFR Requirements (CONDITIONAL, per-unit). Read and follow
+      `.aidlc-rule-details/construction/nfr-requirements.md`. SKIP (with justification) if there are no
+      NFRs and the tech stack is fixed. Otherwise capture NFRs + tech-stack decisions under
+      `aidlc-docs/construction/shared/nfr-requirements/`.
+    tools: [Read, Write]
+    depends_on: [functional-design]
+
+  - id: nfr-design
+    role: engineer
+    prompt: |
+      AI-DLC stage: NFR Design (CONDITIONAL, per-unit). Read and follow
+      `.aidlc-rule-details/construction/nfr-design.md`. SKIP IF NFR Requirements was skipped. Otherwise
+      incorporate NFR patterns + logical components into the unit's design under aidlc-docs/construction/.
+    tools: [Read, Write]
+    depends_on: [nfr-requirements]
+
+  - id: infrastructure-design
+    role: engineer
+    prompt: |
+      AI-DLC stage: Infrastructure Design (CONDITIONAL, per-unit). Read and follow
+      `.aidlc-rule-details/construction/infrastructure-design.md`. SKIP (with justification) if there
+      are no infrastructure changes. Otherwise map logical components to infrastructure services under
+      aidlc-docs/construction/.
+    tools: [Read, Write]
+    depends_on: [nfr-design]
+
+  - id: code-generation
+    role: engineer
+    prompt: |
+      AI-DLC stage: Code Generation (ALWAYS, per-unit). Read and follow
+      `.aidlc-rule-details/construction/code-generation.md`. Part 1: write a detailed plan with exact
+      file paths to `aidlc-docs/construction/plans/`. Part 2: generate ALL application code in the
+      workspace (src/, tests/, package manifest) — complete, working files, not stubs. Read every
+      upstream aidlc-docs/ artifact first.
+    tools: [Read, Write, Edit, Bash]
+    depends_on: [infrastructure-design]
+
+  - id: build-and-test
+    role: engineer
+    prompt: |
+      AI-DLC stage: Build and Test (ALWAYS). Read and follow
+      `.aidlc-rule-details/construction/build-and-test.md`. Write build/unit/integration test
+      instructions under `aidlc-docs/construction/build-and-test/`, install dependencies, run the
+      suite, and fix-and-rerun until green. Write `build-and-test-summary.md` with results.
+    tools: [Read, Write, Edit, Bash]
+    depends_on: [code-generation]
+    gate: build-test   # deterministic ShellGate (registered in the CLI) re-runs tests; blocks on failure
