@@ -38,6 +38,7 @@ class ClaudeCodeExecutor(NodeExecutor):
         timeout: int = 1800,
         funding: str = "subscription",  # "subscription" (preferred) | "api"
         autonomous: bool = True,  # --dangerously-skip-permissions; headless AI-DLC needs it
+        model: str | None = None,  # default model for every node; a node's own `model` overrides it
     ):
         if funding not in ("subscription", "api"):
             raise ValueError(f"funding must be 'subscription' or 'api', got {funding!r}")
@@ -45,16 +46,22 @@ class ClaudeCodeExecutor(NodeExecutor):
         self.timeout = timeout
         self.funding = funding
         self.autonomous = autonomous
+        self.model = model
 
-    def run(self, node: Node, prompt: str, *, cwd: str, env=None) -> ExecutionResult:
+    def _build_cmd(self, node: Node, prompt: str) -> list[str]:
         # stream-json REQUIRES --verbose under --print, else the CLI errors out.
         cmd = [self.binary, "-p", prompt, "--output-format", "stream-json", "--verbose"]
         if self.autonomous:
             cmd.append("--dangerously-skip-permissions")
         if node.tools:
             cmd += ["--allowedTools", ",".join(node.tools)]
-        if node.model:
-            cmd += ["--model", node.model]
+        model = node.model or self.model  # a node's own model overrides the executor default
+        if model:
+            cmd += ["--model", model]
+        return cmd
+
+    def run(self, node: Node, prompt: str, *, cwd: str, env=None) -> ExecutionResult:
+        cmd = self._build_cmd(node, prompt)
 
         proc = subprocess.run(
             cmd,

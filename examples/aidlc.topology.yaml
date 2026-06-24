@@ -1,17 +1,18 @@
 # Cadora topology: the AWS AI-DLC method (awslabs/aidlc-workflows, rules v1.0.0)
 # run as a single autonomous session — the v0.1.0 shape (design decision A).
 #
-# This is what ships in v0.1.0: ONE node drives `claude -p` through the COMPLETE AI-DLC
-# lifecycle, validating the engine end-to-end (executor + build-test gate + run capture).
+# This is what ships in v0.1.0: ONE node drives a headless coding agent through the COMPLETE
+# AI-DLC lifecycle, validating the engine end-to-end (executor + build-test gate + run capture).
 # The per-stage DAG is the destination — see examples/aidlc-stages.topology.yaml.
 #
 # Prerequisites in the target workspace (Cadora's conductor sets these up):
-#   - CLAUDE.md            := aidlc-rules/aws-aidlc-rules/core-workflow.md  (auto-loaded by Claude Code)
+#   - CLAUDE.md / AGENTS.md := AI-DLC core workflow (selected by --executor)
 #   - .aidlc-rule-details/ := aidlc-rules/aws-aidlc-rule-details/*
 #   - vision.md            (your product vision; required input)
 #   - tech-env.md          (optional technical-environment input)
 #
 # Run:  cadora run examples/aidlc.topology.yaml --executor claude
+#       cadora run examples/aidlc.topology.yaml --executor codex --model gpt-5.4
 name: aidlc
 
 nodes:
@@ -19,9 +20,9 @@ nodes:
     role: aidlc-executor
     prompt: |
       Build the software described in `vision.md` by following the AI-DLC workflow from start
-      to finish. The workflow is already loaded as project memory (CLAUDE.md = the AI-DLC
-      core-workflow), with per-stage detail in `.aidlc-rule-details/` — read each stage's rule
-      before executing that stage.
+      to finish. The workflow is already loaded as project memory (`CLAUDE.md` for Claude Code
+      or `AGENTS.md` for Codex), with per-stage detail in `.aidlc-rule-details/` — read each
+      stage's rule before executing that stage.
 
       Execute the full lifecycle: Inception (Workspace Detection → Requirements Analysis →
       Workflow Planning → any conditional design stages) then Construction (Code Generation →

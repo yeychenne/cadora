@@ -1,0 +1,215 @@
+"""Deterministic toolchain-integrity evaluation for generated workspaces.
+
+The coding agent may adapt to an offline sandbox, but it must not impersonate a
+declared compiler, test runner, or package. This module detects the concrete
+failure modes observed in Cadora's Codex validation runs before an LLM repair
+pass is allowed to act on them.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class IntegrityFinding:
+    rule: str
+    severity: str
+    path: str
+    detail: str
+    evidence: str = ""
+
+
+@dataclass
+class IntegrityReport:
+    passed: bool
+    findings: list[IntegrityFinding] = field(default_factory=list)
+
+    @property
+    def blocking_count(self) -> int:
+        return sum(f.severity == "blocking" for f in self.findings)
+
+    @property
+    def warning_count(self) -> int:
+        return sum(f.severity == "warning" for f in self.findings)
+
+
+_SHADOW_DIRS = ("pytest", "setuptools", "pip", "typescript")
+_SHADOW_FILES = ("pytest.py", "setuptools.py", "pip.py", "tsc", "tsc.js", "tsc.mjs")
+_EXCLUDED_PARTS = {
+    ".aidlc-rule-details",
+    ".cadora",
+    ".git",
+    ".gocache",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".uv-cache",
+    ".venv",
+    "aidlc-docs",
+    "dist",
+    "node_modules",
+    "runs",
+}
+_KNOWN_TS_BUILDERS = re.compile(
+    r"(?:^|[\s/&|])(?:tsc|tsup|esbuild|swc|vite|rollup|bun\s+build|deno\s+task)(?:$|[\s/&|])"
+)
+_EXTERNAL_TOOL = re.compile(
+    r"(?P<path>/(?:private/)?tmp/[^\s`'\"]+/(?:\.venv/)?bin/"
+    r"(?:python(?:3(?:\.\d+)?)?|pytest|node|npm|npx|tsc))"
+)
+
+
+def scan_toolchain_integrity(workspace: str | Path) -> IntegrityReport:
+    """Return deterministic findings for suspicious toolchain substitutions."""
+    root = Path(workspace).resolve()
+    findings: list[IntegrityFinding] = []
+    findings.extend(_find_shadow_tools(root))
+    findings.extend(_find_typescript_build_substitutions(root))
+    findings.extend(_find_external_workspace_tools(root))
+    return IntegrityReport(
+        passed=not any(f.severity == "blocking" for f in findings),
+        findings=findings,
+    )
+
+
+def repair_prompt(report: IntegrityReport, gate_detail: str = "") -> str:
+    """Build a constrained prompt for one fresh repair session."""
+    finding_text = "\n".join(
+        f"- [{f.severity}] {f.rule} at {f.path}: {f.detail}"
+        + (f" Evidence: {f.evidence}" if f.evidence else "")
+        for f in report.findings
+    )
+    return f"""You are a fresh toolchain-integrity repair pass.
+
+Inspect the existing workspace and repair only the verification/toolchain issues below.
+
+Deterministic findings:
+{finding_text or "- No integrity finding; address the failing external gate only."}
+
+External gate output:
+{gate_detail or "(no gate output)"}
+
+Hard requirements:
+- Do not create or retain local packages or scripts that impersonate pytest, pip, setuptools,
+  TypeScript, tsc, npm, or another declared tool.
+- Do not weaken, delete, or bypass tests or the external gate.
+- Use a real installed toolchain or a normal declared dependency.
+- If the required toolchain is unavailable, leave the project truthfully BLOCKED and document the
+  missing prerequisite; never claim verification succeeded.
+- Preserve application behavior and the Cadora security baseline.
+- Re-run the exact relevant build/tests after repair and update the build-and-test summary.
+"""
+
+
+def _find_shadow_tools(root: Path) -> list[IntegrityFinding]:
+    findings: list[IntegrityFinding] = []
+    for name in _SHADOW_DIRS:
+        candidate = root / name
+        if candidate.is_dir():
+            findings.append(
+                IntegrityFinding(
+                    rule="shadowed-toolchain",
+                    severity="blocking",
+                    path=name,
+                    detail=f"repository-root directory shadows the real {name!r} package/tool",
+                )
+            )
+    for name in _SHADOW_FILES:
+        candidate = root / name
+        if candidate.is_file():
+            findings.append(
+                IntegrityFinding(
+                    rule="shadowed-toolchain",
+                    severity="blocking",
+                    path=name,
+                    detail=f"repository-root file shadows the real {name!r} package/tool",
+                )
+            )
+
+    for base_name in ("vendor", "scripts"):
+        base = root / base_name
+        if not base.is_dir():
+            continue
+        for candidate in base.rglob("*"):
+            if not candidate.is_file() or _excluded(candidate, root):
+                continue
+            lowered = candidate.name.lower()
+            if lowered in _SHADOW_FILES or lowered in {"pytest", "typescript", "tsc"}:
+                findings.append(
+                    IntegrityFinding(
+                        rule="vendored-toolchain-shim",
+                        severity="blocking",
+                        path=str(candidate.relative_to(root)),
+                        detail="local file appears to impersonate a standard build/test tool",
+                    )
+                )
+    return findings
+
+
+def _find_typescript_build_substitutions(root: Path) -> list[IntegrityFinding]:
+    package_file = root / "package.json"
+    if not package_file.is_file() or not _has_typescript_sources(root):
+        return []
+    try:
+        package = json.loads(package_file.read_text())
+    except json.JSONDecodeError:
+        return []
+    build = str((package.get("scripts") or {}).get("build") or "")
+    if not build or _KNOWN_TS_BUILDERS.search(build):
+        return []
+    return [
+        IntegrityFinding(
+            rule="typescript-build-substitution",
+            severity="blocking",
+            path="package.json",
+            detail="TypeScript sources are built by an unrecognized local script instead of a "
+            "declared compiler/bundler",
+            evidence=build,
+        )
+    ]
+
+
+def _find_external_workspace_tools(root: Path) -> list[IntegrityFinding]:
+    findings: list[IntegrityFinding] = []
+    docs = root / "aidlc-docs"
+    if not docs.is_dir():
+        return findings
+    for summary in docs.rglob("*summary*.md"):
+        text = summary.read_text(errors="replace")
+        for match in _EXTERNAL_TOOL.finditer(text):
+            tool_path = Path(match.group("path"))
+            try:
+                tool_path.resolve().relative_to(root)
+                continue
+            except (OSError, ValueError):
+                pass
+            findings.append(
+                IntegrityFinding(
+                    rule="external-workspace-toolchain",
+                    severity="blocking",
+                    path=str(summary.relative_to(root)),
+                    detail="verification used a tool from another temporary project workspace",
+                    evidence=match.group("path"),
+                )
+            )
+    return findings
+
+
+def _has_typescript_sources(root: Path) -> bool:
+    for base_name in ("src", "test", "tests"):
+        base = root / base_name
+        if base.is_dir() and any(not _excluded(p, root) for p in base.rglob("*.ts")):
+            return True
+    return False
+
+
+def _excluded(path: Path, root: Path) -> bool:
+    try:
+        parts = path.relative_to(root).parts
+    except ValueError:
+        return True
+    return any(part in _EXCLUDED_PARTS for part in parts)

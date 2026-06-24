@@ -1,6 +1,10 @@
 """Tests for AI-DLC workspace setup (rule vendoring + install)."""
 
-from cadora.workspace import rules_version, setup_aidlc_workspace
+from cadora.workspace import (
+    rules_version,
+    setup_aidlc_workspace,
+    workspace_instruction_file,
+)
 
 
 def test_installs_rules_and_inline_vision(tmp_path):
@@ -16,6 +20,29 @@ def test_claude_md_is_the_core_workflow(tmp_path):
     ws = setup_aidlc_workspace(tmp_path / "proj")
     text = (ws / "CLAUDE.md").read_text()
     assert "INCEPTION PHASE" in text and "CONSTRUCTION PHASE" in text
+    assert "AllowAdminCreateUserOnly=True" in text
+    assert "CreateServiceSpecificCredential" in text
+
+
+def test_codex_installs_agents_md_with_security_baseline(tmp_path):
+    ws = setup_aidlc_workspace(tmp_path / "proj", executor="codex")
+    instructions = (ws / "AGENTS.md").read_text()
+    assert "INCEPTION PHASE" in instructions
+    assert "AllowAdminCreateUserOnly=True" in instructions
+    assert "long-term Amazon Bedrock API keys" in instructions
+    assert not (ws / "CLAUDE.md").exists()
+    assert workspace_instruction_file("codex") == "AGENTS.md"
+
+
+def test_codex_preserves_existing_agents_instructions_on_refresh(tmp_path):
+    ws = tmp_path / "proj"
+    ws.mkdir()
+    (ws / "AGENTS.md").write_text("# Team rules\n\nKeep this line.\n")
+    setup_aidlc_workspace(ws, executor="codex")
+    setup_aidlc_workspace(ws, executor="codex")
+    instructions = (ws / "AGENTS.md").read_text()
+    assert instructions.count("<!-- cadora:aidlc:start -->") == 1
+    assert instructions.count("Keep this line.") == 1
 
 
 def test_vision_from_file_is_copied(tmp_path):

@@ -54,6 +54,25 @@ def test_command_flags_and_stdin():
     assert m.call_args.kwargs["stdin"] is subprocess.DEVNULL
 
 
+def test_global_model_flag_passed_when_node_has_none():
+    # regression: `cadora run --model X` -> ClaudeCodeExecutor(model=X) must reach the CLI.
+    _, m = _run('{"type":"result","is_error":false}', model="claude-sonnet-4-6")
+    cmd = m.call_args.args[0]
+    assert "--model" in cmd and cmd[cmd.index("--model") + 1] == "claude-sonnet-4-6"
+
+
+def test_node_model_overrides_executor_model():
+    node = Node(id="n1", tools=["Read"], model="claude-opus-4-8")
+    _, m = _run('{"type":"result","is_error":false}', node=node, model="claude-sonnet-4-6")
+    cmd = m.call_args.args[0]
+    assert cmd[cmd.index("--model") + 1] == "claude-opus-4-8"
+
+
+def test_no_model_means_no_model_flag():
+    _, m = _run('{"type":"result","is_error":false}')
+    assert "--model" not in m.call_args.args[0]
+
+
 def test_not_autonomous_omits_skip_permissions():
     _, m = _run('{"type":"result","is_error":false}', autonomous=False)
     assert "--dangerously-skip-permissions" not in m.call_args.args[0]

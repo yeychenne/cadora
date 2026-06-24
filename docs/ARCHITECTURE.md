@@ -4,7 +4,12 @@ Cadora implements the [AWS AI-DLC method](https://github.com/awslabs/aidlc-workf
 
 ## The AI-DLC workflow
 
-Cadora vendors the AWS AI-DLC rule-set (`awslabs/aidlc-workflows`, MIT-0) under `cadora/aidlc_rules/` and installs it into each run's workspace as `CLAUDE.md` (the core workflow, auto-loaded as project memory) + `.aidlc-rule-details/` (per-stage rules, read on demand). A run drives the agent through the method's three adaptive phases — 🔵 Inception → 🟢 Construction → 🟡 Operations — from a `vision.md`.
+Cadora vendors the AWS AI-DLC rule-set (`awslabs/aidlc-workflows`, MIT-0) under
+`cadora/aidlc_rules/` and installs it into each run's workspace using the backend-native project
+memory file: `CLAUDE.md` for Claude Code or `AGENTS.md` for Codex. The managed workflow block
+preserves pre-existing project instructions. Per-stage rules live in `.aidlc-rule-details/`.
+A run drives the agent through the method's three adaptive phases — 🔵 Inception →
+🟢 Construction → 🟡 Operations — from a `vision.md`.
 
 - **v0.1.0** runs the lifecycle as a **single autonomous session** (`examples/aidlc.topology.yaml`).
 - The **per-stage DAG** (`examples/aidlc-stages.topology.yaml`, one node per AI-DLC stage) is the destination — it makes the stage graph explicit, gate-able, and resumable.
@@ -13,14 +18,36 @@ Cadora vendors the AWS AI-DLC rule-set (`awslabs/aidlc-workflows`, MIT-0) under 
 
 `cadora.executors.NodeExecutor` is the seam. A node's `(prompt, tools, cwd)` goes in; a normalized `ExecutionResult` `(text, events, exit code, usage, cost, model)` comes out. Adding a backend is one class — so Cadora isn't vendor-locked and the same workflow can A/B across backends.
 
-| Backend | Command | Output | v0.1.0 |
+| Backend | Command | Output | v0.2.0 |
 |---|---|---|---|
 | `claude` (default) | `claude -p --output-format stream-json --verbose` | structured events + cost | ✅ shipping |
-| `codex` | `codex exec --json` | structured JSONL | seam / roadmap |
+| `codex` | `codex exec --json` | structured JSONL + usage | ✅ shipping |
 | `kiro` | `kiro-cli chat --no-interactive` | text + exit code | seam / roadmap |
 | `antigravity` | `agy -p` | text (transcript) | seam / roadmap (experimental) |
 
-v0.1.0 ships the **Claude Code** backend; the others are adapters behind the seam, on the roadmap (the same topology + archive serve all of them).
+v0.2.0 ships **Claude Code** and **Codex** publicly. Codex runs are ephemeral, ignore ambient user
+configuration for reproducibility, use `workspace-write`, and normalize `turn.completed` /
+`turn.failed` rather than trusting process exit status alone.
+
+## A second seam: a pluggable human-review surface (MCP)
+
+The AI-DLC method favors human review of the generated documents at key steps. Cadora makes that
+review point its own seam — the way `NodeExecutor` makes the *backend* pluggable, `cadora/mcp/`
+makes the *human-review surface* pluggable.
+
+- `cadora/mcp/channel.py` — `ReviewChannel`, a thread-safe rendezvous between the run thread and a
+  review front-end; `channel_review_fn()` adapts it to the runner's existing `review_fn(node, cwd)`
+  hook. No change to the runner, topology, gates, or archive.
+- `cadora/mcp/session.py` — `RunSession` drives `run_topology(hitl=True)` in a background thread so a
+  front-end can poll for gates and submit decisions while the run is in flight.
+- `cadora/mcp/server.py` — a [Model Context Protocol](https://modelcontextprotocol.io) server
+  (`cadora mcp`) exposing five tools: `start_run`, `review_gate`, `submit_review`, `get_artifact`,
+  `run_status`.
+
+Any MCP client can then be the reviewer: Claude Code, Claude Desktop, or the Codex CLI over **local
+stdio**, or a networked/hosted client over **streamable HTTP** (`--transport http`, localhost by
+default). The server is an optional extra (`pip install 'cadora[mcp]'`); the core has no MCP
+dependency. See [hitl-mcp.md](hitl-mcp.md).
 
 ## Funding (Claude Code)
 
@@ -33,6 +60,17 @@ Subscription by default: the executor removes an ambient `ANTHROPIC_API_KEY` fro
 ## Gates (deterministic-first)
 
 Per Anthropic's verification ranking (rules-based > visual > LLM-judge), gates are shell commands that **block** the run on non-zero exit. v0.1.0 ships a `build-test` gate; AI-DLC compliance + LLM-judge gates are on the roadmap.
+
+The private development line also has a deterministic **toolchain-integrity evaluator**. It detects
+repository-local packages or scripts impersonating tools such as `pytest`/`tsc`, unrecognized
+TypeScript build substitutions, and verification performed with another temporary project's
+environment. Modes are additive to the ordinary shell gate:
+
+- `audit` (default) records structured findings without blocking.
+- `enforce` blocks on integrity findings.
+- `repair` gives one fresh agent session the findings plus exact gate output, then reruns both the
+  deterministic scan and shell gate. If the toolchain is unavailable, the repair prompt requires a
+  truthful BLOCKED result rather than a counterfeit substitute.
 
 ## Archive (the knowledge layer)
 

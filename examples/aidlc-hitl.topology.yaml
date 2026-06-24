@@ -1,0 +1,50 @@
+# Cadora topology: AI-DLC with HUMAN-IN-THE-LOOP review gates.
+#
+# The AI-DLC method favours human review of the documents at key steps. This topology breaks the
+# lifecycle into three coarse stages so a human can review + comment between them. Run it with:
+#
+#   cadora run examples/aidlc-hitl.topology.yaml --vision vision.md --hitl
+#
+# With --hitl, Cadora pauses only at nodes marked `review: true` (here: `requirements` and
+# `design`). The operator explicitly approves, requests changes, or aborts. Requested changes rerun
+# the same stage before downstream work starts. Review decisions are recorded in human-review.md.
+# Without --hitl the topology runs autonomously end-to-end.
+name: aidlc-hitl
+
+nodes:
+  - id: requirements
+    role: analyst
+    prompt: |
+      AI-DLC — Inception, part 1. The AI-DLC workflow is loaded as backend-native project memory
+      (`CLAUDE.md` for Claude Code or `AGENTS.md` for Codex), with per-stage detail in
+      `.aidlc-rule-details/`. Read `vision.md`, then perform Workspace Detection, Requirements
+      Analysis, and Workflow Planning. Write the requirements and the execution plan under
+      `aidlc-docs/inception/` and update `aidlc-state.md`/`audit.md`.
+      STOP after planning — do NOT start application design and do NOT write any application code yet.
+      Write complete documents, not stubs, so a human can review them.
+    tools: [Read, Write, Bash]
+    review: true
+
+  - id: design
+    role: architect
+    prompt: |
+      AI-DLC — Inception, part 2. Read `aidlc-state.md` and the existing `aidlc-docs/inception/`
+      artifacts (requirements + plan). If human review comments are provided above, ADDRESS THEM
+      FIRST. Perform Application Design (components, methods, dependencies, services) and Units
+      Generation, writing to `aidlc-docs/inception/application-design/`; update `aidlc-state.md`.
+      STOP after design — do NOT write application code yet.
+    tools: [Read, Write, Bash]
+    depends_on: [requirements]
+    review: true
+
+  - id: construction
+    role: engineer
+    prompt: |
+      AI-DLC — Construction. Read `aidlc-state.md` and ALL `aidlc-docs/` artifacts. If human review
+      comments are provided above, ADDRESS THEM FIRST. Generate the complete application code in the
+      workspace, then Build and Test: write build/unit/integration test instructions under
+      `aidlc-docs/construction/`, install dependencies, run the suite, and fix-and-rerun until green;
+      write `build-and-test-summary.md`. Write complete, working files — not stubs.
+    tools: [Read, Write, Edit, Bash]
+    depends_on: [design]
+    gate: build-test

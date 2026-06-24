@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "cadora": {
+      "command": "cadora",
+      "args": ["mcp", "--transport", "stdio"]
+    }
+  }
+}

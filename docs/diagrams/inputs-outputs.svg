@@ -1,0 +1,47 @@
+<svg viewBox="0 0 980 440" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Segoe UI, Roboto, sans-serif" role="img">
+<title>Cadora inputs and outputs</title>
+<desc>Inputs are documents (vision, tech-env, topology, AI-DLC rules, HITL comments), the agent CLI on your subscription, and a workspace. Outputs are application code, aidlc-docs, a run archive, an integrity report, and optionally a deployed app.</desc>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<defs>
+<marker id="io" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#64748b"/></marker>
+</defs>
+<text x="28" y="34" font-size="23" font-weight="700" fill="#0f172a">Cadora — Inputs &amp; Outputs</text>
+<text x="28" y="58" font-size="13" fill="#64748b">What goes in - documents, an agent, a workspace - and what you get back.</text>
+
+<rect x="24" y="78" width="324" height="338" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="40" y="106" font-size="15" font-weight="700" fill="#0f172a">INPUTS</text>
+<text x="40" y="140" font-size="13" font-weight="700" fill="#334155">Documents</text>
+<text x="54" y="162" font-size="12" fill="#475569">vision.md - product intent</text>
+<text x="54" y="183" font-size="12" fill="#475569">tech-env.md - target stack</text>
+<text x="54" y="204" font-size="12" fill="#475569">topology.yaml - the run graph</text>
+<text x="54" y="225" font-size="12" fill="#475569">AI-DLC rules (vendored)</text>
+<text x="54" y="246" font-size="12" fill="#b45309">review comments (--hitl)</text>
+<text x="40" y="282" font-size="13" font-weight="700" fill="#334155">Agent (CLI / API)</text>
+<text x="54" y="304" font-size="12" fill="#475569">Claude Code or Codex</text>
+<text x="54" y="325" font-size="12" fill="#475569">on your subscription / API key</text>
+<text x="40" y="361" font-size="13" font-weight="700" fill="#334155">Workspace</text>
+<text x="54" y="383" font-size="12" fill="#475569">the directory it builds in</text>
+<text x="54" y="402" font-size="11" fill="#94a3b8">cloud creds withheld for code-gen</text>
+
+<rect x="398" y="200" width="172" height="96" rx="10" fill="#e0f2fe" stroke="#0ea5e9" stroke-width="2"/>
+<text x="484" y="240" font-size="16" font-weight="700" fill="#075985" text-anchor="middle">CADORA</text>
+<text x="484" y="262" font-size="12" fill="#0369a1" text-anchor="middle">the conductor</text>
+
+<rect x="620" y="78" width="340" height="338" rx="10" fill="#f0fdf4" stroke="#34d399" stroke-width="1.8"/>
+<text x="636" y="106" font-size="15" font-weight="700" fill="#065f46">OUTPUTS</text>
+<text x="636" y="140" font-size="13" font-weight="700" fill="#334155">application code</text>
+<text x="650" y="160" font-size="11.5" fill="#475569">any stack (Py / JS / Go / Swift / ...)</text>
+<text x="636" y="192" font-size="13" font-weight="700" fill="#334155">aidlc-docs/</text>
+<text x="650" y="212" font-size="11.5" fill="#475569">requirements / design / plans</text>
+<text x="650" y="230" font-size="11.5" fill="#475569">build &amp; test / audit / state</text>
+<text x="636" y="262" font-size="13" font-weight="700" fill="#334155">run archive</text>
+<text x="650" y="282" font-size="11.5" fill="#475569">manifest.json - ok/cost/model/turns</text>
+<text x="650" y="300" font-size="11.5" fill="#475569">gate / integrity / events / output</text>
+<text x="636" y="332" font-size="13" font-weight="700" fill="#334155">integrity.json</text>
+<text x="650" y="352" font-size="11.5" fill="#475569">toolchain findings + repair</text>
+<text x="636" y="384" font-size="13" font-weight="700" fill="#065f46">deployed app → AWS</text>
+<text x="650" y="403" font-size="11.5" fill="#94a3b8">Operations (roadmap)</text>
+
+<line x1="348" y1="248" x2="396" y2="248" stroke="#64748b" stroke-width="2.5" marker-end="url(#io)"/>
+<line x1="570" y1="248" x2="618" y2="248" stroke="#64748b" stroke-width="2.5" marker-end="url(#io)"/>
+</svg>

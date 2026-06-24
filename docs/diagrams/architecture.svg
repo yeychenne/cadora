@@ -1,0 +1,63 @@
+<svg viewBox="0 0 960 480" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Segoe UI, Roboto, sans-serif" role="img">
+<title>Cadora architecture</title>
+<desc>Inputs (vision, tech-env, topology) feed the Cadora conductor, which drives a coding-agent backend through the AI-DLC lifecycle and emits working code, AI-DLC docs, and a captured run archive; human review at the gates happens on any MCP client.</desc>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<defs>
+<marker id="ar" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#64748b"/></marker>
+</defs>
+<text x="28" y="36" font-size="23" font-weight="700" fill="#0f172a">Cadora — Architecture</text>
+<text x="28" y="60" font-size="13" fill="#64748b">An AI-DLC conductor: one product vision to the full delivery lifecycle, headless and captured.</text>
+
+<rect x="24" y="92" width="176" height="244" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="112" y="118" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">INPUTS</text>
+<text x="40" y="150" font-size="13" fill="#334155">vision.md</text>
+<text x="40" y="170" font-size="11" fill="#64748b">    product intent</text>
+<text x="40" y="198" font-size="13" fill="#334155">tech-env.md</text>
+<text x="40" y="218" font-size="11" fill="#64748b">    target stack</text>
+<text x="40" y="246" font-size="13" fill="#334155">topology.yaml</text>
+<text x="40" y="266" font-size="11" fill="#64748b">    the run graph</text>
+<text x="40" y="294" font-size="13" fill="#334155">AI-DLC rules</text>
+<text x="40" y="314" font-size="11" fill="#64748b">    (vendored)</text>
+
+<rect x="266" y="92" width="214" height="244" rx="10" fill="#e0f2fe" stroke="#0ea5e9" stroke-width="2"/>
+<text x="373" y="118" font-size="15" font-weight="700" fill="#075985" text-anchor="middle">CADORA — conductor</text>
+<text x="284" y="150" font-size="13" fill="#0f172a">- workspace + rules setup</text>
+<text x="284" y="180" font-size="13" fill="#0f172a">- runner (topo waves)</text>
+<text x="284" y="210" font-size="13" fill="#0f172a">- deterministic gates</text>
+<text x="284" y="240" font-size="13" fill="#0f172a">- toolchain integrity</text>
+<text x="298" y="258" font-size="11" fill="#475569">audit / enforce / repair</text>
+<text x="284" y="288" font-size="13" fill="#0f172a">- run archive</text>
+<text x="298" y="306" font-size="11" fill="#475569">manifest / cost / funding</text>
+<text x="284" y="326" font-size="13" fill="#0f172a">- HITL review · MCP</text>
+
+<rect x="546" y="92" width="158" height="244" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="625" y="118" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">AGENT BACKEND</text>
+<text x="562" y="152" font-size="13" fill="#334155">Claude Code</text>
+<text x="562" y="170" font-size="11" fill="#64748b">    claude -p</text>
+<text x="562" y="200" font-size="13" fill="#334155">Codex</text>
+<text x="562" y="218" font-size="11" fill="#64748b">    codex exec</text>
+<text x="562" y="256" font-size="11" fill="#475569">on your subscription</text>
+<text x="562" y="274" font-size="11" fill="#475569">(or API key)</text>
+<text x="562" y="306" font-size="11" fill="#475569">runs the AI-DLC:</text>
+<text x="562" y="323" font-size="11" fill="#475569">Inception-Construction</text>
+
+<rect x="770" y="92" width="166" height="244" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+<text x="853" y="118" font-size="15" font-weight="700" fill="#065f46" text-anchor="middle">OUTPUTS</text>
+<text x="786" y="152" font-size="13" fill="#334155">working app code</text>
+<text x="786" y="182" font-size="13" fill="#334155">aidlc-docs/</text>
+<text x="786" y="200" font-size="11" fill="#64748b">    reqs/design/tests</text>
+<text x="786" y="230" font-size="13" fill="#334155">run archive</text>
+<text x="786" y="248" font-size="11" fill="#64748b">    ok/cost/model/gate</text>
+<text x="786" y="278" font-size="13" fill="#334155">integrity report</text>
+<text x="786" y="308" font-size="13" fill="#334155">deployed app</text>
+<text x="786" y="326" font-size="11" fill="#64748b">    (Operations - roadmap)</text>
+
+<line x1="202" y1="214" x2="262" y2="214" stroke="#64748b" stroke-width="2" marker-end="url(#ar)"/>
+<line x1="482" y1="214" x2="542" y2="214" stroke="#64748b" stroke-width="2" marker-end="url(#ar)"/>
+<line x1="706" y1="214" x2="766" y2="214" stroke="#64748b" stroke-width="2" marker-end="url(#ar)"/>
+
+<text x="28" y="372" font-size="12" fill="#b45309">Roadmap (dashed):</text>
+<text x="155" y="372" font-size="12" fill="#64748b">Operations / cadora deploy - cadora eval - per-stage DAG concurrency</text>
+<line x1="24" y1="392" x2="936" y2="392" stroke="#e2e8f0" stroke-width="1"/>
+<text x="28" y="416" font-size="11.5" fill="#94a3b8">Two pluggable seams: NodeExecutor backend + cadora-mcp human-review surface (Claude / Codex / HTTP) - subscription-funded - every run captured.</text>
+</svg>

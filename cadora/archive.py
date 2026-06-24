@@ -14,6 +14,8 @@ from pathlib import Path
 
 from cadora.executors.base import ExecutionResult
 from cadora.gates import GateResult
+from cadora.integrity import IntegrityReport
+from cadora.review import ReviewResult, format_review_history
 
 
 class RunArchive:
@@ -33,6 +35,10 @@ class RunArchive:
         gate: GateResult | None = None,
         *,
         cwd: str | Path | None = None,
+        integrity: IntegrityReport | None = None,
+        repair: ExecutionResult | None = None,
+        reviews: list[ReviewResult] | None = None,
+        attempts: list[ExecutionResult] | None = None,
     ) -> None:
         node_dir = self.dir / result.node_id
         node_dir.mkdir(exist_ok=True)
@@ -42,6 +48,27 @@ class RunArchive:
                 "\n".join(json.dumps(e) for e in result.events)
             )
         entry = {k: v for k, v in asdict(result).items() if k != "events"}
+        if attempts and len(attempts) > 1:
+            attempt_dir = node_dir / "attempts"
+            attempt_dir.mkdir(exist_ok=True)
+            attempt_entries = []
+            for number, attempt in enumerate(attempts, start=1):
+                attempt_entry = {
+                    k: v for k, v in asdict(attempt).items() if k != "events"
+                }
+                attempt_entries.append(attempt_entry)
+                (attempt_dir / f"{number}-output.txt").write_text(attempt.text or "")
+                if attempt.events:
+                    (attempt_dir / f"{number}-events.jsonl").write_text(
+                        "\n".join(json.dumps(event) for event in attempt.events)
+                    )
+            entry["attempts"] = attempt_entries
+            costs = [
+                attempt.cost_usd
+                for attempt in attempts
+                if attempt.cost_usd is not None
+            ]
+            entry["cost_usd"] = sum(costs) if costs else None
         # Snapshot the AI-DLC artifacts the node wrote into its workspace, if any.
         if cwd is not None:
             src = Path(cwd) / "aidlc-docs"
@@ -53,6 +80,21 @@ class RunArchive:
                 entry["aidlc_docs"] = f"{result.node_id}/aidlc-docs"
         if gate is not None:
             entry["gate"] = asdict(gate)
+        if integrity is not None:
+            integrity_data = asdict(integrity)
+            entry["integrity"] = integrity_data
+            (node_dir / "integrity.json").write_text(json.dumps(integrity_data, indent=2))
+        if repair is not None:
+            repair_entry = {k: v for k, v in asdict(repair).items() if k != "events"}
+            entry["repair"] = repair_entry
+            (node_dir / "integrity-repair.txt").write_text(repair.text or "")
+            if repair.events:
+                (node_dir / "integrity-repair.events.jsonl").write_text(
+                    "\n".join(json.dumps(e) for e in repair.events)
+                )
+        if reviews:
+            entry["human_reviews"] = [asdict(review) for review in reviews]
+            (node_dir / "human-review.md").write_text(format_review_history(reviews))
         self.manifest["nodes"].append(entry)
 
     def finalize(self, ok: bool) -> Path:

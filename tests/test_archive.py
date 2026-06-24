@@ -4,6 +4,8 @@ import pytest
 
 from cadora.archive import RunArchive, list_runs, read_manifest
 from cadora.executors.base import ExecutionResult
+from cadora.gates import GateResult
+from cadora.review import REVIEW_APPROVE, ReviewResult
 
 
 def _archive(root, run_id, **node):
@@ -47,6 +49,41 @@ def test_cli_archive_show(tmp_path, capsys):
     cli.main(["archive", "show", "runY", "--archive-dir", str(tmp_path)])
     out = capsys.readouterr().out
     assert "runY" in out and "sonnet" in out and "funding=subscription" in out and "n1" in out
+
+
+def test_cli_archive_show_distinguishes_missing_prerequisite(tmp_path, capsys):
+    ar = RunArchive(tmp_path, "blocked", "codex", "aidlc")
+    ar.record(
+        ExecutionResult(node_id="n1", ok=True, exit_code=0),
+        GateResult(
+            name="build-test",
+            passed=False,
+            status="blocked_prerequisite",
+            missing_prerequisites=["pytest-cov"],
+        ),
+    )
+    ar.finalize(False)
+
+    import cadora.cli as cli
+
+    cli.main(["archive", "show", "blocked", "--archive-dir", str(tmp_path)])
+    assert "gate:build-test BLOCKED_PREREQUISITE" in capsys.readouterr().out
+
+
+def test_cli_archive_show_includes_structured_review(tmp_path, capsys):
+    ar = RunArchive(tmp_path, "reviewed", "codex", "aidlc")
+    ar.record(
+        ExecutionResult(node_id="n1", ok=True, exit_code=0),
+        reviews=[ReviewResult(REVIEW_APPROVE, timestamp="2026-06-23T00:00:00+00:00")],
+    )
+    ar.finalize(True)
+
+    import cadora.cli as cli
+
+    cli.main(["archive", "show", "reviewed", "--archive-dir", str(tmp_path)])
+    output = capsys.readouterr().out
+    assert "review:approve" in output
+    assert "human-review.md" in output
 
 
 def test_cli_archive_show_missing(tmp_path):

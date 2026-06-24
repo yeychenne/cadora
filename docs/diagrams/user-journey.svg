@@ -1,0 +1,58 @@
+<svg viewBox="0 0 980 380" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Segoe UI, Roboto, sans-serif" role="img">
+<title>Cadora user journey</title>
+<desc>Operator writes a vision, runs Cadora, which builds via the AI-DLC lifecycle with optional human review gates, then verifies, and the operator inspects or deploys the result.</desc>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<defs>
+<marker id="j" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#64748b"/></marker>
+</defs>
+<text x="28" y="36" font-size="23" font-weight="700" fill="#0f172a">Cadora — User Journey</text>
+<text x="28" y="60" font-size="13" fill="#64748b">From a one-page vision to an inspectable, deployed app - you stay in control at the review gates.</text>
+
+<rect x="392" y="78" width="210" height="56" rx="9" fill="#fffbeb" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="497" y="100" font-size="12.5" font-weight="700" fill="#b45309" text-anchor="middle">HITL review gate</text>
+<text x="497" y="118" font-size="10.5" fill="#92400e" text-anchor="middle">you review + comment the docs;</text>
+<text x="497" y="130" font-size="10.5" fill="#92400e" text-anchor="middle">comments feed the next stage</text>
+<line x1="497" y1="134" x2="497" y2="168" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#j)"/>
+
+<rect x="24" y="172" width="168" height="120" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+<circle cx="52" cy="200" r="14" fill="#0ea5e9"/><text x="52" y="205" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">1</text>
+<text x="76" y="205" font-size="15" font-weight="700" fill="#0f172a">Define</text>
+<text x="40" y="236" font-size="11.5" fill="#475569">write vision.md</text>
+<text x="40" y="256" font-size="11.5" fill="#475569">+ tech-env.md</text>
+<text x="40" y="278" font-size="10.5" fill="#94a3b8">the product intent</text>
+
+<rect x="216" y="172" width="168" height="120" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+<circle cx="244" cy="200" r="14" fill="#0ea5e9"/><text x="244" y="205" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">2</text>
+<text x="268" y="205" font-size="15" font-weight="700" fill="#0f172a">Run</text>
+<text x="232" y="236" font-size="11.5" fill="#475569">cadora run</text>
+<text x="232" y="256" font-size="11.5" fill="#475569">backend / funding</text>
+<text x="232" y="278" font-size="10.5" fill="#94a3b8">subscription default</text>
+
+<rect x="408" y="172" width="178" height="120" rx="10" fill="#e0f2fe" stroke="#0ea5e9" stroke-width="2"/>
+<circle cx="436" cy="200" r="14" fill="#0284c7"/><text x="436" y="205" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">3</text>
+<text x="460" y="205" font-size="15" font-weight="700" fill="#075985">Build</text>
+<text x="424" y="236" font-size="11.5" fill="#334155">AI-DLC lifecycle</text>
+<text x="424" y="256" font-size="11" fill="#475569">Inception - Construction</text>
+<text x="424" y="278" font-size="10" fill="#0284c7">reqs-design-code-test</text>
+
+<rect x="610" y="172" width="168" height="120" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+<circle cx="638" cy="200" r="14" fill="#0ea5e9"/><text x="638" y="205" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">4</text>
+<text x="662" y="205" font-size="15" font-weight="700" fill="#0f172a">Verify</text>
+<text x="626" y="236" font-size="11.5" fill="#475569">gate / integrity</text>
+<text x="626" y="256" font-size="11.5" fill="#475569">→ run archive</text>
+<text x="626" y="278" font-size="10.5" fill="#94a3b8">cost / model / result</text>
+
+<rect x="802" y="172" width="170" height="120" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+<circle cx="830" cy="200" r="14" fill="#059669"/><text x="830" y="205" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">5</text>
+<text x="854" y="205" font-size="14" font-weight="700" fill="#065f46">Inspect/Deploy</text>
+<text x="818" y="236" font-size="11.5" fill="#334155">archive show</text>
+<text x="818" y="256" font-size="11.5" fill="#334155">cdk deploy → AWS</text>
+<text x="818" y="278" font-size="10.5" fill="#94a3b8">a live app to inspect</text>
+
+<line x1="192" y1="232" x2="214" y2="232" stroke="#64748b" stroke-width="2" marker-end="url(#j)"/>
+<line x1="384" y1="232" x2="406" y2="232" stroke="#64748b" stroke-width="2" marker-end="url(#j)"/>
+<line x1="586" y1="232" x2="608" y2="232" stroke="#64748b" stroke-width="2" marker-end="url(#j)"/>
+<line x1="778" y1="232" x2="800" y2="232" stroke="#64748b" stroke-width="2" marker-end="url(#j)"/>
+
+<text x="28" y="338" font-size="11.5" fill="#94a3b8">Autonomous by default; with --hitl, step 3 pauses at each stage for your review — in the terminal or any MCP client (Claude Code/Desktop, Codex) — before continuing.</text>
+</svg>

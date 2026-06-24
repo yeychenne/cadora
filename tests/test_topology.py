@@ -2,7 +2,7 @@
 
 import pytest
 
-from cadora.topology import Node, Topology, topo_sort
+from cadora.topology import Node, Topology, load_topology, topo_sort
 
 
 def _topo(*nodes: Node) -> Topology:
@@ -38,3 +38,12 @@ def test_unknown_dependency_raises():
     t = _topo(Node(id="a", depends_on=["ghost"]))
     with pytest.raises(ValueError, match="unknown"):
         topo_sort(t)
+
+
+def test_loads_explicit_review_flag(tmp_path):
+    topology = tmp_path / "review.yaml"
+    topology.write_text(
+        "name: review\nnodes:\n  - id: requirements\n    review: true\n"
+    )
+    loaded = load_topology(topology)
+    assert loaded.nodes[0].review is True

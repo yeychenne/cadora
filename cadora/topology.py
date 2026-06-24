@@ -25,6 +25,7 @@ class Node:
     model: str | None = None  # optional per-node model pin
     cwd: str | None = None  # working dir for this node (defaults to run cwd)
     gate: str | None = None  # name of a post-step gate to run after this node
+    review: bool = False  # explicit human review point, activated by --hitl
 
 
 @dataclass

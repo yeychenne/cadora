@@ -1,6 +1,8 @@
 """End-to-end runner tests using a FakeExecutor (no real agent CLI)."""
 
 import json
+import shlex
+import sys
 
 import pytest
 
@@ -27,6 +29,21 @@ class FakeExecutor(NodeExecutor):
             cost_usd=0.01,
             meta={"funding_resolved": "subscription"},
         )
+
+
+class RepairExecutor(FakeExecutor):
+    def __init__(self, workspace):
+        super().__init__()
+        self.workspace = workspace
+
+    def run(self, node, prompt, *, cwd, env=None):
+        result = super().run(node, prompt, cwd=cwd, env=env)
+        if node.id.endswith("-integrity-repair"):
+            fake = self.workspace / "pytest"
+            for child in fake.iterdir():
+                child.unlink()
+            fake.rmdir()
+        return result
 
 
 def _topo(*nodes):
@@ -58,6 +75,35 @@ def test_failing_gate_blocks_run(tmp_path):
     manifest = json.loads((tmp_path / "runs" / "r2" / "manifest.json").read_text())
     assert manifest["ok"] is False
     assert manifest["nodes"][0]["gate"]["passed"] is False
+
+
+def test_missing_gate_prerequisite_has_structured_block_reason(tmp_path):
+    ex = FakeExecutor()
+    python = shlex.quote(sys.executable)
+    command = (
+        f"{python} -c \"import sys; "
+        "sys.stderr.write('error: unrecognized arguments: --cov=src'); sys.exit(4)\""
+    )
+    gates = {"build-test": ShellGate("build-test", command)}
+
+    with pytest.raises(SystemExit, match=r"missing prerequisite\(s\): pytest-cov"):
+        run_topology(
+            _topo(Node(id="a", prompt="A", gate="build-test")),
+            ex,
+            run_id="missing-prerequisite",
+            cwd=str(tmp_path),
+            archive_root=_runs(tmp_path),
+            gates=gates,
+            integrity_mode="repair",
+        )
+
+    manifest = json.loads(
+        (tmp_path / "runs" / "missing-prerequisite" / "manifest.json").read_text()
+    )
+    gate = manifest["nodes"][0]["gate"]
+    assert gate["status"] == "blocked_prerequisite"
+    assert gate["missing_prerequisites"] == ["pytest-cov"]
+    assert [call[0] for call in ex.calls] == ["a"]  # an LLM cannot repair missing infrastructure
 
 
 def test_passing_gate_allows_run(tmp_path):
@@ -121,3 +167,80 @@ def test_cli_run_wires_workspace_gate_and_executor(tmp_path, monkeypatch):
     manifest = json.loads((tmp_path / "runs" / "cli1" / "manifest.json").read_text())
     assert manifest["ok"] is True
     assert manifest["nodes"][0]["gate"]["passed"] is True
+
+
+def test_cli_run_installs_codex_project_memory(tmp_path, monkeypatch):
+    import cadora.cli as cli
+
+    topo = tmp_path / "t.yaml"
+    topo.write_text("name: t\nnodes:\n  - id: a\n    prompt: hi\n")
+    monkeypatch.setattr(cli, "get_executor", lambda name, **kw: FakeExecutor())
+    rc = cli.main(
+        [
+            "run",
+            str(topo),
+            "--executor",
+            "codex",
+            "--cwd",
+            str(tmp_path),
+            "--archive-dir",
+            _runs(tmp_path),
+            "--run-id",
+            "codex-cli",
+            "--vision",
+            "Build X.",
+        ]
+    )
+    assert rc == 0
+    assert (tmp_path / "AGENTS.md").is_file()
+    assert not (tmp_path / "CLAUDE.md").exists()
+
+
+def test_integrity_audit_records_but_does_not_block(tmp_path):
+    (tmp_path / "pytest").mkdir()
+    (tmp_path / "pytest" / "__init__.py").write_text("")
+    out = run_topology(
+        _topo(Node(id="a", prompt="A")),
+        FakeExecutor(),
+        run_id="integrity-audit",
+        cwd=str(tmp_path),
+        archive_root=_runs(tmp_path),
+        integrity_mode="audit",
+    )
+    manifest = json.loads((out / "manifest.json").read_text())
+    assert manifest["ok"] is True
+    assert manifest["nodes"][0]["integrity"]["passed"] is False
+    assert (out / "a" / "integrity.json").is_file()
+
+
+def test_integrity_enforce_blocks(tmp_path):
+    (tmp_path / "pytest").mkdir()
+    (tmp_path / "pytest" / "__init__.py").write_text("")
+    with pytest.raises(SystemExit, match="toolchain integrity blocked"):
+        run_topology(
+            _topo(Node(id="a", prompt="A")),
+            FakeExecutor(),
+            run_id="integrity-enforce",
+            cwd=str(tmp_path),
+            archive_root=_runs(tmp_path),
+            integrity_mode="enforce",
+        )
+
+
+def test_integrity_repair_runs_once_and_rescans(tmp_path):
+    (tmp_path / "pytest").mkdir()
+    (tmp_path / "pytest" / "__init__.py").write_text("")
+    executor = RepairExecutor(tmp_path)
+    out = run_topology(
+        _topo(Node(id="a", prompt="A")),
+        executor,
+        run_id="integrity-repair",
+        cwd=str(tmp_path),
+        archive_root=_runs(tmp_path),
+        integrity_mode="repair",
+    )
+    manifest = json.loads((out / "manifest.json").read_text())
+    assert [call[0] for call in executor.calls] == ["a", "a-integrity-repair"]
+    assert manifest["ok"] is True
+    assert manifest["nodes"][0]["integrity"]["passed"] is True
+    assert manifest["nodes"][0]["repair"]["ok"] is True
