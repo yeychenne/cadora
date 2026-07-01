@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+## v0.3.0 — 2026-06-27
+
+Observability and local-iteration release: see what a run is doing and what it cost, iterate
+offline, and productize the analyst front-end.
+
+### Added
+- **Run dashboard** — `cadora dashboard` serves a local web dashboard: active and recent runs,
+  token usage and cost by model, and a per-run **detail view** (DAG progress, node inspector,
+  activity timeline, output preview, and artifact list + text preview). Localhost-only with no
+  authentication — keep it on loopback or front it with TLS + auth before exposing. `cadora usage`
+  summarizes tokens and cost by model from the run archive. See [docs/dashboard.md](docs/dashboard.md).
+- **Live stage progress** — `cadora run` announces each node as it starts and emits an elapsed-time
+  heartbeat, so long autonomous runs show progress instead of going silent.
+- **Local fixture executor** — `--executor fixture` writes deterministic `aidlc-docs` with **no
+  external model call**, for private/offline HITL demos and CI.
+- **HITL quick-desktop front-end (Track B)** — a phase-aware desktop review surface for the
+  fail-closed HITL gates.
+- **Reusable analyst-frontend (FE-builder) topology** — `examples/analyst-frontend.topology.yaml`:
+  a domain-agnostic node that turns any deterministic case-scoring engine into engine + FastAPI
+  analyst API + Vite/React GUI + WeasyPrint PDF + a deterministic audit/explainability panel. An
+  optional `frontend.manifest.yaml` steers it (contract-first); discovery fills the rest. See
+  [docs/analyst-frontend.md](docs/analyst-frontend.md).
+
+### Fixed
+- **Gate cwd resolution** — prerequisite provisioning no longer doubles the path when `--cwd` is set.
+- **Version alignment** — `cadora.__version__` is back in sync with the packaged version (was `0.1.0`).
+- Dropped a private-doc reference from a shipped module docstring.
+
 ## v0.2.0 — 2026-06-24
 
 ### Added

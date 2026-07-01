@@ -7,7 +7,12 @@ record to the archive. A blocking gate failure (or executor failure) stops the r
 
 from __future__ import annotations
 
+import contextlib
+import itertools
 import sys
+import threading
+import time
+from dataclasses import asdict
 from pathlib import Path
 
 from cadora.archive import RunArchive
@@ -20,9 +25,42 @@ from cadora.review import (
     REVIEW_REQUEST_CHANGES,
     ReviewResult,
 )
+from cadora.telemetry import RunTelemetry
 from cadora.topology import Node, Topology, topo_sort
 
 MAX_REVIEW_REVISIONS = 3
+
+
+@contextlib.contextmanager
+def _stage_progress(node: Node, executor: NodeExecutor):
+    """Announce the running stage and show a live elapsed-time heartbeat.
+
+    The executor captures the agent's output, so without this the terminal is silent for the
+    minutes a stage takes. Heartbeat is TTY-only — it no-ops when output is piped or captured.
+    """
+    model = node.model or getattr(executor, "model", None) or "default model"
+    _log(f"▶ {node.id} · {model} · running… (generating documents; this can take a few minutes)")
+    stop = threading.Event()
+
+    def _beat() -> None:
+        if not sys.stderr.isatty():
+            return
+        spinner = itertools.cycle("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
+        start = time.monotonic()
+        while not stop.wait(0.5):
+            secs = int(time.monotonic() - start)
+            sys.stderr.write(f"\r  {next(spinner)} {node.id} running… {secs // 60}m{secs % 60:02d}s ")
+            sys.stderr.flush()
+        sys.stderr.write("\r" + " " * 60 + "\r")  # clear the heartbeat line
+        sys.stderr.flush()
+
+    beat = threading.Thread(target=_beat, daemon=True)
+    beat.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        beat.join(timeout=1)
 
 
 def run_topology(
@@ -36,6 +74,7 @@ def run_topology(
     integrity_mode: str = "audit",
     hitl: bool = False,
     review_fn=None,
+    construction_executor: NodeExecutor | None = None,
 ) -> Path:
     if integrity_mode not in {"off", "audit", "enforce", "repair"}:
         raise ValueError(f"invalid integrity mode: {integrity_mode!r}")
@@ -50,6 +89,8 @@ def run_topology(
         )
 
     archive = RunArchive(archive_root, run_id, executor.name, topology.name)
+    telemetry = RunTelemetry(archive_root, run_id, topology, executor.name)
+    telemetry.run_started()
     outputs: dict[str, str] = {}
     funding = getattr(executor, "funding", None)
     _log(
@@ -62,6 +103,12 @@ def run_topology(
         # TODO: run nodes within a wave concurrently — they are independent.
         for node in wave:
             node_cwd = node.cwd or cwd
+            # Phase-aware routing: construction nodes use a dedicated executor if configured.
+            node_executor = (
+                construction_executor
+                if construction_executor and node.phase == "construction"
+                else executor
+            )
             base_prompt = _render(node, outputs, reviews)
             revision_comments = ""
             review_history: list[ReviewResult] = []
@@ -74,7 +121,12 @@ def run_topology(
                         "\n\n## Human review of your previous attempt — revise this same stage\n"
                         + revision_comments
                     )
-                result = executor.run(node, prompt, cwd=node_cwd)
+                telemetry.node_started(
+                    node.id,
+                    model=node.model or getattr(node_executor, "model", None),
+                )
+                with _stage_progress(node, node_executor):
+                    result = node_executor.run(node, prompt, cwd=node_cwd)
                 attempt_results.append(result)
                 gate_result = gates[node.gate].check(node_cwd) if node.gate else None
                 integrity = (
@@ -91,7 +143,7 @@ def run_topology(
                         tools=node.tools,
                         model=node.model,
                     )
-                    repair_result = executor.run(
+                    repair_result = node_executor.run(
                         repair_node,
                         repair_prompt(
                             integrity or IntegrityReport(True),
@@ -129,15 +181,29 @@ def run_topology(
                     reason = _failure_reason(
                         node, result, gate_result, integrity_blocked, repair_failed
                     )
+                    telemetry.node_recorded(
+                        node.id,
+                        ok=False,
+                        model=result.model,
+                        cost_usd=result.cost_usd,
+                        usage=result.usage,
+                        gate=asdict(gate_result) if gate_result else None,
+                        integrity=asdict(integrity) if integrity else None,
+                        review=review_history[-1].decision if review_history else None,
+                        error=reason,
+                    )
+                    telemetry.run_completed(False, error=f"node {node.id!r}: {reason}")
                     _log(_node_line(node, result, gate_result, integrity, repair_result))
                     _log(f"✗ stopped at node {node.id!r}: {reason}  ->  {out}")
                     raise SystemExit(f"node {node.id!r}: {reason}")
 
                 if hitl and node.review:
+                    telemetry.review_waiting(node.id)
                     review = review_fn(node, node_cwd)
                     if not isinstance(review, ReviewResult):
                         raise TypeError("review_fn must return ReviewResult")
                     review_history.append(review)
+                    telemetry.review_resolved(node.id, review.decision)
                     if review.decision == REVIEW_REQUEST_CHANGES:
                         revisions = sum(
                             item.decision == REVIEW_REQUEST_CHANGES
@@ -154,6 +220,21 @@ def run_topology(
                                 attempts=attempt_results,
                             )
                             out = archive.finalize(False)
+                            telemetry.node_recorded(
+                                node.id,
+                                ok=False,
+                                model=result.model,
+                                cost_usd=result.cost_usd,
+                                usage=result.usage,
+                                gate=asdict(gate_result) if gate_result else None,
+                                integrity=asdict(integrity) if integrity else None,
+                                review=review.decision,
+                                error="human review revision limit exceeded",
+                            )
+                            telemetry.run_completed(
+                                False,
+                                error=f"node {node.id!r}: human review revision limit exceeded",
+                            )
                             raise SystemExit(
                                 f"node {node.id!r}: human review revision limit exceeded "
                                 f"-> {out}"
@@ -171,6 +252,21 @@ def run_topology(
                             attempts=attempt_results,
                         )
                         out = archive.finalize(False)
+                        telemetry.node_recorded(
+                            node.id,
+                            ok=False,
+                            model=result.model,
+                            cost_usd=result.cost_usd,
+                            usage=result.usage,
+                            gate=asdict(gate_result) if gate_result else None,
+                            integrity=asdict(integrity) if integrity else None,
+                            review=review.decision,
+                            error="human review aborted run",
+                        )
+                        telemetry.run_completed(
+                            False,
+                            error=f"node {node.id!r}: human review aborted run",
+                        )
                         raise SystemExit(
                             f"node {node.id!r}: human review aborted run -> {out}"
                         )
@@ -186,10 +282,21 @@ def run_topology(
                     reviews=review_history,
                     attempts=attempt_results,
                 )
+                telemetry.node_recorded(
+                    node.id,
+                    ok=True,
+                    model=result.model,
+                    cost_usd=result.cost_usd,
+                    usage=result.usage,
+                    gate=asdict(gate_result) if gate_result else None,
+                    integrity=asdict(integrity) if integrity else None,
+                    review=review_history[-1].decision if review_history else None,
+                )
                 _log(_node_line(node, result, gate_result, integrity, repair_result))
                 break
 
     out = archive.finalize(True)
+    telemetry.run_completed(True)
     _log(f"✓ run complete -> {out}")
     return out
 

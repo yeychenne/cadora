@@ -47,3 +47,35 @@ def test_loads_explicit_review_flag(tmp_path):
     )
     loaded = load_topology(topology)
     assert loaded.nodes[0].review is True
+
+
+def test_node_phase_defaults_to_inception():
+    n = Node(id="x")
+    assert n.phase == "inception"
+
+
+def test_invalid_phase_rejected():
+    with pytest.raises(ValueError, match="invalid phase"):
+        Node(id="x", phase="bogus")
+
+
+def test_loads_phase_from_yaml(tmp_path):
+    topology = tmp_path / "phased.yaml"
+    topology.write_text(
+        "name: phased\nnodes:\n"
+        "  - id: req\n    phase: inception\n    review: true\n"
+        "  - id: build\n    phase: construction\n    depends_on: [req]\n"
+    )
+    loaded = load_topology(topology)
+    assert loaded.nodes[0].phase == "inception"
+    assert loaded.nodes[1].phase == "construction"
+
+
+def test_phased_topology_example_loads():
+    from pathlib import Path
+    example = Path(__file__).parent.parent / "examples" / "aidlc-phased.topology.yaml"
+    if example.exists():
+        loaded = load_topology(example)
+        assert len(loaded.nodes) == 4
+        phases = [n.phase for n in loaded.nodes]
+        assert phases == ["inception", "inception", "construction", "construction"]

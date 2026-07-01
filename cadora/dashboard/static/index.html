@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cadora Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>Cadora</h1>
+        <p>Conductor runs and token consumption</p>
+      </div>
+      <button id="refresh" type="button">Refresh</button>
+    </header>
+
+    <main>
+      <section class="metrics" aria-label="Usage summary">
+        <div class="metric">
+          <span class="label">Runs</span>
+          <strong id="metric-runs">0</strong>
+        </div>
+        <div class="metric">
+          <span class="label">Generation Tokens</span>
+          <strong id="metric-generation">0</strong>
+        </div>
+        <div class="metric">
+          <span class="label">Context Tokens</span>
+          <strong id="metric-context">0</strong>
+        </div>
+        <div class="metric">
+          <span class="label">Cost</span>
+          <strong id="metric-cost">$0.0000</strong>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Active Runs</h2>
+          <span id="active-count">0 active</span>
+        </div>
+        <div id="active-runs" class="run-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Recent Runs</h2>
+          <span id="recent-count">0 runs</span>
+        </div>
+        <div id="recent-runs" class="run-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Usage By Model</h2>
+          <span>archive total</span>
+        </div>
+        <div id="usage-models" class="table"></div>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

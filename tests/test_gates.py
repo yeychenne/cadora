@@ -52,6 +52,26 @@ def test_auto_setup_uses_cached_isolated_python_environment(tmp_path):
     assert "provision: cached" in second.setup_detail
 
 
+def test_auto_setup_handles_relative_cwd(tmp_path, monkeypatch):
+    # Regression: a relative cwd must not double the provisioning paths — the gate-venv was created
+    # at <cwd>/<cwd>/.cadora and `pip install -r <cwd>/requirements-dev.txt` could not be opened.
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "requirements-dev.txt").write_text("")
+    command = (
+        "python -c \"import os, pathlib; "
+        "assert pathlib.Path(os.environ['VIRTUAL_ENV']).name == 'gate-venv'\""
+    )
+    monkeypatch.chdir(tmp_path)
+
+    result = ShellGate("test", command, setup_mode="auto").check("ws")  # RELATIVE cwd — the repro
+
+    assert result.status == GATE_PASSED
+    assert "Could not open requirements file" not in result.detail
+    assert (ws / ".cadora" / "gate-venv").is_dir()  # created at the correct, non-doubled path
+    assert not (ws / "ws").exists()  # no doubled path
+
+
 def test_auto_setup_failure_is_reported_without_running_gate(tmp_path):
     (tmp_path / "requirements-dev.txt").write_text("definitely-missing-cadora-package==0\n")
     gate = ShellGate(

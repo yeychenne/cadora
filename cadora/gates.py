@@ -96,6 +96,7 @@ def _prepare_python_gate(
     cwd: Path, wheelhouse: str | None
 ) -> tuple[dict[str, str], str, str] | None:
     """Provision a cached isolated Python gate environment when the project declares one."""
+    cwd = cwd.resolve()  # absolute: these paths are passed to subprocess(cwd=cwd); relative ones double
     requirements = _dev_requirements(cwd)
     if requirements is None:
         return None

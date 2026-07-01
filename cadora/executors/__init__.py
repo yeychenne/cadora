@@ -8,6 +8,7 @@ from cadora.executors.antigravity import AntigravityExecutor
 from cadora.executors.base import ExecutionResult, NodeExecutor
 from cadora.executors.claude_code import ClaudeCodeExecutor
 from cadora.executors.codex import CodexExecutor
+from cadora.executors.fixture import FixtureExecutor
 from cadora.executors.kiro import KiroExecutor
 
 _REGISTRY: dict[str, type[NodeExecutor]] = {
@@ -15,6 +16,7 @@ _REGISTRY: dict[str, type[NodeExecutor]] = {
     KiroExecutor.name: KiroExecutor,                # kiro — AWS/demo; plain text
     CodexExecutor.name: CodexExecutor,              # codex — OpenAI; structured JSONL
     AntigravityExecutor.name: AntigravityExecutor,  # antigravity — Google; EXPERIMENTAL (agy)
+    FixtureExecutor.name: FixtureExecutor,          # fixture — local deterministic demo/test backend
 }
 
 

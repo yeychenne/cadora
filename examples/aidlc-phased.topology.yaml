@@ -1,0 +1,41 @@
+name: aidlc-phased
+description: |
+  Full AI-DLC lifecycle with phase-aware executor routing.
+  Inception nodes are reviewed in the front-end (Quick Desktop / Claude Desktop).
+  Construction nodes route to the backend executor (Kiro / Claude Code / Codex).
+
+nodes:
+  - id: requirements
+    phase: inception
+    role: requirements-analysis
+    prompt: |
+      Read vision.md. Generate requirements.md following the AI-DLC
+      requirements-analysis rules in .aidlc-rule-details/inception/.
+    review: true
+
+  - id: design
+    phase: inception
+    role: application-design
+    depends_on: [requirements]
+    prompt: |
+      Based on requirements.md, generate the application design
+      following .aidlc-rule-details/inception/application-design.md.
+    review: true
+
+  - id: code-generation
+    phase: construction
+    role: code-generation
+    depends_on: [design]
+    prompt: |
+      Implement the design in application-components.md.
+      Follow .aidlc-rule-details/construction/code-generation.md.
+    gate: build-test
+
+  - id: build-test
+    phase: construction
+    role: build-and-test
+    depends_on: [code-generation]
+    prompt: |
+      Run the full build and test suite.
+      Follow .aidlc-rule-details/construction/build-and-test.md.
+    gate: build-test

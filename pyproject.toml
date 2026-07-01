@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cadora"
-version = "0.2.0"
+version = "0.3.0"
 description = "An AI-DLC workflow conductor — drive the AWS AI-DLC method on a headless coding agent (Claude Code), with deterministic gates and run capture."
 readme = "README.md"
 requires-python = ">=3.10"

@@ -10,13 +10,16 @@ Cadora is the **conductor**, not the agent: it doesn't implement the agent loop 
 and **OpenAI Codex** (`codex exec --json`, using your Codex login). Select either with
 `--executor claude` or `--executor codex`; both use the same AI-DLC topology, deterministic gates,
 toolchain-integrity evaluation, and run archive, so their results can be A/B-compared directly.
+For private demos, CI smoke tests, and policy-safe HITL walkthroughs, Cadora also includes a
+fully local deterministic fixture backend: `--executor fixture`. It writes small reviewable
+`aidlc-docs/` artifacts and never calls an external model service.
 
 Both backends ship in **v0.2.0** — Claude Code since v0.1.0, and OpenAI Codex promoted to a
 supported backend after live verification.
 
 ## Status
 
-**v0.2.0 — released** ([PyPI](https://pypi.org/project/cadora/)). Adds the pluggable **HITL review surface over MCP** (`cadora mcp` — Claude Code/Desktop, Codex, remote HTTP), the **OpenAI Codex** backend, gate-prerequisite provisioning, and toolchain integrity on top of the v0.1.0 conductor. Live-proven end-to-end — from a tiny CLI to a multi-stack AWS app (CDK + Lambda + Next.js, `cdk synth` + tests passing). `pytest` green, `ruff` clean, CI on Python 3.10–3.12.
+**v0.3.0**. Adds the **run dashboard** (`cadora dashboard` — live runs, token cost, and a per-run DAG/detail view), **live stage progress**, a local **fixture executor** (`--executor fixture`), a **HITL desktop** review surface, and the reusable **analyst-frontend** (FE-builder) topology — on top of the v0.2.0 MCP/Codex/integrity release. Live-proven end-to-end — from a tiny CLI to a multi-stack AWS app **deployed to AWS** (CDK + Lambda + API Gateway + Cognito; golden-path smoke test passing). `pytest` green, `ruff` clean, CI on Python 3.10–3.12.
 
 ## How it works
 
@@ -71,6 +74,22 @@ cadora run examples/aidlc.topology.yaml \
   --cwd ./my-project
 ```
 
+Private HITL demo with no external model call:
+
+```bash
+cadora run examples/aidlc-hitl.topology.yaml \
+  --executor fixture \
+  --hitl \
+  --cwd ./my-project
+```
+
+Inspect token usage/cost or watch runs live: `cadora usage --archive-dir runs` summarizes tokens and
+cost by model from the run archive, and `cadora dashboard` serves a small local web dashboard at
+`http://127.0.0.1:8765` with active runs, recent runs, usage by model, DAG progress, activity,
+outputs, and artifacts. The dashboard binds **localhost only** and has **no authentication** — keep
+it on loopback, or front it with TLS + authentication before exposing it beyond the host. See
+[docs/dashboard.md](docs/dashboard.md).
+
 Cadora installs the workflow into the backend-native project memory file: `CLAUDE.md` for Claude
 Code or `AGENTS.md` for Codex. Existing project instructions are preserved outside a managed block.
 Toolchain integrity defaults to non-blocking `audit`. Use `--integrity-mode enforce` to block local
@@ -96,6 +115,11 @@ besides the terminal, `cadora mcp` serves the review gate over the Model Context
 client — Claude Code, Claude Desktop, or the Codex CLI (local stdio), or a networked client over
 streamable HTTP. See [docs/hitl-mcp.md](docs/hitl-mcp.md).
 
+Beyond the AI-DLC lifecycle, `examples/analyst-frontend.topology.yaml` is a reusable, domain-agnostic node
+that turns any deterministic case-scoring engine into engine + FastAPI analyst API + Vite/React GUI +
+WeasyPrint PDF + a deterministic audit/explainability panel; an optional `frontend.manifest.yaml` steers it
+(contract-first). See [docs/analyst-frontend.md](docs/analyst-frontend.md).
+
 Scan any existing workspace without running an agent:
 
 ```bash
@@ -113,7 +137,7 @@ Cadora **defaults to your Claude Code subscription** — it removes any ambient 
 
 ## The AI-DLC method
 
-Cadora vendors the AWS AI-DLC rule-set ([`awslabs/aidlc-workflows`](https://github.com/awslabs/aidlc-workflows), MIT-0) under `cadora/aidlc_rules/` and installs it per run as backend-native project memory + `.aidlc-rule-details/` (per-stage rules). v0.1.0 drives the lifecycle as a **single autonomous session** (`examples/aidlc.topology.yaml`); the **per-stage DAG** (`examples/aidlc-stages.topology.yaml`, one node per stage) is the roadmap.
+Cadora vendors the AWS AI-DLC rule-set ([`awslabs/aidlc-workflows`](https://github.com/awslabs/aidlc-workflows), MIT-0) under `cadora/aidlc_rules/` and installs it per run as backend-native project memory + `.aidlc-rule-details/` (per-stage rules). Cadora drives the lifecycle as a **single autonomous session** (`examples/aidlc.topology.yaml`) or as a **per-stage DAG** (`examples/aidlc-stages.topology.yaml`, one node per stage), with optional fail-closed **HITL** gates (`--hitl`) and a local **run dashboard** (`cadora dashboard`) for live progress, token cost, and per-run inspection.
 
 ## Architecture
 

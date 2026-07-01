@@ -26,6 +26,7 @@ class FakeExecutor(NodeExecutor):
             ok=self.ok,
             exit_code=0 if self.ok else 1,
             text=f"out-{node.id}",
+            usage={"input_tokens": 10, "output_tokens": 5},
             cost_usd=0.01,
             meta={"funding_resolved": "subscription"},
         )
@@ -64,6 +65,29 @@ def test_runs_in_dependency_order_and_threads_outputs(tmp_path):
     assert manifest["ok"] is True
     assert [n["node_id"] for n in manifest["nodes"]] == ["a", "b"]
     assert manifest["nodes"][0]["cost_usd"] == 0.01
+    status = json.loads((out / "status.json").read_text())
+    assert status["status"] == "completed"
+    assert status["nodes"]["a"]["status"] == "completed"
+    assert status["nodes"]["a"]["generation_tokens"] == 15
+    events = [json.loads(line) for line in (out / "run-events.jsonl").read_text().splitlines()]
+    assert [event["type"] for event in events] == [
+        "run_started",
+        "node_started",
+        "node_completed",
+        "node_started",
+        "node_completed",
+        "run_completed",
+    ]
+
+
+def test_run_announces_each_stage(tmp_path, capsys):
+    # progress visibility: each stage prints a "▶ <node>" announce before it runs
+    ex = FakeExecutor()
+    t = _topo(Node(id="a"), Node(id="b", depends_on=["a"]))
+    run_topology(t, ex, run_id="r", cwd=str(tmp_path), archive_root=_runs(tmp_path))
+    err = capsys.readouterr().err
+    assert "▶ a · " in err
+    assert "▶ b · " in err
 
 
 def test_failing_gate_blocks_run(tmp_path):
@@ -75,6 +99,9 @@ def test_failing_gate_blocks_run(tmp_path):
     manifest = json.loads((tmp_path / "runs" / "r2" / "manifest.json").read_text())
     assert manifest["ok"] is False
     assert manifest["nodes"][0]["gate"]["passed"] is False
+    status = json.loads((tmp_path / "runs" / "r2" / "status.json").read_text())
+    assert status["status"] == "failed"
+    assert status["nodes"]["a"]["status"] == "failed"
 
 
 def test_missing_gate_prerequisite_has_structured_block_reason(tmp_path):

@@ -14,6 +14,7 @@ from cadora.executors import get_executor
 from cadora.gates import ShellGate
 from cadora.runner import run_topology
 from cadora.topology import load_topology
+from cadora.usage import summarize_usage
 
 
 def _default_run_id() -> str:
@@ -78,6 +79,13 @@ def cmd_mcp(args) -> int:
     from cadora.mcp.server import serve
 
     serve(transport=args.transport, host=args.host, port=args.port)
+    return 0
+
+
+def cmd_dashboard(args) -> int:
+    from cadora.dashboard.server import serve_dashboard
+
+    serve_dashboard(args.archive_dir, host=args.host, port=args.port)
     return 0
 
 
@@ -213,6 +221,47 @@ def cmd_archive_show(args) -> int:
     return 0
 
 
+def _fmt_tokens(value: int) -> str:
+    if value >= 1_000_000:
+        return f"{value / 1_000_000:.2f}M"
+    if value >= 1_000:
+        return f"{value / 1_000:.1f}k"
+    return str(value)
+
+
+def cmd_usage(args) -> int:
+    try:
+        summary = summarize_usage(args.archive_dir, since=args.since)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    if args.json:
+        print(json.dumps(summary.to_dict(), indent=2))
+        return 0
+    window = f" since {summary.since}" if summary.since else ""
+    print(f"usage{window}: {summary.run_count} run(s), {summary.node_count} node(s)")
+    print(
+        "  tokens: "
+        f"input={_fmt_tokens(summary.input_tokens)}  "
+        f"output={_fmt_tokens(summary.output_tokens)}  "
+        f"cache_create={_fmt_tokens(summary.cache_creation_input_tokens)}  "
+        f"cache_read={_fmt_tokens(summary.cache_read_input_tokens)}"
+    )
+    print(
+        f"  totals: generation={_fmt_tokens(summary.generation_tokens)}  "
+        f"context={_fmt_tokens(summary.context_tokens)}  "
+        f"cost=${summary.cost_usd:.4f}"
+    )
+    if summary.by_model:
+        print("  by model:")
+        for item in summary.by_model:
+            print(
+                f"    {item['model']:<24} "
+                f"{_fmt_tokens(item['context_tokens']):>8} context  "
+                f"${item['cost_usd']:.4f}"
+            )
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="cadora", description="AI-DLC workflow conductor")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -302,6 +351,16 @@ def main(argv=None) -> int:
     m.add_argument("--port", type=int, default=8000, help="bind port for --transport http")
     m.set_defaults(func=cmd_mcp)
 
+    dash = sub.add_parser("dashboard", help="serve a lightweight local run dashboard")
+    dash.add_argument("--archive-dir", default="runs")
+    dash.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="bind host (default: 127.0.0.1)",
+    )
+    dash.add_argument("--port", type=int, default=8765, help="bind port (default: 8765)")
+    dash.set_defaults(func=cmd_dashboard)
+
     integrity = sub.add_parser(
         "integrity",
         help="scan a workspace for counterfeit or substituted build/test tooling",
@@ -319,6 +378,16 @@ def main(argv=None) -> int:
     ash.add_argument("run_id")
     ash.add_argument("--archive-dir", default="runs")
     ash.set_defaults(func=cmd_archive_show)
+
+    usage = sub.add_parser("usage", help="summarize token and cost usage from run archives")
+    usage.add_argument("--archive-dir", default="runs")
+    usage.add_argument(
+        "--since",
+        default=None,
+        help="optional cutoff: ISO timestamp, Nd (days), or Nh (hours)",
+    )
+    usage.add_argument("--json", action="store_true", help="emit the structured summary")
+    usage.set_defaults(func=cmd_usage)
 
     a = sub.add_parser("aidlc-init", help="set up an AI-DLC workspace (rules + inputs)")
     a.add_argument("workspace")

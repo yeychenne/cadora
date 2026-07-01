@@ -15,10 +15,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
+VALID_PHASES = ("inception", "construction", "operations")
+
+
 @dataclass
 class Node:
     id: str
     role: str = ""
+    phase: str = "inception"  # "inception" | "construction" | "operations"
     prompt: str = ""
     tools: list[str] = field(default_factory=list)  # per-node tool allowlist
     depends_on: list[str] = field(default_factory=list)
@@ -26,6 +30,12 @@ class Node:
     cwd: str | None = None  # working dir for this node (defaults to run cwd)
     gate: str | None = None  # name of a post-step gate to run after this node
     review: bool = False  # explicit human review point, activated by --hitl
+
+    def __post_init__(self) -> None:
+        if self.phase not in VALID_PHASES:
+            raise ValueError(
+                f"node {self.id!r}: invalid phase {self.phase!r}; expected one of {VALID_PHASES}"
+            )
 
 
 @dataclass
