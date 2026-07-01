@@ -20,6 +20,7 @@ from pathlib import Path
 GATE_PASSED = "passed"
 GATE_FAILED = "failed"
 GATE_BLOCKED_PREREQUISITE = "blocked_prerequisite"
+GATE_VACUOUS = "vacuous"
 
 
 @dataclass
@@ -74,16 +75,21 @@ class ShellGate:
         )
         detail = (proc.stdout + proc.stderr)[-4000:]
         missing = _missing_prerequisites(detail)
-        status = (
-            GATE_PASSED
-            if proc.returncode == 0
-            else GATE_BLOCKED_PREREQUISITE
-            if missing
-            else GATE_FAILED
-        )
+        if proc.returncode == 0:
+            # Substance, not presence: a gate that invoked a test runner but executed ZERO
+            # tests (e.g. `go test` / `cargo test` / `jest --passWithNoTests` all exit 0 with
+            # no tests) verified nothing — refuse to pass it.
+            if _invokes_test_runner(self.command) and _ran_zero_tests(detail):
+                passed, status = False, GATE_VACUOUS
+            else:
+                passed, status = True, GATE_PASSED
+        elif missing:
+            passed, status = False, GATE_BLOCKED_PREREQUISITE
+        else:
+            passed, status = False, GATE_FAILED
         return GateResult(
             name=self.name,
-            passed=proc.returncode == 0,
+            passed=passed,
             detail=detail,
             status=status,
             exit_code=proc.returncode,
@@ -167,6 +173,46 @@ def _is_python_gate(command: str) -> bool:
     )
 
 
+_TEST_RUNNER = re.compile(
+    r"(?:^|[\s/&|=])(?:pytest|py\.test|jest|vitest|mocha|"
+    r"go\s+test|cargo\s+test|swift\s+test|deno\s+test|rspec|"
+    r"npm\s+(?:run\s+)?test|yarn\s+(?:run\s+)?test|pnpm\s+(?:run\s+)?test)(?:$|[\s/&|])",
+    re.IGNORECASE,
+)
+# At least one test actually executed — guards the vacuous check against false positives
+# (e.g. a multi-package `go test ./...` where only some packages carry tests).
+_TESTS_RAN = re.compile(
+    r"\b[1-9]\d*\s+(?:passed|passing|failed)\b"
+    r"|^ok\s+\S+\s"
+    r"|^---\s+(?:PASS|FAIL)\b"
+    r"|^test\s+.+\.\.\.\s+ok\b",
+    re.IGNORECASE | re.MULTILINE,
+)
+# Explicit "no tests executed" signals across runners.
+_NO_TESTS = re.compile(
+    r"no tests ran"
+    r"|collected 0 items"
+    r"|\bno test files\b"
+    r"|running 0 tests"
+    r"|no tests found"
+    r"|tests:\s+0 total"
+    r"|\b0 passing\b"
+    r"|executed 0 of 0",
+    re.IGNORECASE,
+)
+
+
+def _invokes_test_runner(command: str) -> bool:
+    return bool(_TEST_RUNNER.search(command))
+
+
+def _ran_zero_tests(detail: str) -> bool:
+    """True when a passing test gate executed no tests at all (a vacuous pass)."""
+    if _TESTS_RAN.search(detail):
+        return False
+    return bool(_NO_TESTS.search(detail))
+
+
 def _requirements_fingerprint(cwd: Path, requirements: Path, wheelhouse: str | None) -> str:
     digest = hashlib.sha256()
     digest.update(requirements.read_bytes())
@@ -184,6 +230,9 @@ _MISSING_PATTERNS = (
     re.compile(r"(?P<name>[\w.-]+):\s*command not found", re.IGNORECASE),
     re.compile(r"Could not find a version that satisfies the requirement (?P<name>[\w.-]+)"),
     re.compile(r"No matching distribution found for (?P<name>[\w.-]+)"),
+    re.compile(r"Cannot find module ['\"](?P<name>[^'\"]+)"),  # node
+    re.compile(r"no required module provides package (?P<name>[^\s;:]+)"),  # go modules
+    re.compile(r"can't find crate for `(?P<name>[\w-]+)`"),  # rust
 )
 
 

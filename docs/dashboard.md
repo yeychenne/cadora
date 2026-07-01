@@ -63,7 +63,10 @@ The home page at `/` shows:
 - generation tokens
 - context tokens, including cache read/create tokens
 - reported cost
-- usage by model
+- a **FinOps** panel: a token split (input / output / cache), a **cost-by-day** trend, and cost
+  broken down **by model, by executor, and by funding** — each with a cost bar. A time-window
+  toggle (all / 30d / 7d) narrows every breakdown; the window is applied server-side over the run
+  archive (the same filter as `cadora usage --since`).
 
 Each run card links to a run detail page:
 
@@ -76,7 +79,10 @@ http://127.0.0.1:8765/runs/<run-id>
 The run detail page is the operator view for one conductor run. It shows:
 
 - run status, executor, topology, cost, and node count
-- a DAG progress canvas with arrows between dependent nodes
+- a DAG progress canvas with arrows between dependent nodes, where each node box is a
+  cost-and-quality map: it carries the node's **cost and context tokens** and **badges for its gate,
+  toolchain-integrity, and human-review outcomes** — so a `gate vacuous` or `gate blocked_prerequisite`
+  badge surfaces a construction gate that did not truly pass, right on the node
 - clickable node boxes
 - selected-node facts: model, cost, context tokens, review state
 - activity timeline

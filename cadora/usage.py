@@ -40,6 +40,8 @@ class UsageSummary:
     cost_usd: float
     by_model: list[dict]
     by_executor: list[dict]
+    by_funding: list[dict]
+    by_day: list[dict]
     nodes: list[NodeUsage]
 
     def to_dict(self) -> dict:
@@ -60,10 +62,19 @@ def summarize_usage(
         for manifest in list_runs(archive_root)
         if _include_manifest(manifest, cutoff)
     ]
-    nodes = [node for manifest in manifests for node in normalize_manifest_usage(manifest)]
+    nodes: list[NodeUsage] = []
+    days: dict[str, dict] = {}
+    for manifest in manifests:
+        run_nodes = normalize_manifest_usage(manifest)
+        nodes.extend(run_nodes)
+        key = _day_key(manifest)
+        day = days.get(key)
+        if day is None:
+            day = days[key] = _empty_day(key)
+        day["run_count"] += 1
+        for node in run_nodes:
+            _add_node_to_day(day, node)
 
-    by_model = _group(nodes, "model")
-    by_executor = _group(nodes, "executor")
     return UsageSummary(
         since=cutoff.isoformat() if cutoff else None,
         run_count=len(manifests),
@@ -75,8 +86,10 @@ def summarize_usage(
         generation_tokens=sum(n.generation_tokens for n in nodes),
         context_tokens=sum(n.context_tokens for n in nodes),
         cost_usd=sum(n.cost_usd or 0.0 for n in nodes),
-        by_model=by_model,
-        by_executor=by_executor,
+        by_model=_group(nodes, "model"),
+        by_executor=_group(nodes, "executor"),
+        by_funding=_group(nodes, "funding"),
+        by_day=[days[key] for key in sorted(days)],
         nodes=nodes,
     )
 
@@ -188,6 +201,29 @@ def _group(nodes: list[NodeUsage], field: str) -> list[dict]:
         bucket["context_tokens"] += node.context_tokens
         bucket["cost_usd"] += node.cost_usd or 0.0
     return sorted(groups.values(), key=lambda item: item["context_tokens"], reverse=True)
+
+
+def _day_key(manifest: dict) -> str:
+    moment = _manifest_time(manifest)
+    return moment.date().isoformat() if moment else "undated"
+
+
+def _empty_day(day: str) -> dict:
+    return {
+        "day": day,
+        "run_count": 0,
+        "node_count": 0,
+        "generation_tokens": 0,
+        "context_tokens": 0,
+        "cost_usd": 0.0,
+    }
+
+
+def _add_node_to_day(day: dict, node: NodeUsage) -> None:
+    day["node_count"] += 1
+    day["generation_tokens"] += node.generation_tokens
+    day["context_tokens"] += node.context_tokens
+    day["cost_usd"] += node.cost_usd or 0.0
 
 
 def _int(value) -> int:

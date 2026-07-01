@@ -7,7 +7,14 @@ from cadora.executors.base import ExecutionResult
 from cadora.usage import normalize_manifest_usage, summarize_usage
 
 
-def _archive(root, run_id="run-20260626-090000"):
+def _archive(
+    root,
+    run_id="run-20260626-090000",
+    *,
+    cost=0.25,
+    model="claude-sonnet-4-6",
+    funding="subscription",
+):
     ar = RunArchive(root, run_id, "claude", "aidlc")
     ar.record(
         ExecutionResult(
@@ -20,9 +27,9 @@ def _archive(root, run_id="run-20260626-090000"):
                 "cache_creation_input_tokens": 30,
                 "cache_read_input_tokens": 40,
             },
-            cost_usd=0.25,
-            model="claude-sonnet-4-6",
-            meta={"funding_resolved": "subscription"},
+            cost_usd=cost,
+            model=model,
+            meta={"funding_resolved": funding},
         )
     )
     ar.finalize(True)
@@ -54,6 +61,26 @@ def test_summarize_usage_groups_by_model_and_executor(tmp_path):
     assert summary.cost_usd == 0.25
     assert summary.by_model[0]["model"] == "claude-sonnet-4-6"
     assert summary.by_executor[0]["executor"] == "claude"
+    assert summary.by_funding[0]["funding"] == "subscription"
+    assert summary.by_day[0]["day"] == "2026-06-26"
+
+
+def test_summarize_usage_by_funding_and_by_day(tmp_path):
+    _archive(tmp_path, "run-20260626-090000", cost=0.25, funding="subscription")
+    _archive(tmp_path, "run-20260627-101500", cost=0.75, funding="api")
+
+    summary = summarize_usage(tmp_path)
+
+    assert summary.run_count == 2
+    fundings = {row["funding"]: row["cost_usd"] for row in summary.by_funding}
+    assert fundings == {"subscription": 0.25, "api": 0.75}
+
+    days = {row["day"]: row for row in summary.by_day}
+    assert set(days) == {"2026-06-26", "2026-06-27"}
+    assert days["2026-06-27"]["cost_usd"] == 0.75
+    assert days["2026-06-27"]["run_count"] == 1
+    # by_day is sorted ascending by date
+    assert [row["day"] for row in summary.by_day] == ["2026-06-26", "2026-06-27"]
 
 
 def test_cli_usage_json(tmp_path, capsys):

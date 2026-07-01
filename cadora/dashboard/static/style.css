@@ -286,7 +286,7 @@ main {
   color: #063b21;
   display: grid;
   gap: 3px;
-  min-height: 56px;
+  min-height: 88px;
   padding: 7px 10px;
   position: absolute;
   width: 170px;
@@ -465,6 +465,176 @@ pre {
   }
 
   .activity-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Topology: per-node badges + cost/token footer --------------------- */
+.dag-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.badge {
+  background: #26324a;
+  border-radius: 4px;
+  color: #cdd7e5;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 5px;
+}
+
+.badge.ok {
+  background: #0f5132;
+  color: var(--green-soft);
+}
+
+.badge.warn {
+  background: #5a4a15;
+  color: var(--amber);
+}
+
+.badge.bad {
+  background: #5a1622;
+  color: var(--red);
+}
+
+.dag-foot {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+/* --- FinOps panel ------------------------------------------------------ */
+.since-toggle {
+  display: flex;
+  gap: 6px;
+}
+
+.since-toggle button {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.since-toggle button.active {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.finops-top {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  margin-bottom: 16px;
+}
+
+.finops-block {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.split em {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+.finops-cols {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.finops-cols > div > .label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.cost-row {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(56px, 0.7fr) minmax(50px, 1fr) auto;
+  font-size: 13px;
+  padding: 7px 0;
+}
+
+.cost-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar {
+  background: #0d1526;
+  border-radius: 999px;
+  display: block;
+  height: 8px;
+  overflow: hidden;
+}
+
+.bar > span {
+  background: linear-gradient(90deg, var(--blue), var(--green));
+  display: block;
+  height: 100%;
+}
+
+.daily {
+  align-items: end;
+  display: flex;
+  gap: 4px;
+  height: 92px;
+  margin-top: 10px;
+}
+
+.daily-col {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  height: 100%;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.daily-fill {
+  background: linear-gradient(180deg, var(--green-soft), var(--blue));
+  border-radius: 3px 3px 0 0;
+  display: block;
+  width: 68%;
+}
+
+.daily-col small {
+  color: var(--muted);
+  font-size: 10px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .finops-top,
+  .finops-cols {
     grid-template-columns: 1fr;
   }
 }

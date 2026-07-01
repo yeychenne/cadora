@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cadora"
-version = "0.3.0"
+version = "0.4.0"
 description = "An AI-DLC workflow conductor — drive the AWS AI-DLC method on a headless coding agent (Claude Code), with deterministic gates and run capture."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -28,6 +28,25 @@ Repository = "https://github.com/yeychenne/cadora"
 
 [tool.hatch.build.targets.wheel]
 packages = ["cadora"]
+
+[tool.hatch.build.targets.sdist]
+# ALLOWLIST — only the files listed below ship in the PyPI source distribution. Hatchling's VCS
+# default would otherwise ship every tracked file, including internal planning and design docs.
+# Anything not listed here is excluded.
+include = [
+  "/cadora",
+  "/examples",
+  "/tests",
+  "/docs",
+  "/README.md",
+  "/CHANGELOG.md",
+  "/LICENSE",
+  "/pyproject.toml",
+]
+exclude = [
+  "/docs/DESIGN.md",
+  "/docs/design",
+]
 
 [tool.ruff]
 line-length = 100

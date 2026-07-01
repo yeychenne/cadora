@@ -1,5 +1,6 @@
 let selectedNodeId = null;
 let selectedTab = "activity";
+let sinceWindow = "";
 
 const fmtTokens = (value) => {
   const n = Number(value || 0);
@@ -61,6 +62,124 @@ const runIdFromPath = () => {
 
 const renderPill = (status) => `<span class="pill ${escapeHtml(status)}">${escapeHtml(status)}</span>`;
 
+const costFmt = (value) => `$${Number(value || 0).toFixed(4)}`;
+
+// --- Topology: per-node gate / integrity / review badges -------------------
+const gateStatus = (node) => {
+  const gate = node.gate;
+  if (gate == null) return null;
+  if (typeof gate === "string") return gate;
+  return gate.status || (gate.passed === true ? "passed" : gate.passed === false ? "failed" : null);
+};
+
+const integrityStatus = (node) => {
+  const integrity = node.integrity;
+  if (integrity == null) return null;
+  if (typeof integrity === "string") return integrity;
+  if (typeof integrity.passed === "boolean") return integrity.passed ? "clean" : "flagged";
+  if (typeof integrity.ok === "boolean") return integrity.ok ? "clean" : "flagged";
+  return integrity.status || integrity.mode || null;
+};
+
+const badgeTone = (kind, label) => {
+  const value = String(label).toLowerCase();
+  if (kind === "gate") return value.includes("passed") ? "ok" : value.includes("fail") ? "bad" : "warn";
+  if (kind === "integrity") return /clean|ok|off/.test(value) ? "ok" : "warn";
+  if (kind === "review") return value === "approve" ? "ok" : /reject|change|abort/.test(value) ? "bad" : "warn";
+  return "";
+};
+
+const nodeBadges = (node) => {
+  const chips = [];
+  const gate = gateStatus(node);
+  if (gate) chips.push(["gate", `gate ${gate}`, badgeTone("gate", gate)]);
+  const integrity = integrityStatus(node);
+  if (integrity) chips.push(["integrity", integrity, badgeTone("integrity", integrity)]);
+  if (node.review) chips.push(["review", node.review, badgeTone("review", node.review)]);
+  return chips
+    .map(
+      ([kind, label, tone]) =>
+        `<span class="badge ${tone}" title="${escapeHtml(kind)}">${escapeHtml(label)}</span>`,
+    )
+    .join("");
+};
+
+// --- FinOps: cost breakdowns, token split, daily trend ---------------------
+const bar = (value, max) => {
+  const pct = max > 0 ? Math.max(3, Math.round((Number(value || 0) / max) * 100)) : 0;
+  return `<span class="bar"><span style="width:${pct}%"></span></span>`;
+};
+
+const costTable = (rows, key) => {
+  const used = (rows || []).filter(
+    (row) => Number(row.cost_usd || 0) > 0 || Number(row.context_tokens || 0) > 0,
+  );
+  if (!used.length) return `<p class="empty">No usage yet</p>`;
+  const maxCost = Math.max(...used.map((row) => Number(row.cost_usd || 0)), 0.0001);
+  return used
+    .map(
+      (row) => `
+        <div class="cost-row">
+          <strong>${escapeHtml(row[key] || "unknown")}</strong>
+          ${bar(row.cost_usd, maxCost)}
+          <span class="muted">${fmtTokens(row.context_tokens)} / ${costFmt(row.cost_usd)}</span>
+        </div>`,
+    )
+    .join("");
+};
+
+const renderDaily = (series) => {
+  if (!series.length) return `<p class="empty">No runs in window</p>`;
+  const max = Math.max(...series.map((day) => day.cost_usd), 0.0001);
+  return `<div class="daily">${series
+    .map(
+      (day) => `
+      <div class="daily-col" title="${escapeHtml(day.day)}: ${costFmt(day.cost_usd)} (${day.run_count} run${day.run_count === 1 ? "" : "s"})">
+        <span class="daily-fill" style="height:${Math.max(4, Math.round((day.cost_usd / max) * 100))}%"></span>
+        <small>${escapeHtml(day.day === "undated" ? "n/a" : day.day.slice(5))}</small>
+      </div>`,
+    )
+    .join("")}</div>`;
+};
+
+const renderFinops = (usage) => {
+  const cacheTokens =
+    Number(usage.cache_creation_input_tokens || 0) + Number(usage.cache_read_input_tokens || 0);
+  const windows = ["", "30d", "7d"];
+  return `
+    <div class="panel-title">
+      <h2>FinOps</h2>
+      <div class="since-toggle">
+        ${windows
+          .map(
+            (window) =>
+              `<button class="${sinceWindow === window ? "active" : ""}" data-since="${window}">${window === "" ? "all" : window}</button>`,
+          )
+          .join("")}
+      </div>
+    </div>
+    <div class="finops-top">
+      <div class="finops-block">
+        <span class="label">Token split</span>
+        <div class="split">
+          <span><em>in</em> ${fmtTokens(usage.input_tokens)}</span>
+          <span><em>out</em> ${fmtTokens(usage.output_tokens)}</span>
+          <span><em>cache</em> ${fmtTokens(cacheTokens)}</span>
+        </div>
+      </div>
+      <div class="finops-block">
+        <span class="label">Cost by day</span>
+        ${renderDaily(usage.by_day || [])}
+      </div>
+    </div>
+    <div class="finops-cols">
+      <div><span class="label">By model</span><div class="table">${costTable(usage.by_model || [], "model")}</div></div>
+      <div><span class="label">By executor</span><div class="table">${costTable(usage.by_executor || [], "executor")}</div></div>
+      <div><span class="label">By funding</span><div class="table">${costTable(usage.by_funding || [], "funding")}</div></div>
+    </div>
+  `;
+};
+
 const renderRun = (run) => {
   const status = statusOf(run);
   const nodes = nodesOf(run);
@@ -105,16 +224,16 @@ const overviewShell = () => {
       <div class="panel-title"><h2>Recent Runs</h2><span id="recent-count">0 runs</span></div>
       <div id="recent-runs" class="run-list"></div>
     </section>
-    <section class="panel">
-      <div class="panel-title"><h2>Usage By Model</h2><span>archive total</span></div>
-      <div id="usage-models" class="table"></div>
-    </section>
+    <section class="panel finops" id="finops"></section>
   `;
 };
 
 const loadOverview = async () => {
   overviewShell();
-  const [runsResponse, usageResponse] = await Promise.all([fetch("/api/runs"), fetch("/api/usage")]);
+  const [runsResponse, usageResponse] = await Promise.all([
+    fetch("/api/runs"),
+    fetch(`/api/usage?since=${encodeURIComponent(sinceWindow)}`),
+  ]);
   const runsData = await runsResponse.json();
   const usage = await usageResponse.json();
   const runs = runsData.runs || [];
@@ -132,17 +251,13 @@ const loadOverview = async () => {
   document.getElementById("recent-runs").innerHTML = runs.length
     ? runs.slice(0, 12).map(renderRun).join("")
     : `<p class="empty">No archived runs</p>`;
-  document.getElementById("usage-models").innerHTML = (usage.by_model || []).length
-    ? usage.by_model
-        .map(
-          (item) => `
-        <div class="usage-row">
-          <strong>${escapeHtml(item.model)}</strong>
-          <span class="muted">${fmtTokens(item.context_tokens)} context / $${Number(item.cost_usd || 0).toFixed(4)}</span>
-        </div>`,
-        )
-        .join("")
-    : `<p class="empty">No usage yet</p>`;
+  document.getElementById("finops").innerHTML = renderFinops(usage);
+  document.querySelectorAll("[data-since]").forEach((button) => {
+    button.addEventListener("click", () => {
+      sinceWindow = button.dataset.since;
+      loadOverview();
+    });
+  });
 };
 
 const levelNodes = (nodes) => {
@@ -169,7 +284,7 @@ const renderDag = (nodes) => {
     byDepth.set(node.depth, row);
   });
   const nodeW = 170;
-  const nodeH = 72;
+  const nodeH = 104;
   const colGap = 60;
   const rowGap = 42;
   const paddingX = 48;
@@ -226,7 +341,8 @@ const renderDag = (nodes) => {
             <button class="dag-node ${node.status} ${selected}" style="left:${node.x}px; top:${node.y}px" data-node="${escapeHtml(id)}">
               <span class="dag-title">${escapeHtml(id)}</span>
               <span class="dag-sub">${escapeHtml(node.role || node.phase || "")}</span>
-              ${renderPill(node.status || "idle")}
+              <div class="dag-badges">${nodeBadges(node)}</div>
+              <div class="dag-foot"><span>${costFmt(node.cost_usd)}</span><span>${fmtTokens(node.context_tokens)} ctx</span></div>
             </button>
           `;
         })

@@ -7,6 +7,7 @@ from cadora.gates import (
     GATE_BLOCKED_PREREQUISITE,
     GATE_FAILED,
     GATE_PASSED,
+    GATE_VACUOUS,
     ShellGate,
 )
 
@@ -95,3 +96,53 @@ def test_auto_setup_does_not_provision_for_non_python_gate(tmp_path):
 
     assert result.status == GATE_PASSED
     assert not (tmp_path / ".cadora").exists()
+
+
+def test_test_runner_that_ran_zero_tests_is_vacuous(tmp_path):
+    # `cargo test` exits 0 even when it runs no tests — that verified nothing, so it must not pass.
+    command = "cargo() { echo 'running 0 tests'; }; cargo test"
+    result = ShellGate("test", command).check(str(tmp_path))
+
+    assert result.passed is False
+    assert result.status == GATE_VACUOUS
+    assert result.exit_code == 0
+
+
+def test_go_with_no_test_files_is_vacuous(tmp_path):
+    command = "go() { echo '? ./x [no test files]'; }; go test ./..."
+    result = ShellGate("test", command).check(str(tmp_path))
+
+    assert result.status == GATE_VACUOUS
+
+
+def test_real_passing_tests_are_not_vacuous(tmp_path):
+    command = "cargo() { echo 'test result: ok. 3 passed; 0 failed'; }; cargo test"
+    result = ShellGate("test", command).check(str(tmp_path))
+
+    assert result.passed is True
+    assert result.status == GATE_PASSED
+
+
+def test_some_packages_with_tests_are_not_vacuous(tmp_path):
+    # Mixed `go test ./...`: one package ran tests, another had none — overall NOT vacuous.
+    command = "go() { echo 'ok ./a 0.4s'; echo '? ./b [no test files]'; }; go test ./..."
+    result = ShellGate("test", command).check(str(tmp_path))
+
+    assert result.passed is True
+    assert result.status == GATE_PASSED
+
+
+def test_non_test_gate_is_exempt_from_the_vacuous_check(tmp_path):
+    # A lint/build gate doesn't invoke a test runner, so its output never triggers the check.
+    result = ShellGate("lint", "echo 'no test files'").check(str(tmp_path))
+
+    assert result.passed is True
+    assert result.status == GATE_PASSED
+
+
+def test_node_missing_module_is_a_prerequisite_block(tmp_path):
+    command = "echo \"Error: Cannot find module 'jest'\" 1>&2 ; exit 1"
+    result = ShellGate("test", command).check(str(tmp_path))
+
+    assert result.status == GATE_BLOCKED_PREREQUISITE
+    assert "jest" in result.missing_prerequisites

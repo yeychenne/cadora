@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+## v0.4.0 — 2026-07-01
+
+Gate-quality and observability release: the construction gate refuses hollow passes and understands
+cross-stack toolchains, and the local dashboard becomes a topology + FinOps cockpit.
+
+### Changed
+- **Gate substance check** — a construction gate that invokes a test runner but executes **zero
+  tests** (`go test` / `cargo test` / `jest --passWithNoTests` all exit 0 with no tests) is now
+  reported as `vacuous` and **blocks the run** instead of passing — it verified nothing. Any test
+  that actually ran exempts the gate, so mixed multi-package runs aren't penalized.
+- **Cross-stack prerequisite detection** — the "toolchain missing vs. tests failed" classifier now
+  also recognizes Node (`Cannot find module`), Go (`no required module provides package`), and Rust
+  (`can't find crate for`) missing-dependency errors, so a missing toolchain on those stacks is a
+  `blocked_prerequisite`, not a `failed` gate.
+
+### Added
+- **Topology + FinOps dashboard** — the `cadora dashboard` overview gains a **FinOps** panel (a token
+  split, a cost-by-day trend, and cost by model / executor / funding, with an all/30d/7d window), and
+  the run-detail **DAG becomes a cost-and-quality map**: every node box shows its cost and context
+  tokens plus badges for its gate, integrity, and review outcomes. `summarize_usage` (and
+  `cadora usage --json`) now expose `by_funding` and a per-day `by_day` cost series. See
+  [docs/dashboard.md](docs/dashboard.md).
+
 ## v0.3.0 — 2026-06-27
 
 Observability and local-iteration release: see what a run is doing and what it cost, iterate
