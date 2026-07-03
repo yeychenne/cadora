@@ -1,8 +1,12 @@
 # Cadora architecture
 
-Cadora implements the [AWS AI-DLC method](https://github.com/awslabs/aidlc-workflows) as a thin, **headless, backend-agnostic conductor** over external coding-agent CLIs. The differentiated value — the workflow DAG, the AI-DLC rules + workspace setup, the deterministic gates, and the run archive / eval layer — lives here; the agent loop does not (the backend CLI owns it).
+Cadora is an **audit-grade, headless, backend-agnostic conductor** over external coding-agent
+CLIs. The differentiated value — deterministic fail-closed gates, toolchain-integrity evaluation,
+explicit human review, and the run archive / per-node cost-attribution layer — lives here; the
+agent loop does not (the backend CLI owns it). Workflow methods are **pluggable packs**; Cadora
+ships the [AWS AI-DLC method](https://github.com/awslabs/aidlc-workflows) as its flagship pack.
 
-## The AI-DLC workflow
+## The flagship method pack: AI-DLC
 
 Cadora vendors the AWS AI-DLC rule-set (`awslabs/aidlc-workflows`, MIT-0) under
 `cadora/aidlc_rules/` and installs it into each run's workspace using the backend-native project

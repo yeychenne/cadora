@@ -25,6 +25,7 @@ class ExecutionResult:
     usage: dict = field(default_factory=dict)  # token/credit usage if reported
     cost_usd: float | None = None  # per-node cost when the backend reports it; else None
     model: str | None = None  # model actually used, when reported
+    executor: str | None = None  # backend that ran this node (claude | codex | ...); set by the runner
     meta: dict = field(default_factory=dict)  # backend extras (session_id, funding, num_turns, ...)
     artifacts_dir: str | None = None
 

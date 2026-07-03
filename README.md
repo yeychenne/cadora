@@ -1,161 +1,146 @@
 # Cadora
 
-**An AI-DLC workflow conductor — drive the AWS AI-DLC method on a coding agent, headlessly, and capture every run.**
+**Ship agent-built software you can prove — deterministic gates, tamper detection, run evidence,
+and per-node cost attribution, across coding-agent CLIs.**
 
-Cadora implements the [AWS AI-DLC method](https://github.com/awslabs/aidlc-workflows) (AI-Driven Development Life Cycle) as a thin, **backend-agnostic conductor**. Point it at a product vision and it drives a coding agent through the full AI-DLC lifecycle — 🔵 Inception (requirements → planning → design) then 🟢 Construction (code generation → build & test) — **autonomously and headlessly**, applies a deterministic gate, and captures the whole run (artifacts, events, cost) for inspection and comparison.
+Coding agents can build real software. Cadora is the **audit-grade conductor** that proves what
+they built: it drives headless coding-agent CLIs (**Claude Code**, **OpenAI Codex**) through a
+declared multi-step workflow, refuses to take the agent's word for the result, and captures the
+whole run — artifacts, events, human decisions, and **to-the-node cost** — as inspectable
+evidence.
 
-Cadora is the **conductor**, not the agent: it doesn't implement the agent loop (the backend CLI does), and it isn't an in-session/in-IDE assistant. It installs the AI-DLC rules into a workspace, drives an external headless coding-agent CLI, gates the result, and archives it — so runs are **reproducible, scriptable, gate-able, and comparable**.
+Cadora is the **conductor, not the agent**: it doesn't implement the agent loop (the backend CLI
+does), and it isn't an in-IDE assistant. It sits *above* the vendors, which is exactly what makes
+its verdicts neutral and its cost ledger cross-vendor.
 
-**Backends:** Cadora supports both **Claude Code** (`claude -p`, subscription-funded by default)
-and **OpenAI Codex** (`codex exec --json`, using your Codex login). Select either with
-`--executor claude` or `--executor codex`; both use the same AI-DLC topology, deterministic gates,
-toolchain-integrity evaluation, and run archive, so their results can be A/B-compared directly.
-For private demos, CI smoke tests, and policy-safe HITL walkthroughs, Cadora also includes a
-fully local deterministic fixture backend: `--executor fixture`. It writes small reviewable
-`aidlc-docs/` artifacts and never calls an external model service.
+## Why it exists
 
-Both backends ship in **v0.2.0** — Claude Code since v0.1.0, and OpenAI Codex promoted to a
-supported backend after live verification.
+A vendor's tool verifying that vendor's agent is the fox auditing the henhouse. Cadora verifies
+from the outside:
 
-## Status
+- **Deterministic, fail-closed gates** — Cadora re-runs your build and tests itself and reads
+  exit codes and test counts, never the agent's claims. A test runner that executes **zero tests**
+  is reported `vacuous` and **blocks the run**. A missing toolchain is `blocked_prerequisite`,
+  not a fake failure — classified for Python, Node, Go, and Rust.
+- **Tamper detection** — `cadora integrity` detects generated packages and scripts that
+  impersonate real tools, unrecognized build substitutions, and tests run against another
+  project's environment. Modes: `audit` (record), `enforce` (block), `repair` (one constrained
+  fix session, then re-verify).
+- **Fail-closed human review** — mark nodes `review: true` and run `--hitl`: the operator must
+  approve, request bounded revisions, or abort; closed stdin aborts rather than silently
+  approving. Every decision, comment, and revision cost is archived. The review surface is
+  pluggable over **MCP** (Claude Code, Claude Desktop, Codex CLI, or any MCP client).
+- **Per-node cost attribution, cross-vendor** — every node records its backend, model, tokens,
+  and dollars, split by funding source (subscription vs metered API). `cadora usage` and the
+  local dashboard's FinOps panel aggregate by model / backend / funding / day — one ledger even
+  when design runs on Claude and code runs on Codex.
 
-**v0.3.0**. Adds the **run dashboard** (`cadora dashboard` — live runs, token cost, and a per-run DAG/detail view), **live stage progress**, a local **fixture executor** (`--executor fixture`), a **HITL desktop** review surface, and the reusable **analyst-frontend** (FE-builder) topology — on top of the v0.2.0 MCP/Codex/integrity release. Live-proven end-to-end — from a tiny CLI to a multi-stack AWS app **deployed to AWS** (CDK + Lambda + API Gateway + Cognito; golden-path smoke test passing). `pytest` green, `ruff` clean, CI on Python 3.10–3.12.
+The evidence of a run *is* the archive: `runs/<id>/manifest.json` + per-stage artifacts + the
+event stream + gate/integrity/review outcomes + cost. Inspect with `cadora archive ls / show`
+or the dashboard.
 
-## How it works
+## Backends
 
-```
-vision.md ─▶ install AI-DLC rules (agent memory + .aidlc-rule-details/) into a workspace
-          ─▶ drive the selected backend through the AI-DLC lifecycle
-          ─▶ deterministic build-test gate (blocks on failure)
-          ─▶ run archive: aidlc-docs/ + events + cost   →   cadora archive show
-```
+| Backend | Drive | Notes |
+|---|---|---|
+| `claude` (default) | `claude -p`, structured stream-json | **subscription-funded by default**; metered API is explicit opt-in (`--funding api`) |
+| `codex` | `codex exec --json`, structured JSONL | uses your Codex login/plan |
+| `fixture` | local, deterministic, offline | demos, CI smoke, policy-safe HITL walkthroughs — no model call |
+
+Both live backends run the **same topology, gates, integrity evaluation, and archive**, so their
+results A/B-compare directly — including phase-split runs (`--executor claude
+--construction-executor codex`). The `NodeExecutor` seam makes a new backend one class.
+
+## Methods are packs — AI-DLC is the flagship
+
+Cadora ships the [AWS AI-DLC method](https://github.com/awslabs/aidlc-workflows) (AI-Driven
+Development Life Cycle, MIT-0) as its built-in flagship workflow: `cadora aidlc-init` installs
+the rule-set into your workspace (`CLAUDE.md` for Claude Code, `AGENTS.md` for Codex — existing
+project instructions are preserved outside a managed block), and the example topologies drive
+🔵 Inception → 🟢 Construction → Build & Test from a `vision.md`. The method is a **pack, not the
+product**: any workflow you can express as a topology of gated nodes conducts the same way.
 
 ## Install
 
-Requires **Python 3.10+** and at least one authenticated backend CLI:
-
-- [`claude`](https://docs.claude.com/claude-code) for Claude Code.
-- [`codex`](https://developers.openai.com/codex/cli/) for OpenAI Codex.
+Requires **Python 3.10+** and at least one authenticated backend CLI
+([`claude`](https://docs.claude.com/claude-code) or
+[`codex`](https://developers.openai.com/codex/cli/)):
 
 ```bash
 pip install cadora
 ```
 
-From source (for development):
-
-```bash
-git clone https://github.com/yeychenne/cadora.git && cd cadora
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-```
+From source: `git clone https://github.com/yeychenne/cadora.git && cd cadora && python3 -m venv
+.venv && source .venv/bin/activate && pip install -e ".[dev]"`.
 
 ## Quickstart
 
 ```bash
-# 1. Set up an AI-DLC workspace from your product vision.
+# 1. Set up a workspace from your product vision (installs the AI-DLC method pack).
 cadora aidlc-init ./my-project --vision vision.md
 
-# 2. Drive the full AI-DLC lifecycle on Claude Code (autonomous, subscription-funded).
+# 2. Drive the workflow on Claude Code — autonomous, gated, subscription-funded.
 cadora run examples/aidlc.topology.yaml --vision vision.md --cwd ./my-project
 
-# 3. Inspect what happened.
+# 3. Read the evidence.
 cadora archive ls
 cadora archive show <run-id>
+cadora usage            # tokens + dollars by model / backend / funding
+cadora dashboard        # local cockpit: DAG cost/quality map + FinOps panel
 ```
 
-Codex development instance:
+A/B the same spec on Codex:
 
 ```bash
 cadora run examples/aidlc.topology.yaml \
-  --executor codex \
-  --model gpt-5.4 \
+  --executor codex --model gpt-5.5 \
   --integrity-mode repair \
-  --vision vision.md \
-  --cwd ./my-project
+  --vision vision.md --cwd ./my-project
 ```
 
-Private HITL demo with no external model call:
+Split phases across vendors (design on Claude, code on Codex):
 
 ```bash
-cadora run examples/aidlc-hitl.topology.yaml \
-  --executor fixture \
-  --hitl \
-  --cwd ./my-project
+cadora run examples/aidlc-phased.topology.yaml \
+  --executor claude \
+  --construction-executor codex --construction-model gpt-5.5 \
+  --vision vision.md --cwd ./my-project
 ```
 
-Inspect token usage/cost or watch runs live: `cadora usage --archive-dir runs` summarizes tokens and
-cost by model from the run archive, and `cadora dashboard` serves a small local web dashboard at
-`http://127.0.0.1:8765` with active runs, recent runs, usage by model, DAG progress, activity,
-outputs, and artifacts. The dashboard binds **localhost only** and has **no authentication** — keep
-it on loopback, or front it with TLS + authentication before exposing it beyond the host. See
-[docs/dashboard.md](docs/dashboard.md).
-
-Cadora installs the workflow into the backend-native project memory file: `CLAUDE.md` for Claude
-Code or `AGENTS.md` for Codex. Existing project instructions are preserved outside a managed block.
-Toolchain integrity defaults to non-blocking `audit`. Use `--integrity-mode enforce` to block local
-packages/scripts that impersonate declared tools, or `repair` to allow one fresh, constrained agent
-session to remove the substitution and rerun the external gate.
-
-The deterministic gate also distinguishes a real test/build failure from an unavailable
-prerequisite. By default, Python workspaces that declare `requirements-dev.txt`,
-`dev-requirements.txt`, or `requirements/dev.txt` get a cached isolated environment under
-`.cadora/gate-venv`; the original `--gate-cmd` is then executed unchanged inside it. If dependency
-provisioning is unavailable, the archive records `blocked_prerequisite` and the missing packages
-instead of misreporting the application as failing. For disconnected environments, provide a local
-wheel cache with `--gate-wheelhouse /path/to/wheels`; use `--gate-setup off` to manage the gate
-environment yourself.
-
-Human review is explicit and fail-closed. In a multi-stage topology, mark selected nodes with
-`review: true` and run with `--hitl`. At each declared point the operator must approve, request
-changes, or abort. Requested changes rerun the same stage—with a maximum of three revision
-cycles—before any downstream node starts. Closed/non-interactive stdin aborts rather than silently
-approving. Decisions, comments, individual attempt outputs, and aggregate revision cost are stored
-in the archive. See `examples/aidlc-hitl.topology.yaml`. The review surface is **pluggable**:
-besides the terminal, `cadora mcp` serves the review gate over the Model Context Protocol to any MCP
-client — Claude Code, Claude Desktop, or the Codex CLI (local stdio), or a networked client over
-streamable HTTP. See [docs/hitl-mcp.md](docs/hitl-mcp.md).
-
-Beyond the AI-DLC lifecycle, `examples/analyst-frontend.topology.yaml` is a reusable, domain-agnostic node
-that turns any deterministic case-scoring engine into engine + FastAPI analyst API + Vite/React GUI +
-WeasyPrint PDF + a deterministic audit/explainability panel; an optional `frontend.manifest.yaml` steers it
-(contract-first). See [docs/analyst-frontend.md](docs/analyst-frontend.md).
-
-Scan any existing workspace without running an agent:
+Scan any existing workspace for toolchain tampering — no agent run required:
 
 ```bash
-cadora integrity ./my-project
-cadora integrity ./my-project --json
+cadora integrity ./my-project [--json]
 ```
 
-The run lands in `runs/<run-id>/` — `manifest.json` (ok, cost, model, structured gate status,
-funding) + a per-node `aidlc-docs/` snapshot + the event stream. The generated application code
-lands in your workspace.
+## Gate mechanics worth knowing
 
-### Funding (Claude Code)
+The gate distinguishes a real failure from an unavailable prerequisite. Python workspaces that
+declare dev requirements get a cached isolated gate environment (`.cadora/gate-venv`); your
+`--gate-cmd` runs unchanged inside it. If provisioning is impossible, the archive records
+`blocked_prerequisite` + the missing packages instead of misreporting the application as broken.
+Offline: `--gate-wheelhouse /path/to/wheels`; opt out with `--gate-setup off`.
 
-Cadora **defaults to your Claude Code subscription** — it removes any ambient `ANTHROPIC_API_KEY` from the run so a stray key can't silently meter you. Metered API is explicit opt-in (`--funding api`). Set the subscription token once with `claude setup-token`, or just be logged in to Claude Code.
+Autonomous runs pass `--dangerously-skip-permissions` to the backend (an agentic workflow edits
+files and runs commands) — point Cadora only at workspaces you trust, prefer a dedicated
+worktree/container, and keep credentials out of the workspace environment.
 
-## The AI-DLC method
+The dashboard binds **localhost only, no authentication** — keep it on loopback or front it with
+TLS + auth. See [docs/dashboard.md](docs/dashboard.md).
 
-Cadora vendors the AWS AI-DLC rule-set ([`awslabs/aidlc-workflows`](https://github.com/awslabs/aidlc-workflows), MIT-0) under `cadora/aidlc_rules/` and installs it per run as backend-native project memory + `.aidlc-rule-details/` (per-stage rules). Cadora drives the lifecycle as a **single autonomous session** (`examples/aidlc.topology.yaml`) or as a **per-stage DAG** (`examples/aidlc-stages.topology.yaml`, one node per stage), with optional fail-closed **HITL** gates (`--hitl`) and a local **run dashboard** (`cadora dashboard`) for live progress, token cost, and per-run inspection.
+## Status
 
-## Architecture
+**v0.5.0** — the multi-backend + repositioning release: **multi-backend phase routing**
+(`--construction-executor`), **per-node executor cost attribution** in `cadora usage` and the
+dashboard FinOps panel, and the audit-grade repositioning (AI-DLC becomes the flagship method
+pack). On top of v0.4.0's gate substance checks (vacuous-pass blocking), cross-stack prerequisite
+classification, and the topology/FinOps dashboard. 120+ tests, `ruff` clean, CI on Python
+3.10–3.12.
 
-- `cadora/topology.py` — the workflow DAG (schema + loader + dependency-ordered waves).
-- `cadora/executors/` — the `NodeExecutor` seam + structured Claude Code and Codex CLI backends.
-- `cadora/mcp/` — the MCP interface seam: serves the HITL review gate + run control to any MCP client (Claude Code/Desktop, Codex, or remote HTTP).
-- `cadora/workspace.py` — install the AI-DLC rules + inputs into a run workspace.
-- `cadora/gates.py` — deterministic-first gates (shell checks that block).
-- `cadora/archive.py` — run capture (`runs/<id>/manifest.json` + artifacts) + `cadora archive ls/show`.
-- `cadora/runner.py` — wires it together.
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## Roadmap
-
-`cadora eval` / `compare` (deterministic AI-DLC compliance + LLM-judge over captured runs),
-per-stage wave concurrency, hardening for Kiro/Antigravity, and a consulting deliverable pack.
+**Roadmap:** `cadora report` — a portable, self-contained **evidence pack** per run (gates,
+integrity findings, review trail, per-node cost); `cadora compare` — side-by-side measured
+verdicts across backends/models; additional backend and method packs as they earn verification.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). The vendored AI-DLC rules are MIT-0 (`cadora/aidlc_rules/LICENSE`).
+MIT. The vendored AI-DLC rule-set is MIT-0 (`awslabs/aidlc-workflows`).

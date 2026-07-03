@@ -127,6 +127,7 @@ def run_topology(
                 )
                 with _stage_progress(node, node_executor):
                     result = node_executor.run(node, prompt, cwd=node_cwd)
+                result.executor = node_executor.name  # per-node backend, for cost attribution
                 attempt_results.append(result)
                 gate_result = gates[node.gate].check(node_cwd) if node.gate else None
                 integrity = (

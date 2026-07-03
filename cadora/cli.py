@@ -39,6 +39,16 @@ def cmd_run(args) -> int:
         timeout=args.timeout,
         model=args.model,
     )
+    construction_executor = None
+    if getattr(args, "construction_executor", None):
+        # Phase-aware routing: construction-phase nodes run on a second backend (e.g. Codex)
+        # while inception/operations nodes stay on --executor (e.g. Claude Code).
+        construction_executor = get_executor(
+            args.construction_executor,
+            funding=args.funding,
+            timeout=args.timeout,
+            model=args.construction_model,
+        )
     # Register every gate the topology references, all running the configured command.
     gate_names = {n.gate for n in topology.nodes if n.gate}
     gates = {
@@ -60,6 +70,7 @@ def cmd_run(args) -> int:
         gates=gates,
         integrity_mode=args.integrity_mode,
         hitl=args.hitl,
+        construction_executor=construction_executor,
     )
     print(f"run complete: {out}")
     return 0
@@ -273,6 +284,17 @@ def main(argv=None) -> int:
     r.add_argument("--archive-dir", default="runs")
     r.add_argument("--run-id", default=None)
     r.add_argument("--model", default=None, help="optional backend model override")
+    r.add_argument(
+        "--construction-executor",
+        default=None,
+        help="route construction-phase nodes to this executor (e.g. codex); "
+        "inception/operations nodes stay on --executor",
+    )
+    r.add_argument(
+        "--construction-model",
+        default=None,
+        help="optional model for --construction-executor (e.g. gpt-5.5)",
+    )
     r.add_argument(
         "--vision",
         default=None,

@@ -12,7 +12,7 @@
 #   - tech-env.md          (optional technical-environment input)
 #
 # Run:  cadora run examples/aidlc.topology.yaml --executor claude
-#       cadora run examples/aidlc.topology.yaml --executor codex --model gpt-5.4
+#       cadora run examples/aidlc.topology.yaml --executor codex --model gpt-5.5
 name: aidlc
 
 nodes:

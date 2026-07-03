@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cadora"
-version = "0.4.0"
-description = "An AI-DLC workflow conductor — drive the AWS AI-DLC method on a headless coding agent (Claude Code), with deterministic gates and run capture."
+version = "0.5.0"
+description = "Ship agent-built software you can prove — an audit-grade conductor for coding-agent CLIs (Claude Code, Codex): deterministic gates, tamper detection, run evidence, per-node cost attribution."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Yves Eychenne", email = "yeychenne@yahoo.fr" }]
-keywords = ["agents", "orchestration", "claude-code", "kiro", "ai-dlc", "dag", "workflow"]
+keywords = ["agents", "verification", "governance", "audit", "finops", "claude-code", "codex", "ai-dlc", "dag", "workflow"]
 dependencies = [
     "pyyaml>=6.0",
 ]

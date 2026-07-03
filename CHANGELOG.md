@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+## v0.5.0 — 2026-07-03
+
+Multi-backend + repositioning release: drive design and construction on different agent backends
+from one conductor with per-backend cost attribution, and reposition Cadora as the **audit-grade
+conductor** — with AI-DLC as the flagship method pack.
+
+### Changed
+- **Repositioning** — Cadora's identity is the **audit-grade conductor** for coding-agent CLIs:
+  deterministic fail-closed gates, tamper detection, run evidence, and per-node cross-backend
+  cost attribution. The AWS AI-DLC method remains the flagship built-in workflow — a **method
+  pack, not the product identity**. README and architecture docs rewritten accordingly.
+
+### Removed
+- The **quick-desktop HITL review surface** (parked) — the terminal and MCP review surfaces
+  remain the supported ways to run fail-closed human review.
+- The **analyst-frontend example topology and doc** — moved out of the core distribution; it
+  lives on as a sample application of the conductor rather than a core feature.
+
+### Added
+- **Multi-backend runs** — `cadora run` gains `--construction-executor` / `--construction-model`,
+  routing construction-phase nodes to a second backend (e.g. **design on Claude Code, code on
+  Codex**) while inception/operations nodes stay on `--executor`.
+- **Per-node executor attribution** — each node records the backend that ran it, so `cadora usage`
+  and the dashboard FinOps **"by executor"** panel split cost/tokens across backends (claude vs
+  codex) instead of lumping everything under the run-level executor; the run-detail node panel now
+  shows each node's **backend**. Codex `cached_input_tokens` are counted toward context.
+
 ## v0.4.0 — 2026-07-01
 
 Gate-quality and observability release: the construction gate refuses hollow passes and understands

@@ -1,6 +1,6 @@
 """MCP server — expose Cadora runs + HITL review over the interface seam.
 
-Any MCP client (Claude Code, Claude Desktop, Codex CLI, Amazon Quick Desktop, or the terminal) can
+Any MCP client (Claude Code, Claude Desktop, Codex CLI, or the terminal) can
 start an AI-DLC run, fetch the non-code artifacts at each review gate, and approve / request changes
 / abort — the HITL surface becomes pluggable, mirroring how NodeExecutor makes the backend pluggable.
 

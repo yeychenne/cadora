@@ -35,6 +35,7 @@ const nodesOf = (run) => {
     status: node.ok ? "completed" : "failed",
     depends_on: index > 0 ? [all[index - 1].node_id] : [],
     model: node.model,
+    executor: node.executor,
     cost_usd: node.cost_usd,
     generation_tokens:
       Number(node.usage?.input_tokens || 0) + Number(node.usage?.output_tokens || 0),
@@ -439,6 +440,7 @@ const loadRunDetail = async (runId) => {
             </div>
             <div class="node-facts">
               <span>model <strong>${escapeHtml(node.model || "unknown")}</strong></span>
+              <span>backend <strong>${escapeHtml(node.executor || "—")}</strong></span>
               <span>cost <strong>$${Number(node.cost_usd || 0).toFixed(4)}</strong></span>
               <span>context <strong>${fmtTokens(node.context_tokens)}</strong></span>
               <span>review <strong>${escapeHtml(node.review || "none")}</strong></span>

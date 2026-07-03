@@ -2,7 +2,7 @@
 
 The runner calls ``review_fn(node, cwd) -> ReviewResult`` at each ``review: true`` gate.
 ``channel_review_fn(channel)`` returns such a review_fn backed by a ``ReviewChannel``, so an external
-front-end (an MCP client — Claude Desktop, Codex/ChatGPT, Quick Desktop — or a test) supplies the
+front-end (an MCP client — Claude Desktop, Codex/ChatGPT — or a test) supplies the
 decision. The run executes in its own thread; the front-end polls ``pending()`` and calls ``respond()``.
 
 This decouples HITL from any one surface, mirroring how ``NodeExecutor`` decouples Cadora from any

@@ -4,6 +4,10 @@ Cadora includes a small local web dashboard for inspecting conductor runs from t
 is designed for operator visibility during local development, demos, and beta testing without
 running a container, database, or frontend build.
 
+**Scope:** the dashboard is a *cockpit over the run archive* — inspection and cost visibility —
+and is deliberately kept small. Portable run evidence (`cadora report`, roadmap) is where export
+and sharing will live; backend-native dashboards are consumed as data sources, not competed with.
+
 ## Start the dashboard
 
 From the workspace where your `runs/` archive lives:
@@ -84,7 +88,8 @@ The run detail page is the operator view for one conductor run. It shows:
   toolchain-integrity, and human-review outcomes** — so a `gate vacuous` or `gate blocked_prerequisite`
   badge surfaces a construction gate that did not truly pass, right on the node
 - clickable node boxes
-- selected-node facts: model, cost, context tokens, review state
+- selected-node facts: model, **backend** (the executor that ran the node), cost, context tokens,
+  review state
 - activity timeline
 - node output
 - produced artifacts

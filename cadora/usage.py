@@ -97,11 +97,14 @@ def summarize_usage(
 def normalize_manifest_usage(manifest: dict) -> list[NodeUsage]:
     """Normalize every node usage record in one run manifest."""
     run_id = str(manifest.get("run_id", ""))
-    executor = str(manifest.get("executor") or "unknown")
+    run_executor = str(manifest.get("executor") or "unknown")
     normalized = []
     for node in manifest.get("nodes", []):
         usage = node.get("usage") or {}
         meta = node.get("meta") or {}
+        # Per-node executor: phase routing sends construction nodes to a second backend
+        # (e.g. Codex); fall back to the run-level executor for manifests without it.
+        node_executor = str(node.get("executor") or run_executor)
         input_tokens = _int(usage.get("input_tokens") or usage.get("inputTokens"))
         output_tokens = _int(usage.get("output_tokens") or usage.get("outputTokens"))
         cache_creation = _int(
@@ -109,7 +112,10 @@ def normalize_manifest_usage(manifest: dict) -> list[NodeUsage]:
             or usage.get("cacheCreationInputTokens")
         )
         cache_read = _int(
-            usage.get("cache_read_input_tokens") or usage.get("cacheReadInputTokens")
+            usage.get("cache_read_input_tokens")
+            or usage.get("cacheReadInputTokens")
+            or usage.get("cached_input_tokens")  # Codex reports cached prompt tokens here
+            or usage.get("cachedInputTokens")
         )
         total = _int(usage.get("total_tokens") or usage.get("totalTokens"))
         if not input_tokens and not output_tokens and total:
@@ -121,7 +127,7 @@ def normalize_manifest_usage(manifest: dict) -> list[NodeUsage]:
             NodeUsage(
                 run_id=run_id,
                 node_id=str(node.get("node_id", "")),
-                executor=executor,
+                executor=node_executor,
                 model=node.get("model"),
                 funding=meta.get("funding_resolved") or meta.get("funding") or "unknown",
                 input_tokens=input_tokens,

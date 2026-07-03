@@ -162,7 +162,12 @@ def _token_totals(usage: dict) -> tuple[int, int]:
     cache_creation = _int(
         usage.get("cache_creation_input_tokens") or usage.get("cacheCreationInputTokens")
     )
-    cache_read = _int(usage.get("cache_read_input_tokens") or usage.get("cacheReadInputTokens"))
+    cache_read = _int(
+        usage.get("cache_read_input_tokens")
+        or usage.get("cacheReadInputTokens")
+        or usage.get("cached_input_tokens")
+        or usage.get("cachedInputTokens")
+    )
     total = _int(usage.get("total_tokens") or usage.get("totalTokens"))
     generation = input_tokens + output_tokens
     context = generation + cache_creation + cache_read
