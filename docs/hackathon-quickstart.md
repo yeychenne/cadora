@@ -33,13 +33,20 @@ cadora compare <run-id-a> <run-id-b>
 
 ## Picking a topology for a live demo
 
-`examples/aidlc.topology.yaml` is one node — fastest (~2 min), and it gate-passes reliably on
-Claude and Codex. On some backends (Kiro in particular) a single-node run can trip the gate on a
-lint nit the agent left behind (an unused import) — **that's the gate working, not a bug**, and
-it's a fine thing to show an audience. For a guaranteed-green live demo, prefer the three-stage
-`examples/aidlc-hitl.topology.yaml` (run it autonomously — without `--hitl`): the design and
-requirements stages clean the spec up before construction, so it passes more consistently and
-produces a richer artifact (working code + a full test suite + AI-DLC docs).
+The single-node `examples/aidlc.topology.yaml` is the **verified demo path**: its construction
+step emits complete runnable code, and it gate-passes on Claude and Codex (fastest, ~2 min). On
+Kiro it occasionally trips the gate on a lint nit the agent left behind (an unused import) —
+**that's the gate working, not a bug**, and it's a fine thing to show an audience.
+
+Larger topologies like `examples/aidlc-hitl.topology.yaml` (three stages) can produce richer
+artifacts, but their gate outcome **varies by backend**: some models lean into writing AI-DLC
+*documentation* rather than runnable code, and the gate then correctly blocks a run with no tests.
+In our testing, `aidlc-hitl` gate-passed on Kiro (a full app with 23 tests) but produced
+docs-without-code on Claude. So there's one reliable rule:
+
+**Rehearse your exact backend + topology once before you present.** And remember: a gate failure
+isn't a stumble to hide — it's Cadora catching a real issue (no runnable tests, a lint nit), which
+is itself worth showing.
 
 ## What you'll see
 

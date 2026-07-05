@@ -12,11 +12,11 @@ For a presenter running the hackathon demo live. Pair with
 - Have `examples/aidlc.topology.yaml` and `examples/hackathon-hello.vision.md` open in a second
   window so the audience can see the spec being built from.
 - `mkdir -p ./demo ./demo2` (two throwaway dirs — Claude Code run and Codex run).
-- **Topology choice:** the single-node `aidlc.topology.yaml` is fastest and passes reliably on
-  Claude/Codex. Demoing on Kiro (or want a guaranteed-green run)? Use the three-stage
-  `examples/aidlc-hitl.topology.yaml` autonomously instead — it cleans the spec up before
-  construction. A single-node gate failure isn't a stumble to hide: it's Cadora catching a real
-  lint issue, which is exactly the point — pivot to `cadora archive show` and show the caught gate.
+- **Topology choice:** the single-node `aidlc.topology.yaml` is the verified path — it emits
+  runnable code and gate-passes on Claude/Codex. Larger topologies (`aidlc-hitl`) vary by backend
+  (some models write AI-DLC docs instead of code, and the gate blocks the empty run). **Rehearse
+  your exact backend + topology once beforehand.** And if a gate does fail live, don't hide it —
+  it's Cadora catching a real issue; pivot to `cadora archive show` and show the caught gate.
 
 ## 0:00 — Setup (30s)
 
