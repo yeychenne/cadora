@@ -52,6 +52,18 @@ config file and restart the app:
 
 The Codex CLI uses the same stdio command in its own MCP configuration.
 
+## Connect any local MCP client
+
+Local MCP clients can use the same stdio command:
+
+```json
+{
+  "mcpServers": {
+    "cadora": { "command": "cadora", "args": ["mcp", "--transport", "stdio"] }
+  }
+}
+```
+
 ## Tools
 
 | Tool | Arguments | Returns |

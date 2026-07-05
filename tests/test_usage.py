@@ -157,3 +157,156 @@ def test_cli_usage_json(tmp_path, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["context_tokens"] == 100
     assert payload["nodes"][0]["node_id"] == "requirements"
+
+
+def _codex_archive(root, run_id="run-20260703-100000", *, model="gpt-5.5", cost=None):
+    ar = RunArchive(root, run_id, "codex", "aidlc")
+    ar.record(
+        ExecutionResult(
+            node_id="code",
+            ok=True,
+            exit_code=0,
+            usage={
+                "input_tokens": 10_000,
+                "cached_input_tokens": 4_000,
+                "output_tokens": 2_000,
+                "reasoning_output_tokens": 500,
+            },
+            cost_usd=cost,
+            model=model,
+        )
+    )
+    ar.finalize(True)
+
+
+def test_codex_cost_estimated_from_price_table(tmp_path):
+    _codex_archive(tmp_path)
+    manifest = json.loads((tmp_path / "run-20260703-100000" / "manifest.json").read_text())
+
+    node = normalize_manifest_usage(manifest)[0]
+
+    # (10k-4k) uncached @ $5 + 4k cached @ $0.50 + 2k output @ $30, per MTok.
+    assert node.cost_usd == (6_000 * 5.00 + 4_000 * 0.50 + 2_000 * 30.00) / 1_000_000
+    assert node.cost_estimated is True
+    assert node.reasoning_output_tokens == 500
+
+    summary = summarize_usage(tmp_path)
+    assert summary.estimated_cost_nodes == 1
+    assert summary.cost_usd == node.cost_usd
+
+
+def test_backend_reported_cost_stays_authoritative(tmp_path):
+    _archive(tmp_path, cost=0.25)
+    manifest = json.loads((tmp_path / "run-20260626-090000" / "manifest.json").read_text())
+
+    node = normalize_manifest_usage(manifest)[0]
+
+    assert node.cost_usd == 0.25
+    assert node.cost_estimated is False
+
+
+def test_unknown_model_gets_no_estimate(tmp_path):
+    _codex_archive(tmp_path, model="mystery-1")
+    manifest = json.loads((tmp_path / "run-20260703-100000" / "manifest.json").read_text())
+
+    node = normalize_manifest_usage(manifest)[0]
+
+    assert node.cost_usd is None
+    assert node.cost_estimated is False
+    assert summarize_usage(tmp_path).estimated_cost_nodes == 0
+
+
+def test_estimate_cost_tolerates_dated_model_ids():
+    from cadora.usage import estimate_cost_usd
+
+    exact = estimate_cost_usd("gpt-5.5", input_tokens=1_000_000, output_tokens=0)
+    dated = estimate_cost_usd("gpt-5.5-2026-04-23", input_tokens=1_000_000, output_tokens=0)
+    assert exact == dated == 5.00
+    assert estimate_cost_usd(None, input_tokens=10) is None
+
+
+def _kiro_archive(root, run_id="kiro-test-001", *, credits=7.24):
+    """Create a Kiro-style archive with credits instead of tokens."""
+    ar = RunArchive(root, run_id, "kiro", "aidlc")
+    ar.record(
+        ExecutionResult(
+            node_id="aidlc-run",
+            ok=True,
+            exit_code=0,
+            usage={"credits": credits},
+            model=None,
+            meta={"effort": "high", "duration_seconds": 45},
+        )
+    )
+    ar.finalize(True)
+
+
+def test_normalize_manifest_usage_kiro_credits(tmp_path):
+    _kiro_archive(tmp_path)
+    manifest = json.loads((tmp_path / "kiro-test-001" / "manifest.json").read_text())
+
+    node = normalize_manifest_usage(manifest)[0]
+
+    assert node.credits == 7.24
+    assert node.funding == "kiro/credits"
+    assert node.input_tokens == 0
+    assert node.output_tokens == 0
+
+
+def test_summarize_usage_includes_kiro_credits(tmp_path):
+    _kiro_archive(tmp_path, credits=3.5)
+
+    summary = summarize_usage(tmp_path)
+
+    assert summary.credits == 3.5
+    assert summary.by_executor[0]["executor"] == "kiro"
+    assert summary.by_executor[0]["credits"] == 3.5
+    assert summary.by_funding[0]["funding"] == "kiro/credits"
+    assert summary.by_funding[0]["credits"] == 3.5
+
+
+def test_summarize_usage_mixed_claude_and_kiro(tmp_path):
+    _archive(tmp_path, "run-20260626-090000")
+    _kiro_archive(tmp_path, "kiro-run-001", credits=5.0)
+
+    summary = summarize_usage(tmp_path)
+
+    assert summary.run_count == 2
+    assert summary.cost_usd == 0.25
+    assert summary.credits == 5.0
+
+
+def test_price_prefix_matching_prefers_longest_prefix():
+    from cadora.usage import estimate_cost_usd
+
+    # "gpt-5.4-mini-<date>" must price as mini ($0.75/M in), never as gpt-5.4 ($2.50/M).
+    cost = estimate_cost_usd("gpt-5.4-mini-2026-05-01", input_tokens=1_000_000)
+    assert cost == 0.75
+
+
+def test_cost_is_consistent_across_all_surfaces(tmp_path, capsys):
+    """A codex run priced by the table must show the SAME total in usage, archive-show,
+    report, eval, and compare — never $0.00 in one and $1.98 in another."""
+    import cadora.cli as cli
+    from cadora.report import build_report
+    from cadora.usage import normalize_manifest_usage, summarize_usage
+
+    _codex_archive(tmp_path, run_id="run-20260704-200000", model="gpt-5.5")
+    manifest = json.loads(
+        (tmp_path / "run-20260704-200000" / "manifest.json").read_text()
+    )
+
+    node = normalize_manifest_usage(manifest)[0]
+    expected = node.cost_usd
+    assert expected and expected > 0  # codex node IS priced (not $0)
+
+    # 1) summarize_usage
+    assert summarize_usage(tmp_path).cost_usd == expected
+    # 2) archive show — the surface that used to sum raw $0
+    cli.main(["archive", "show", "run-20260704-200000", "--archive-dir", str(tmp_path)])
+    shown = capsys.readouterr().out
+    assert f"${expected:.4f}" in shown and "est." in shown
+    # 3) report
+    assert build_report(tmp_path / "run-20260704-200000")["summary"]["cost_usd"] == round(
+        expected, 4
+    )

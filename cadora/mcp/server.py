@@ -105,8 +105,15 @@ def build_app(executor_factory=None, *, host="127.0.0.1", port=8000):
         session = sessions.get(run_id)
         if session is None:
             return f"error: unknown run {run_id!r}"
-        base = Path(session.run_kwargs.get("cwd", "."))
-        return (base / path).read_text(errors="replace")
+        base = Path(session.run_kwargs.get("cwd", ".")).resolve()
+        target = (base / path).resolve()
+        # Fail closed on traversal: any reachable MCP client can call this tool, so a
+        # `../`-shaped path must never read outside the run's workspace.
+        if not target.is_relative_to(base):
+            return f"error: path {path!r} escapes the run workspace"
+        if not target.is_file():
+            return f"error: no such artifact {path!r}"
+        return target.read_text(errors="replace")
 
     @app.tool()
     def run_status(run_id: str) -> dict:

@@ -29,7 +29,9 @@ from the outside:
 - **Fail-closed human review** — mark nodes `review: true` and run `--hitl`: the operator must
   approve, request bounded revisions, or abort; closed stdin aborts rather than silently
   approving. Every decision, comment, and revision cost is archived. The review surface is
-  pluggable over **MCP** (Claude Code, Claude Desktop, Codex CLI, or any MCP client).
+  pluggable over **MCP** — run `cadora mcp` and drive `start_run` / `review_gate` /
+  `submit_review` / `get_artifact` / `run_status` from any MCP client (Claude Code, Claude
+  Desktop, Codex CLI, or a networked client). See [docs/hitl-mcp.md](docs/hitl-mcp.md).
 - **Per-node cost attribution, cross-vendor** — every node records its backend, model, tokens,
   and dollars, split by funding source (subscription vs metered API). `cadora usage` and the
   local dashboard's FinOps panel aggregate by model / backend / funding / day — one ledger even
@@ -37,7 +39,11 @@ from the outside:
 
 The evidence of a run *is* the archive: `runs/<id>/manifest.json` + per-stage artifacts + the
 event stream + gate/integrity/review outcomes + cost. Inspect with `cadora archive ls / show`
-or the dashboard.
+or the dashboard — and hand it to someone with **`cadora report <run-id>`**: a portable
+**evidence pack** (self-contained `report.html` + `report.json` + a SHA-256 `checksums.txt`
+covering every archived file), verifiable after it leaves your machine
+(`shasum -a 256 -c`). The pack states exactly what it claims — and that it's checksummed,
+not signed.
 
 ## Backends
 
@@ -45,6 +51,8 @@ or the dashboard.
 |---|---|---|
 | `claude` (default) | `claude -p`, structured stream-json | **subscription-funded by default**; metered API is explicit opt-in (`--funding api`) |
 | `codex` | `codex exec --json`, structured JSONL | uses your Codex login/plan |
+| `kiro` | `kiro-cli chat --no-interactive` | bills **subscription credits** (shown in FinOps); live-verified on 2.10.0 |
+| `glm` *(experimental)* | Z.ai's Anthropic-compatible endpoint behind the `claude` CLI | `ZAI_API_KEY`; Anthropic credentials are stripped from the env; dollars computed from the public Z.ai rate table (flagged `est.`) |
 | `fixture` | local, deterministic, offline | demos, CI smoke, policy-safe HITL walkthroughs — no model call |
 
 Both live backends run the **same topology, gates, integrity evaluation, and archive**, so their
@@ -59,6 +67,22 @@ the rule-set into your workspace (`CLAUDE.md` for Claude Code, `AGENTS.md` for C
 project instructions are preserved outside a managed block), and the example topologies drive
 🔵 Inception → 🟢 Construction → Build & Test from a `vision.md`. The method is a **pack, not the
 product**: any workflow you can express as a topology of gated nodes conducts the same way.
+
+**EXPERIMENTAL — aidlc-workflows 2.0 pack.** `cadora aidlc-init <ws> --method aidlc-v2` installs
+upstream's v2 engine (pinned tag, **commit-verified** — a moved tag fails the install) with a
+guarded twist: upstream's defaults silently re-point every session at **Bedrock us-east-1 with
+`opus[1m]` at `xhigh` effort** and wire five remote MCP servers; the installer **strips those
+pins by default and records exactly what it stripped** in `.cadora-aidlc-v2.json` (restore with
+`--keep-provider-pins` / `--keep-mcp`). Then drive `/aidlc` yourself in Claude Code, and inspect
+the run any time — read-only — with:
+
+```bash
+cadora aidlc-audit ./my-project          # state + 68-event audit trail summary
+cadora aidlc-audit ./my-project --json   # full structured events (gates, sensors, human turns)
+```
+
+Requires `bun` (v2's hooks; `cadora doctor` checks it). The full external driver for v2 is
+deliberately deferred while upstream's GA preview stabilizes its gate surface.
 
 ## Install
 
@@ -75,18 +99,28 @@ From source: `git clone https://github.com/yeychenne/cadora.git && cd cadora && 
 
 ## Quickstart
 
+Run these commands from a clone of this repository so the `examples/` files are present.
+
 ```bash
+# 0. Check your backend CLIs against the tested contract ranges (offline, no model calls).
+cadora doctor
+
 # 1. Set up a workspace from your product vision (installs the AI-DLC method pack).
 cadora aidlc-init ./my-project --vision vision.md
 
 # 2. Drive the workflow on Claude Code — autonomous, gated, subscription-funded.
 cadora run examples/aidlc.topology.yaml --vision vision.md --cwd ./my-project
 
-# 3. Read the evidence.
+# 3. Read the evidence — package it, judge it, compare it.
 cadora archive ls
 cadora archive show <run-id>
-cadora usage            # tokens + dollars by model / backend / funding
-cadora dashboard        # local cockpit: DAG cost/quality map + FinOps panel
+cadora report <run-id>         # portable evidence pack: html + json + sha-256 checksums
+cadora eval <run-id>           # deterministic verdict + CI-friendly exit code
+cadora eval <run-id> --judge   # + opt-in LLM rubric (advisory; any backend; never overrides)
+cadora compare <run-a> <run-b> # per-node outcome/model/cost diff — the measured A/B
+cadora deliverable <run-id>    # client-facing delivery report (markdown; --docx / --pptx optional)
+cadora usage                   # tokens + dollars/credits by model / backend / funding
+cadora dashboard               # local cockpit: DAG cost/quality map + FinOps panel
 ```
 
 A/B the same spec on Codex:
@@ -121,25 +155,45 @@ declare dev requirements get a cached isolated gate environment (`.cadora/gate-v
 `blocked_prerequisite` + the missing packages instead of misreporting the application as broken.
 Offline: `--gate-wheelhouse /path/to/wheels`; opt out with `--gate-setup off`.
 
-Autonomous runs pass `--dangerously-skip-permissions` to the backend (an agentic workflow edits
-files and runs commands) — point Cadora only at workspaces you trust, prefer a dedicated
-worktree/container, and keep credentials out of the workspace environment.
+## Security model — read before pointing it at your code
 
-The dashboard binds **localhost only, no authentication** — keep it on loopback or front it with
-TLS + auth. See [docs/dashboard.md](docs/dashboard.md).
+Cadora **audits the agent's output** (deterministic gates, integrity checks, evidence) — it does
+**not sandbox the agent's execution**. An autonomous run drives the backend with
+`--dangerously-skip-permissions` inside your `--cwd`: the agent reads, writes, and runs commands
+there with your user's permissions, and gates may install dependencies (executing agent-authored
+build hooks). So:
+
+- **Point Cadora only at a trusted or throwaway workspace** — a fresh directory, a git worktree,
+  or a container. Not your home directory, not a repo with secrets in it.
+- **Keep credentials out of that environment.** Executors drop ambient provider keys where they
+  can (e.g. the `claude` backend strips a stray `ANTHROPIC_API_KEY` in subscription mode), but the
+  workspace itself is the agent's to touch.
+- Every autonomous run prints a blast-radius banner and, interactively, asks once to proceed;
+  CI/automation bypasses with `--yes` or `CADORA_ASSUME_YES=1`.
+- The **dashboard and MCP server are localhost-only with no authentication.** Cadora refuses to
+  bind either to a non-loopback host unless you pass `--i-understand-no-auth` — front them with
+  TLS + auth before exposing them. See [docs/dashboard.md](docs/dashboard.md).
+- The pre-publish **leak scan is a codename denylist, not a general secrets scanner** — it guards
+  *our* release hygiene, it is not a substitute for your own secret-scanning on generated code.
+
+New to Cadora, or bringing it to a hackathon? Start with the
+[getting started guide](docs/getting-started.md), the
+[hackathon quickstart](docs/hackathon-quickstart.md) (5 commands), and the
+[5-minute demo script](docs/demo-script-5min.md).
 
 ## Status
 
-**v0.5.0** — the multi-backend + repositioning release: **multi-backend phase routing**
-(`--construction-executor`), **per-node executor cost attribution** in `cadora usage` and the
-dashboard FinOps panel, and the audit-grade repositioning (AI-DLC becomes the flagship method
-pack). On top of v0.4.0's gate substance checks (vacuous-pass blocking), cross-stack prerequisite
-classification, and the topology/FinOps dashboard. 120+ tests, `ruff` clean, CI on Python
-3.10–3.12.
+**v0.6.0** — the hackathon-readiness release: trust-gated autonomous runs, one cost ledger across
+`archive` / `report` / `eval` / `compare` / `usage` / dashboard, full advertised-backend coverage
+in `cadora doctor`, fail-closed localhost guards for the dashboard and MCP server, and a
+tester-ready onboarding kit. It includes the v0.5.0 multi-backend foundation
+(`--construction-executor`), per-node cost attribution, evidence packs, `eval` (+ opt-in LLM
+judge), `compare`, `deliverable`, Kiro credits, and the experimental GLM and AI-DLC v2 paths.
+180+ tests, `ruff` clean, CI on Python 3.10–3.12.
 
-**Roadmap:** `cadora report` — a portable, self-contained **evidence pack** per run (gates,
-integrity findings, review trail, per-node cost); `cadora compare` — side-by-side measured
-verdicts across backends/models; additional backend and method packs as they earn verification.
+**Roadmap:** signed evidence packs, full MCP auth, CI secrets-scanner + lockfile hardening, a
+backend contract matrix, a container sandbox wrapper, and additional backend/method packs as they
+earn verification.
 
 ## License
 

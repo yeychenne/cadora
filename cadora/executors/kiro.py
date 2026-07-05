@@ -33,6 +33,7 @@ _PROMPT_PREFIX_RE = re.compile(r"^>\s*", re.MULTILINE)
 
 class KiroExecutor(NodeExecutor):
     name = "kiro"
+    funding = "kiro/credits"  # Kiro bills subscription credits, not tokens/dollars
 
     def __init__(
         self,

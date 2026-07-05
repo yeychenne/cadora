@@ -2,6 +2,117 @@
 
 ## Unreleased
 
+## v0.6.0 — 2026-07-05
+
+The hackathon-readiness release: trust-gated autonomous runs, one cost ledger across
+`archive` / `report` / `eval` / `compare` / `usage` / dashboard, full advertised-backend coverage
+in `cadora doctor`, and fail-closed localhost guards for the dashboard and MCP server — on top of
+the portable evidence pack, deterministic `eval` (+ opt-in LLM judge), cross-backend `compare`,
+the `deliverable` report, Kiro credits, the experimental GLM and AI-DLC v2 paths, and a
+tester-ready onboarding kit.
+
+### Added
+- **Autonomous-run trust gate** — every autonomous run prints a blast-radius banner (backend,
+  workspace, skip-permissions) and, interactively, asks once to proceed; CI/automation bypasses
+  with `--yes` / `CADORA_ASSUME_YES=1`. Cadora audits the agent's *output*, not its *execution* —
+  the README now has a **Security model** section stating this plainly.
+- **`cadora doctor` covers all advertised backends** — kiro (kiro-cli ≥ 2.10.0) and glm (claude
+  present + `ZAI_API_KEY`) join the checks, so the first command a new user runs tells the whole
+  truth about what's usable.
+- **Onboarding kit** — a `docs/hackathon-quickstart.md` (5-command flow), a
+  `docs/demo-script-5min.md`, and a tiny `examples/hackathon-hello.vision.md` that builds in ~2
+  minutes for a fast, reliable live demo.
+
+### Changed
+- **One cost source across every surface** — `cadora archive show` / `ls` now price nodes through
+  the usage layer like `usage` / `report` / `eval` / `compare` / dashboard already do, so a
+  Codex/GLM run no longer shows real dollars in one command and `$0.00` in another (estimates are
+  flagged `est.`; Kiro credits shown alongside).
+
+### Security
+- **Unauthenticated surfaces fail closed on non-loopback binds** — `cadora mcp` and
+  `cadora dashboard` refuse a non-loopback `--host` unless `--i-understand-no-auth` is passed.
+- **MCP `get_artifact` path traversal fixed** — the artifact reader now resolves and fail-closes
+  any path escaping the run workspace (a `../` path from any connected MCP client could
+  previously read arbitrary files). Found by the internal security review board.
+- **Codex `stderr_tail` is redacted** before landing in the archived (dashboard-served)
+  manifest — credential-shaped strings (bearer/`sk-`/key=…) are masked in case the backend CLI
+  ever logs a token on an error path.
+- `scripts/refresh-aidlc-rules.sh` now defaults to a **pinned release tag**, never `main`.
+
+### Fixed
+- **Claude/GLM node timeouts are archived, not raised** — a hung `claude -p` (or GLM) node now
+  returns an archivable failure (`exit_code=124`, `timed_out` meta, partial stream captured)
+  instead of escaping the runner and losing the evidence for exactly the failure long agent runs
+  hit most. Codex and Kiro already behaved this way.
+- **GLM per-node `model:` overrides route correctly** — the `--model` flag is now stripped for
+  the child call in every case (it previously leaked through for per-node overrides, handing GLM
+  ids to the Claude CLI instead of the env aliases).
+- **Evidence-pack checksums verify under `--out`** — the report checksum line references the
+  actual output location (relative to the run dir when possible, absolute otherwise) instead of
+  a hard-coded `report/` prefix.
+- **Price-table prefix matching prefers the longest prefix** — dated ids like
+  `gpt-5.4-mini-2026…` price as mini, never as `gpt-5.4` (was over-charging 3.3–10×).
+
+### Added
+- **EXPERIMENTAL GLM backend** — `--executor glm` drives Zhipu GLM (default `glm-5.2`) through
+  Z.ai's Anthropic-compatible endpoint behind the existing `claude` CLI: same stream-json
+  contract, same archive. Guarded by construction: ambient Anthropic credentials
+  (`ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`) are stripped from the subprocess so a GLM run
+  can neither bill Anthropic nor leak an Anthropic key to a third-party endpoint; auth comes
+  only from `ZAI_API_KEY`. The CLI's client-side cost estimate (an Anthropic price table that
+  doesn't know GLM) is discarded and dollars are computed from the public Z.ai rate table with
+  Anthropic-wire cache semantics, flagged `est.`. Live smoke (`scripts/live-smoke.sh glm`)
+  gates promotion out of experimental.
+- **Kiro backend live-verified + credits in FinOps** — the `kiro` executor is verified against
+  kiro-cli 2.10.0 (real captured output in the test fixtures; one full AI-DLC topology run =
+  **3.68 credits**). Kiro reports **subscription credits**, not tokens/dollars, so `cadora usage`
+  (totals + by model/executor/funding), `--json`, and `cadora archive show` now carry a
+  `credits` dimension alongside dollars — one FinOps ledger across three billing models
+  (Claude $, Codex tokens→$, Kiro credits).
+- **`cadora deliverable <run-id>`** — generate a client-facing delivery report from an archived
+  run (`md` now, `docx` as an optional extra — core stays pyyaml-only), with `--client` /
+  `--project` header fields: the consulting hand-off document generated from the same evidence
+  the archive already holds.
+- **`cadora eval <run>` — deterministic run evaluation.** Six checks, no LLM cost: run
+  completion, per-node success, gate verdicts, integrity findings (critical — gate the verdict
+  and the exit code, so it drops into CI) plus cost attribution and artifact capture (warnings).
+  Cost attribution counts price-table estimates; the integrity check explains when it is stricter
+  than the run's own audit mode.
+- **Opt-in LLM-as-judge on `eval`** — `cadora eval <run> --judge [--judge-executor …]` adds a
+  rubric-scored advisory verdict from **any backend** (judge a Claude run with Codex or vice
+  versa). Off by default, its cost is reported, and it **never overrides the deterministic verdict**.
+- **`cadora compare <a> <b>` — diff two archived runs.** Per-node outcome/model/cost with
+  ok-regression and node-presence flags, a run-level cost delta, and a same-topology guard — the
+  cross-backend A/B (Claude vs Codex on one topology), measured instead of guessed.
+- **`cadora report <run-id>` — the evidence pack.** Turns one archived run into a portable,
+  self-contained proof pack: `report.html` (single file, no external assets — attach it to a
+  deliverable), `report.json` (structured), and `checksums.txt` (SHA-256 of every archived run
+  file + the report itself; verify with `shasum -a 256 -c`). Covers deterministic gate verdicts
+  (incl. vacuous/blocked), integrity findings, the human-review trail, and per-node cost across
+  backends with estimated costs explicitly flagged. States its claims honestly: checksummed,
+  not signed (signing is on the roadmap).
+- **EXPERIMENTAL aidlc-workflows 2.0 method pack** — `cadora aidlc-init --method aidlc-v2`
+  installs upstream's v2 engine from a **pinned, commit-verified tag** (a moved tag aborts the
+  install), **strips upstream's silent provider/cost pins by default** (`CLAUDE_CODE_USE_BEDROCK`,
+  region, model aliases, `model: opus[1m]`, `effortLevel: xhigh`) and leaves the five remote MCP
+  servers uninstalled unless opted in — recording exactly what was stripped in
+  `.cadora-aidlc-v2.json`. New read-only **`cadora aidlc-audit`** summarizes a v2 workspace's
+  state file and 68-event audit trail (gates, human turns, sensors; `--json` for the full event
+  stream). `cadora doctor` now also checks for `bun` (v2's hook runtime). The full external
+  driver for v2 is deferred while upstream's GA preview stabilizes its gate surface.
+- **`cadora doctor`** — offline backend-CLI contract checks: Python floor, backend binary
+  presence, and whether each CLI's version falls inside the range the adapter was last verified
+  against (backend CLIs ship weekly with no machine-output stability guarantee — drift is the
+  top operational risk). Outside-range is a warning (`untested`), missing/unparsable is the hard
+  signal; `--json` for machines. Exits non-zero only when no live backend is usable.
+- **Codex dollar cost** — nodes that report tokens but no dollars (Codex) are now priced from
+  the public OpenAI rate table (gpt-5.5 / 5.4 / 5.4-mini / 5.4-nano / 5.3-codex; cached input
+  billed at the cached rate). ChatGPT-plan credit-funded runs price identically (the credit rate
+  card maps to API rates exactly). Estimated costs are **flagged**: `cadora usage` prints the
+  estimated-node count, and `--json` exposes per-node `cost_estimated` plus the new
+  `reasoning_output_tokens`. A backend-reported cost is always authoritative.
+
 ## v0.5.0 — 2026-07-03
 
 Multi-backend + repositioning release: drive design and construction on different agent backends

@@ -21,3 +21,21 @@ jobs:
       - run: pip install -e ".[dev,mcp]"
       - run: ruff check .
       - run: pytest -q
+
+  # Release consistency — inlined (not a scripts/ call) so it runs identically on the public
+  # mirror, where scripts/ does not exist. Guards the 0.4.0-style slip: shipping a version whose
+  # README/CHANGELOG still describe the previous one.
+  consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: version / README / CHANGELOG agree
+        run: |
+          set -euo pipefail
+          VER="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -1)"
+          INIT="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' cadora/__init__.py | head -1)"
+          [ -n "$VER" ] || { echo "no version in pyproject.toml"; exit 1; }
+          [ "$VER" = "$INIT" ] || { echo "pyproject $VER != __version__ $INIT"; exit 1; }
+          grep -q "\*\*v${VER}\*\*" README.md || { echo "README Status does not name v$VER"; exit 1; }
+          grep -qE "^## v${VER} — (20|TBD)" CHANGELOG.md || { echo "CHANGELOG lacks a v$VER section"; exit 1; }
+          echo "consistency OK (v$VER)"

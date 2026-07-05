@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cadora"
-version = "0.5.0"
+version = "0.6.0"
 description = "Ship agent-built software you can prove — an audit-grade conductor for coding-agent CLIs (Claude Code, Codex): deterministic gates, tamper detection, run evidence, per-node cost attribution."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -18,6 +18,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-cov>=6.0", "ruff"]
 mcp = ["mcp>=1.2"]
+deliverable = ["python-docx>=1.1"]
 
 [project.scripts]
 cadora = "cadora.cli:main"

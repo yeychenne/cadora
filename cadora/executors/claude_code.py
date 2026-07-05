@@ -63,15 +63,40 @@ class ClaudeCodeExecutor(NodeExecutor):
     def run(self, node: Node, prompt: str, *, cwd: str, env=None) -> ExecutionResult:
         cmd = self._build_cmd(node, prompt)
 
-        proc = subprocess.run(
-            cmd,
-            cwd=cwd,
-            env=self._resolve_env(env),
-            stdin=subprocess.DEVNULL,  # headless: never block waiting on stdin
-            capture_output=True,
-            text=True,
-            timeout=self.timeout,
-        )
+        try:
+            proc = subprocess.run(
+                cmd,
+                cwd=cwd,
+                env=self._resolve_env(env),
+                stdin=subprocess.DEVNULL,  # headless: never block waiting on stdin
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
+            )
+        except subprocess.TimeoutExpired as exc:
+            # A hung node is the failure mode long agent runs hit most — it must land in
+            # the archive as evidence, not escape the runner as an exception.
+            partial = _parse_stream_json(_as_text(exc.stdout))
+            meta = dict(partial.meta)
+            meta.update(
+                {
+                    "timed_out": True,
+                    "timeout_seconds": self.timeout,
+                    "funding_requested": self.funding,
+                    "funding_resolved": _funding_source(partial.api_key_source),
+                }
+            )
+            return ExecutionResult(
+                node_id=node.id,
+                ok=False,
+                exit_code=124,
+                text=partial.text,
+                events=partial.events,
+                usage=partial.usage,
+                cost_usd=partial.cost_usd,
+                model=partial.model,
+                meta=meta,
+            )
 
         r = _parse_stream_json(proc.stdout)
         # Normalized success: the process exited 0 AND the run reported no error.
@@ -104,6 +129,12 @@ class ClaudeCodeExecutor(NodeExecutor):
         if self.funding == "subscription" and "ANTHROPIC_API_KEY" not in overlay:
             proc_env.pop("ANTHROPIC_API_KEY", None)
         return proc_env
+
+
+def _as_text(value: str | bytes | None) -> str:
+    if isinstance(value, bytes):
+        return value.decode(errors="replace")
+    return value or ""
 
 
 def _funding_source(api_key_source: str | None) -> str:

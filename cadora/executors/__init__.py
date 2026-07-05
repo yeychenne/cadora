@@ -9,12 +9,14 @@ from cadora.executors.base import ExecutionResult, NodeExecutor
 from cadora.executors.claude_code import ClaudeCodeExecutor
 from cadora.executors.codex import CodexExecutor
 from cadora.executors.fixture import FixtureExecutor
+from cadora.executors.glm import GlmExecutor
 from cadora.executors.kiro import KiroExecutor
 
 _REGISTRY: dict[str, type[NodeExecutor]] = {
     ClaudeCodeExecutor.name: ClaudeCodeExecutor,    # claude — default; structured stream-json
-    KiroExecutor.name: KiroExecutor,                # kiro — AWS/demo; plain text
+    KiroExecutor.name: KiroExecutor,                # kiro — AWS; credits; live-verified 2.10.0
     CodexExecutor.name: CodexExecutor,              # codex — OpenAI; structured JSONL
+    GlmExecutor.name: GlmExecutor,                  # glm — Z.ai behind claude CLI; EXPERIMENTAL
     AntigravityExecutor.name: AntigravityExecutor,  # antigravity — Google; EXPERIMENTAL (agy)
     FixtureExecutor.name: FixtureExecutor,          # fixture — local deterministic demo/test backend
 }

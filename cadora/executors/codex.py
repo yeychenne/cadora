@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 from dataclasses import dataclass, field
 
@@ -97,7 +98,9 @@ class CodexExecutor(NodeExecutor):
             "ephemeral": self.ephemeral,
         }
         if proc.stderr:
-            meta["stderr_tail"] = proc.stderr[-2000:]
+            # stderr lands in the archived (and dashboard-served) manifest — redact anything
+            # credential-shaped in case the CLI ever logs a token on an error path.
+            meta["stderr_tail"] = _REDACT_RE.sub("[redacted]", proc.stderr[-2000:])
         return ExecutionResult(
             node_id=node.id,
             ok=ok,
@@ -108,6 +111,11 @@ class CodexExecutor(NodeExecutor):
             model=resolved_model,
             meta={k: v for k, v in meta.items() if v not in (None, "")},
         )
+
+
+_REDACT_RE = re.compile(
+    r"(?i)(bearer\s+[a-z0-9._\-]{8,}|sk-[a-z0-9_\-]{8,}|(?:api|auth)[_-]?(?:key|token)\s*[=:]\s*\S+)"
+)
 
 
 @dataclass

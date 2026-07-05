@@ -24,6 +24,19 @@ def _default_run_id() -> str:
 
 def cmd_run(args) -> int:
     topology = load_topology(args.topology)
+
+    # Honest trust gate: autonomous runs drive skip-permissions agents in --cwd. Show the
+    # blast radius; let a human abort; never block CI (--yes / CADORA_ASSUME_YES / no TTY).
+    from cadora.preflight import preflight_autonomous
+
+    if not preflight_autonomous(
+        cwd=args.cwd,
+        executor=args.executor,
+        autonomous=not getattr(args, "no_autonomous", False),
+        assume_yes=getattr(args, "yes", False),
+    ):
+        return 1
+
     if args.vision is not None:
         from cadora.workspace import setup_aidlc_workspace
 
@@ -77,18 +90,55 @@ def cmd_run(args) -> int:
 
 
 def cmd_compare(args) -> int:
-    # TODO: implement run comparison (diff manifests + per-node outputs).
-    raise SystemExit("cadora compare: not implemented yet")
+    from cadora.compare import compare_runs, format_comparison
+
+    try:
+        a = read_manifest(args.archive_dir, args.run_a)
+        b = read_manifest(args.archive_dir, args.run_b)
+    except FileNotFoundError as e:
+        raise SystemExit(f"no such run: {e}")
+    diff = compare_runs(a, b)
+    print(json.dumps(diff, indent=2) if getattr(args, "json", False)
+          else format_comparison(diff))
+    return 0
 
 
 def cmd_eval(args) -> int:
-    # TODO: implement the eval pipeline (LLM-as-judge graders).
-    raise SystemExit("cadora eval: not implemented yet")
+    from cadora.evaluate import evaluate_run, format_evaluation
+
+    try:
+        m = read_manifest(args.archive_dir, args.run_id)
+    except FileNotFoundError:
+        raise SystemExit(f"no such run {args.run_id!r} in {args.archive_dir}/")
+    result = evaluate_run(m, run_dir=Path(args.archive_dir) / args.run_id)
+    print(json.dumps(result, indent=2) if getattr(args, "json", False)
+          else format_evaluation(result))
+    return 0 if result["verdict"] == "pass" else 1
+
+
+_LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1", ""}
+
+
+def _guard_bind(host: str, surface: str, acknowledged: bool) -> None:
+    """Refuse a non-loopback bind of an unauthenticated surface unless acknowledged.
+
+    Both the MCP server and the dashboard are localhost-only with NO authentication. Binding
+    either to a routable interface exposes it (the MCP tools read/drive runs; the dashboard
+    serves the archive). Fail closed with an explicit escape hatch.
+    """
+    if host in _LOOPBACK_HOSTS or acknowledged:
+        return
+    raise SystemExit(
+        f"refusing to bind the {surface} to {host!r}: it has NO authentication and would be "
+        f"reachable from the network. Front it with TLS + auth, or pass "
+        f"--i-understand-no-auth to bind anyway (do this only on a trusted network)."
+    )
 
 
 def cmd_mcp(args) -> int:
     from cadora.mcp.server import serve
 
+    _guard_bind(args.host, "MCP server", args.i_understand_no_auth)
     serve(transport=args.transport, host=args.host, port=args.port)
     return 0
 
@@ -96,6 +146,7 @@ def cmd_mcp(args) -> int:
 def cmd_dashboard(args) -> int:
     from cadora.dashboard.server import serve_dashboard
 
+    _guard_bind(args.host, "dashboard", args.i_understand_no_auth)
     serve_dashboard(args.archive_dir, host=args.host, port=args.port)
     return 0
 
@@ -131,6 +182,9 @@ def cmd_aidlc_init(args) -> int:
         workspace_instruction_file,
     )
 
+    if getattr(args, "method", "aidlc") == "aidlc-v2":
+        return _aidlc_v2_init(args)
+
     ws = setup_aidlc_workspace(
         args.workspace,
         vision=args.vision,
@@ -151,8 +205,112 @@ def cmd_aidlc_init(args) -> int:
     return 0
 
 
+def _aidlc_v2_init(args) -> int:
+    from cadora.aidlc_v2 import PINNED_REF, InstallError, install_v2
+
+    if args.executor != "claude":
+        raise SystemExit("the aidlc-v2 pack currently supports --executor claude only")
+    try:
+        record = install_v2(
+            args.workspace,
+            ref=args.ref or PINNED_REF,
+            keep_provider_pins=args.keep_provider_pins,
+            keep_mcp=args.keep_mcp,
+            force=args.force,
+        )
+    except InstallError as exc:
+        raise SystemExit(str(exc)) from exc
+    if args.vision:
+        from cadora.workspace import _resolve_input
+
+        (Path(args.workspace) / "vision.md").write_text(_resolve_input(args.vision))
+
+    commit = (record.get("commit") or "")[:12]
+    print(f"aidlc-v2 pack (EXPERIMENTAL) installed at {args.workspace}")
+    print(f"  upstream: {record['upstream']}@{record['ref']} ({commit or 'local source'})")
+    if record["provider_pins_stripped"]:
+        pins = record["provider_pins_stripped"]
+        names = [k for k in pins if k != "env"] + list(pins.get("env", {}))
+        print(f"  provider/cost pins stripped (recorded): {', '.join(names)}")
+        print("    (upstream default silently switches sessions to Bedrock at opus[1m]/xhigh;")
+        print("     funding stays yours — restore with --keep-provider-pins)")
+    if record["mcp_servers_available"] and not record["mcp_installed"]:
+        print(
+            "  remote MCP servers NOT installed (opt in with --keep-mcp): "
+            + ", ".join(record["mcp_servers_available"])
+        )
+    if not record["bun_found"]:
+        print("  WARNING: bun not found — v2's 11 hooks (incl. the audit logger) will not fire.")
+        print("           install: brew install bun   (or see bun.sh)")
+    print(f"  install record: {args.workspace}/.cadora-aidlc-v2.json")
+    print(f"  next: cd {args.workspace} && claude   then run /aidlc — inspect any time with:")
+    print(f"        cadora aidlc-audit {args.workspace}")
+    return 0
+
+
+def cmd_aidlc_audit(args) -> int:
+    from cadora.aidlc_v2 import find_intents, ingest_intent
+
+    intents = find_intents(args.workspace)
+    if not intents:
+        raise SystemExit(f"no aidlc v2 intents under {args.workspace} (aidlc/spaces/*/intents/*)")
+    if args.intent:
+        matches = [p for p in intents if p.name == args.intent]
+        if not matches:
+            raise SystemExit(
+                f"intent {args.intent!r} not found; have: {', '.join(p.name for p in intents)}"
+            )
+        intent_dir = matches[0]
+    else:
+        intent_dir = intents[-1]  # newest (date-prefixed names)
+
+    report = ingest_intent(intent_dir)
+    if args.json:
+        print(json.dumps(report, indent=2))
+        return 0
+
+    state = report["state"]
+    print(f"aidlc-v2 intent: {report['intent']}  (space: {report['space']})")
+    print(
+        f"  phase={state.get('phase')}  current={state.get('current_stage')}  "
+        f"next={state.get('next_stage')}  status={state.get('status')}"
+    )
+    rollup = state.get("stage_rollup", {})
+    label = {"x": "done", "-": "in-progress", "?": "awaiting-approval", "R": "revising",
+             "S": "skipped", " ": "not-started"}
+    print(
+        "  stages: "
+        + "  ".join(f"{label.get(k, k)}={v}" for k, v in sorted(rollup.items(), reverse=True))
+    )
+    print(
+        f"  audit: {report['event_count']} events  ·  human_turns={report['human_turns']}  ·  "
+        f"sensors fired/passed/failed={report['sensors']['fired']}/"
+        f"{report['sensors']['passed']}/{report['sensors']['failed']}"
+    )
+    for gate in report["gates"]:
+        print(f"    {gate.get('timestamp', '?'):<22} {gate['event']:<14} {gate.get('stage', '')}")
+    return 0
+
+
+def _manifest_costs(manifest: dict):
+    """Per-node normalized cost/credits — the SINGLE source (matches usage/report/eval/compare).
+
+    Raw ``node.cost_usd`` is $0/None for token-only backends (Codex/GLM report tokens; Kiro
+    reports credits); the usage layer prices those from the rate table. Summing raw manifest
+    cost would show $0.00 for a run that `cadora usage` prices at real dollars — this keeps the
+    CLI honest and consistent with every other surface.
+    """
+    from cadora.usage import normalize_manifest_usage
+
+    return {u.node_id: u for u in normalize_manifest_usage(manifest)}
+
+
 def _total_cost(manifest: dict) -> float:
-    return sum((n.get("cost_usd") or 0.0) for n in manifest.get("nodes", []))
+    return sum((u.cost_usd or 0.0) for u in _manifest_costs(manifest).values())
+
+
+def _total_credits(manifest: dict) -> float:
+    return sum((u.credits or 0.0) for u in _manifest_costs(manifest).values())
 
 
 def cmd_archive_ls(args) -> int:
@@ -180,13 +338,17 @@ def cmd_archive_show(args) -> int:
         f"run {m.get('run_id')}  ·  executor={m.get('executor')}  ·  "
         f"topology={m.get('topology')}  ·  ok={m.get('ok')}"
     )
+    costs = _manifest_costs(m)
     for node in m.get("nodes", []):
         meta = node.get("meta", {})
         parts = [f"  {'✓' if node.get('ok') else '✗'} {node.get('node_id')}"]
         if node.get("model"):
             parts.append(node["model"])
-        if node.get("cost_usd") is not None:
-            parts.append(f"${node['cost_usd']:.4f}")
+        usage = costs.get(str(node.get("node_id")))
+        if usage and usage.cost_usd is not None:
+            parts.append(f"${usage.cost_usd:.4f}" + (" est." if usage.cost_estimated else ""))
+        if usage and usage.credits is not None:
+            parts.append(f"credits={usage.credits:.2f}")
         if meta.get("funding_resolved"):
             parts.append(f"funding={meta['funding_resolved']}")
         if meta.get("num_turns") is not None:
@@ -228,7 +390,13 @@ def cmd_archive_show(args) -> int:
             arts.append("attempts/")
         if arts:
             print(f"      {node_dir}/{{{','.join(arts)}}}")
-    print(f"  total: ${_total_cost(m):.4f}")
+    total_credits = _total_credits(m)
+    total_line = f"  total: ${_total_cost(m):.4f}"
+    if any(u.cost_estimated for u in costs.values()):
+        total_line += " (incl. est.)"
+    if total_credits:
+        total_line += f"  credits={total_credits:.2f}"
+    print(total_line)
     return 0
 
 
@@ -257,29 +425,91 @@ def cmd_usage(args) -> int:
         f"cache_create={_fmt_tokens(summary.cache_creation_input_tokens)}  "
         f"cache_read={_fmt_tokens(summary.cache_read_input_tokens)}"
     )
-    print(
+    totals = (
         f"  totals: generation={_fmt_tokens(summary.generation_tokens)}  "
         f"context={_fmt_tokens(summary.context_tokens)}  "
         f"cost=${summary.cost_usd:.4f}"
     )
+    if summary.credits:
+        totals += f"  credits={summary.credits:.2f}"
+    print(totals)
+    if summary.estimated_cost_nodes:
+        print(
+            f"  ({summary.estimated_cost_nodes} node cost(s) estimated from the public "
+            "price table — backend reported tokens but no dollars)"
+        )
     if summary.by_model:
         print("  by model:")
         for item in summary.by_model:
-            print(
+            line = (
                 f"    {item['model']:<24} "
                 f"{_fmt_tokens(item['context_tokens']):>8} context  "
                 f"${item['cost_usd']:.4f}"
             )
+            if item.get("credits"):
+                line += f"  credits={item['credits']:.2f}"
+            print(line)
     return 0
 
 
+def cmd_report(args) -> int:
+    from cadora.report import write_report
+
+    try:
+        paths = write_report(args.archive_dir, args.run_id, out=args.out)
+    except FileNotFoundError as exc:
+        raise SystemExit(str(exc)) from exc
+    run_dir = Path(args.archive_dir) / args.run_id
+    print(f"evidence pack for {args.run_id}:")
+    for kind, path in paths.items():
+        print(f"  {kind:<9} {path}")
+    print(f"  verify:   cd {run_dir} && shasum -a 256 -c {paths['checksums'].resolve()}")
+    return 0
+
+
+def cmd_deliverable(args) -> int:
+    from cadora.deliverable import write_deliverable
+
+    run_dir = Path(args.archive_dir) / args.run_id
+    if not (run_dir / "manifest.json").exists():
+        raise SystemExit(f"no such run {args.run_id!r} in {args.archive_dir}/")
+    paths = write_deliverable(run_dir, out=args.out, docx=args.docx)
+    print(f"delivery pack for {args.run_id}:")
+    for kind, path in paths.items():
+        print(f"  {kind:<9} {path}")
+    return 0
+
+
+def cmd_doctor(args) -> int:
+    from cadora.doctor import live_backends_ok, run_doctor
+
+    checks = run_doctor()
+    if args.json:
+        print(json.dumps([c.to_dict() for c in checks], indent=2))
+    else:
+        print("cadora doctor — backend CLI contract checks")
+        for c in checks:
+            version = f" {c.version}" if c.version else ""
+            detail = f"  ({c.detail})" if c.detail else ""
+            print(f"  {c.status:<10} {c.backend:<8}{version}{detail}")
+        print("  (fixture needs no check — offline, no external contract)")
+    # Exit 0 while at least one live backend is usable; 1 when none is (nothing can run).
+    return 0 if live_backends_ok(checks) else 1
+
+
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(prog="cadora", description="AI-DLC workflow conductor")
+    p = argparse.ArgumentParser(
+        prog="cadora",
+        description="Audit-grade conductor for coding-agent CLIs: drive a gated workflow, "
+        "prove what the agent built, and attribute cost per node across backends.",
+    )
     sub = p.add_subparsers(dest="cmd", required=True)
 
     r = sub.add_parser("run", help="run a topology")
     r.add_argument("topology")
-    r.add_argument("--executor", default="claude", help="claude | codex | kiro | antigravity")
+    r.add_argument(
+        "--executor", default="claude", help="claude | codex | kiro | glm | antigravity"
+    )
     r.add_argument("--cwd", default=".", help="working dir for nodes / the AI-DLC workspace")
     r.add_argument("--archive-dir", default="runs")
     r.add_argument("--run-id", default=None)
@@ -347,15 +577,27 @@ def main(argv=None) -> int:
         help="activate explicit `review: true` topology gates; approve, request a same-stage "
         "revision, or abort before downstream work starts",
     )
+    r.add_argument(
+        "--yes",
+        "-y",
+        action="store_true",
+        help="skip the autonomous-run confirmation (also via CADORA_ASSUME_YES=1). Cadora drives "
+        "skip-permissions agents in --cwd and audits their output, not their execution — point "
+        "it only at a trusted or throwaway workspace.",
+    )
     r.set_defaults(func=cmd_run)
 
-    c = sub.add_parser("compare", help="diff two runs")
+    c = sub.add_parser("compare", help="diff two runs (cross-backend / over time)")
     c.add_argument("run_a")
     c.add_argument("run_b")
+    c.add_argument("--archive-dir", default="runs")
+    c.add_argument("--json", action="store_true", help="emit the structured diff as JSON")
     c.set_defaults(func=cmd_compare)
 
-    e = sub.add_parser("eval", help="evaluate a run")
+    e = sub.add_parser("eval", help="evaluate a run (deterministic AI-DLC checks)")
     e.add_argument("run_id")
+    e.add_argument("--archive-dir", default="runs")
+    e.add_argument("--json", action="store_true", help="emit the structured result as JSON")
     e.set_defaults(func=cmd_eval)
 
     m = sub.add_parser("mcp", help="run Cadora as an MCP server (HITL review + run control)")
@@ -371,6 +613,11 @@ def main(argv=None) -> int:
         help="bind host for --transport http (default: localhost; expose remotely behind TLS+auth)",
     )
     m.add_argument("--port", type=int, default=8000, help="bind port for --transport http")
+    m.add_argument(
+        "--i-understand-no-auth",
+        action="store_true",
+        help="allow binding this unauthenticated surface to a non-loopback host",
+    )
     m.set_defaults(func=cmd_mcp)
 
     dash = sub.add_parser("dashboard", help="serve a lightweight local run dashboard")
@@ -381,6 +628,11 @@ def main(argv=None) -> int:
         help="bind host (default: 127.0.0.1)",
     )
     dash.add_argument("--port", type=int, default=8765, help="bind port (default: 8765)")
+    dash.add_argument(
+        "--i-understand-no-auth",
+        action="store_true",
+        help="allow binding this unauthenticated surface to a non-loopback host",
+    )
     dash.set_defaults(func=cmd_dashboard)
 
     integrity = sub.add_parser(
@@ -400,6 +652,36 @@ def main(argv=None) -> int:
     ash.add_argument("run_id")
     ash.add_argument("--archive-dir", default="runs")
     ash.set_defaults(func=cmd_archive_show)
+
+    rep = sub.add_parser(
+        "report",
+        help="write a portable evidence pack for one run (report.html + report.json + checksums)",
+    )
+    rep.add_argument("run_id")
+    rep.add_argument("--archive-dir", default="runs")
+    rep.add_argument(
+        "--out", default=None, help="output dir (default: <archive-dir>/<run-id>/report/)"
+    )
+    rep.set_defaults(func=cmd_report)
+
+    dlv = sub.add_parser(
+        "deliverable",
+        help="write a client-facing delivery report for one run (markdown; --docx optional)",
+    )
+    dlv.add_argument("run_id")
+    dlv.add_argument("--archive-dir", default="runs")
+    dlv.add_argument("--out", default=None, help="output dir (default: <archive-dir>/<run-id>/)")
+    dlv.add_argument(
+        "--docx", action="store_true", help="also render .docx (needs: pip install 'cadora[deliverable]')"
+    )
+    dlv.set_defaults(func=cmd_deliverable)
+
+    doc = sub.add_parser(
+        "doctor",
+        help="validate backend CLIs against the tested contract ranges (offline, no model calls)",
+    )
+    doc.add_argument("--json", action="store_true", help="emit the structured report")
+    doc.set_defaults(func=cmd_doctor)
 
     usage = sub.add_parser("usage", help="summarize token and cost usage from run archives")
     usage.add_argument("--archive-dir", default="runs")
@@ -421,7 +703,35 @@ def main(argv=None) -> int:
     )
     a.add_argument("--vision", default=None, help="path to vision.md, or inline vision text")
     a.add_argument("--tech-env", default=None, help="path to tech-env.md, or inline text")
+    a.add_argument(
+        "--method",
+        default="aidlc",
+        choices=["aidlc", "aidlc-v2"],
+        help="method pack: aidlc (v1 rules, stable, default) or aidlc-v2 (EXPERIMENTAL, "
+        "pinned upstream dist; strips provider/cost pins by default)",
+    )
+    a.add_argument("--ref", default=None, help="aidlc-v2 only: upstream ref (default: pinned tag)")
+    a.add_argument(
+        "--keep-provider-pins",
+        action="store_true",
+        help="aidlc-v2 only: keep upstream's Bedrock/model/effort settings pins",
+    )
+    a.add_argument(
+        "--keep-mcp",
+        action="store_true",
+        help="aidlc-v2 only: also install upstream's remote MCP server wiring",
+    )
+    a.add_argument("--force", action="store_true", help="aidlc-v2 only: overwrite existing pack files")
     a.set_defaults(func=cmd_aidlc_init)
+
+    aa = sub.add_parser(
+        "aidlc-audit",
+        help="read-only: summarize an aidlc-v2 workspace's state + 68-event audit trail",
+    )
+    aa.add_argument("workspace", nargs="?", default=".")
+    aa.add_argument("--intent", default=None, help="intent dir name (default: newest)")
+    aa.add_argument("--json", action="store_true", help="emit the full structured report")
+    aa.set_defaults(func=cmd_aidlc_audit)
 
     args = p.parse_args(argv)
     return args.func(args)

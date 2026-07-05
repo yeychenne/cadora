@@ -150,3 +150,21 @@ def test_model_reports_primary_not_first_key():
     )
     result, _ = _run(stream)
     assert result.model == "claude-sonnet-4-6"
+
+
+def test_timeout_is_archived_not_raised():
+    """A hung node must return an archivable failure, never escape as an exception."""
+    import subprocess as sp
+    from unittest import mock
+
+    from cadora.executors.claude_code import ClaudeCodeExecutor
+    from cadora.topology import Node
+
+    exc = sp.TimeoutExpired(cmd="claude", timeout=7, output="partial stream\n")
+    with mock.patch("cadora.executors.claude_code.subprocess.run", side_effect=exc):
+        result = ClaudeCodeExecutor(timeout=7).run(Node(id="n1"), "go", cwd=".")
+
+    assert result.ok is False
+    assert result.exit_code == 124
+    assert result.meta["timed_out"] is True
+    assert result.meta["timeout_seconds"] == 7

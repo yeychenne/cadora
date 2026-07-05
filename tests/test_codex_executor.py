@@ -91,3 +91,12 @@ def test_timeout_is_captured_as_failed_result():
     assert result.exit_code == 124
     assert result.meta["timed_out"] is True
     assert result.meta["thread_id"] == "partial"
+
+
+def test_stderr_tail_redacts_credential_shapes():
+    from cadora.executors.codex import _REDACT_RE
+
+    noisy = "error calling api key=sk-live-abcdef123456 with Bearer eyJhbGciOiJIUzI1NiJ9.x auth_token: zzz-secret-1"
+    clean = _REDACT_RE.sub("[redacted]", noisy)
+    assert "sk-live" not in clean and "eyJhbGciOiJIUzI1NiJ9" not in clean
+    assert "[redacted]" in clean

@@ -205,3 +205,36 @@ def test_mcp_drives_full_hitl_run(tmp_path):
     assert manifest["ok"] is True
     by_id = {n["node_id"]: n for n in manifest["nodes"]}
     assert by_id["requirements"]["human_reviews"][0]["decision"] == "approve"
+
+
+def test_get_artifact_blocks_path_traversal(tmp_path):
+    # Board finding (CISO): ../ must never read outside the run workspace.
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "ok.txt").write_text("fine")
+    (tmp_path / "secret.txt").write_text("outside")
+    topo = tmp_path / "t.yaml"
+    topo.write_text("name: t\nnodes:\n  - id: one\n    prompt: X\n")
+
+    async def _run():
+        async with connect(_fake_app()) as client:
+            await client.initialize()
+            _result(await client.call_tool("start_run", {
+                "topology": str(topo), "run_id": "trav1", "cwd": str(ws),
+                "archive_dir": str(tmp_path / "runs"),
+            }))
+            for _ in range(500):
+                st = _result(await client.call_tool("run_status", {"run_id": "trav1"}))
+                if not st["running"]:
+                    break
+                await asyncio.sleep(0.01)
+            ok = (await client.call_tool("get_artifact",
+                                         {"run_id": "trav1", "path": "ok.txt"})).content[0].text
+            escaped = (await client.call_tool(
+                "get_artifact", {"run_id": "trav1", "path": "../secret.txt"})).content[0].text
+            return ok, escaped
+
+    ok, escaped = asyncio.run(_run())
+    assert ok == "fine"
+    assert "escapes the run workspace" in escaped
+    assert "outside" not in escaped

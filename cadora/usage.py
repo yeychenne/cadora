@@ -8,6 +8,63 @@ from pathlib import Path
 
 from cadora.archive import list_runs
 
+# $/MTok (input, cached input, output) — for backends that report tokens but no dollar cost.
+# Codex source: developers.openai.com/api/docs/pricing + /codex/pricing, 2026-07-03 (ChatGPT-plan
+# credit-funded runs price identically: the credit rate card maps to API rates at $0.04/credit).
+# GLM source: docs.z.ai/guides/overview/pricing, 2026-07-03 (glm-5.2 before glm-5 — prefix
+# matching relies on insertion order).
+_PRICE_PER_MTOK: dict[str, tuple[float, float, float]] = {
+    "gpt-5.5": (5.00, 0.50, 30.00),
+    "gpt-5.4": (2.50, 0.25, 15.00),
+    "gpt-5.4-mini": (0.75, 0.075, 4.50),
+    "gpt-5.4-nano": (0.20, 0.02, 1.25),
+    "gpt-5.3-codex": (1.75, 0.175, 14.00),
+    "glm-5.2": (1.40, 0.26, 4.40),
+    "glm-5": (1.00, 0.20, 3.20),
+    "glm-4.7": (0.60, 0.11, 2.20),
+}
+
+
+def estimate_cost_usd(
+    model: str | None,
+    *,
+    input_tokens: int = 0,
+    cache_read_input_tokens: int = 0,
+    output_tokens: int = 0,
+    cached_included_in_input: bool = True,
+) -> float | None:
+    """Price a node from the public rate table; None when the model is unknown.
+
+    Wire semantics differ per vendor: on the OpenAI wire cached input is a SUBSET of
+    ``input_tokens`` (``cached_included_in_input=True`` — the uncached remainder bills at the
+    full rate); on the Anthropic wire (GLM via Z.ai) ``input_tokens`` EXCLUDES cache reads, so
+    both bill additively (``cached_included_in_input=False``). Reasoning tokens are already
+    included in ``output_tokens`` upstream and are not double-counted.
+    """
+    if not model:
+        return None
+    key = str(model)
+    rates = _PRICE_PER_MTOK.get(key)
+    if rates is None:  # tolerate dated/suffixed ids, e.g. "gpt-5.5-2026-04-23", "glm-5.2[1m]"
+        # LONGEST prefix wins: "gpt-5.4-mini-2026…" must price as mini, never as gpt-5.4.
+        for prefix in sorted(_PRICE_PER_MTOK, key=len, reverse=True):
+            if key.startswith(prefix):
+                rates = _PRICE_PER_MTOK[prefix]
+                break
+    if rates is None:
+        return None
+    in_rate, cached_rate, out_rate = rates
+    if cached_included_in_input:
+        uncached = max(input_tokens - cache_read_input_tokens, 0)
+        cached = (
+            min(cache_read_input_tokens, input_tokens)
+            if input_tokens
+            else cache_read_input_tokens
+        )
+    else:
+        uncached, cached = input_tokens, cache_read_input_tokens
+    return (uncached * in_rate + cached * cached_rate + output_tokens * out_rate) / 1_000_000
+
 
 @dataclass
 class NodeUsage:
@@ -22,7 +79,10 @@ class NodeUsage:
     cache_read_input_tokens: int = 0
     generation_tokens: int = 0
     context_tokens: int = 0
+    reasoning_output_tokens: int = 0
     cost_usd: float | None = None
+    cost_estimated: bool = False  # True when cost_usd came from the price table, not the backend
+    credits: float | None = None  # Kiro subscription credits (Kiro reports no tokens/dollars)
     raw_usage: dict | None = None
 
 
@@ -38,6 +98,8 @@ class UsageSummary:
     generation_tokens: int
     context_tokens: int
     cost_usd: float
+    credits: float  # Kiro subscription credits across all nodes
+    estimated_cost_nodes: int  # nodes whose cost was computed from the price table
     by_model: list[dict]
     by_executor: list[dict]
     by_funding: list[dict]
@@ -86,6 +148,8 @@ def summarize_usage(
         generation_tokens=sum(n.generation_tokens for n in nodes),
         context_tokens=sum(n.context_tokens for n in nodes),
         cost_usd=sum(n.cost_usd or 0.0 for n in nodes),
+        credits=sum(n.credits or 0.0 for n in nodes),
+        estimated_cost_nodes=sum(1 for n in nodes if n.cost_estimated),
         by_model=_group(nodes, "model"),
         by_executor=_group(nodes, "executor"),
         by_funding=_group(nodes, "funding"),
@@ -120,6 +184,33 @@ def normalize_manifest_usage(manifest: dict) -> list[NodeUsage]:
         total = _int(usage.get("total_tokens") or usage.get("totalTokens"))
         if not input_tokens and not output_tokens and total:
             input_tokens = total
+        reasoning = _int(
+            usage.get("reasoning_output_tokens") or usage.get("reasoningOutputTokens")
+        )
+        # Kiro reports credits (subscription units), not tokens/dollars.
+        credits = usage.get("credits")
+        if credits is not None:
+            try:
+                credits = float(credits)
+            except (TypeError, ValueError):
+                credits = None
+
+        # Backends that report tokens but no dollars (Codex) get a price-table estimate,
+        # flagged as such. A backend-reported cost is always authoritative.
+        cost_usd = node.get("cost_usd")
+        cost_estimated = False
+        if not cost_usd and (input_tokens or output_tokens):
+            computed = estimate_cost_usd(
+                node.get("model"),
+                input_tokens=input_tokens,
+                cache_read_input_tokens=cache_read,
+                output_tokens=output_tokens,
+                # GLM rides the Anthropic wire: cache reads are separate from input, not a subset.
+                cached_included_in_input=node_executor != "glm",
+            )
+            if computed is not None:
+                cost_usd = computed
+                cost_estimated = True
 
         generation = input_tokens + output_tokens
         context = generation + cache_creation + cache_read
@@ -129,14 +220,19 @@ def normalize_manifest_usage(manifest: dict) -> list[NodeUsage]:
                 node_id=str(node.get("node_id", "")),
                 executor=node_executor,
                 model=node.get("model"),
-                funding=meta.get("funding_resolved") or meta.get("funding") or "unknown",
+                funding=meta.get("funding_resolved")
+                or meta.get("funding")
+                or ("kiro/credits" if credits is not None else "unknown"),
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
                 cache_creation_input_tokens=cache_creation,
                 cache_read_input_tokens=cache_read,
                 generation_tokens=generation,
                 context_tokens=context if context else total,
-                cost_usd=node.get("cost_usd"),
+                reasoning_output_tokens=reasoning,
+                cost_usd=cost_usd,
+                cost_estimated=cost_estimated,
+                credits=credits,
                 raw_usage=usage or None,
             )
         )
@@ -198,6 +294,7 @@ def _group(nodes: list[NodeUsage], field: str) -> list[dict]:
                 "generation_tokens": 0,
                 "context_tokens": 0,
                 "cost_usd": 0.0,
+                "credits": 0.0,
             },
         )
         bucket["node_count"] += 1
@@ -206,6 +303,7 @@ def _group(nodes: list[NodeUsage], field: str) -> list[dict]:
         bucket["generation_tokens"] += node.generation_tokens
         bucket["context_tokens"] += node.context_tokens
         bucket["cost_usd"] += node.cost_usd or 0.0
+        bucket["credits"] += node.credits or 0.0
     return sorted(groups.values(), key=lambda item: item["context_tokens"], reverse=True)
 
 

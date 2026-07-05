@@ -6,12 +6,19 @@ from unittest import mock
 from cadora.executors.kiro import KiroExecutor, _parse_stderr, _strip_ansi
 from cadora.topology import Node
 
-# Simulate Kiro's actual output (ANSI codes + prompt prefix)
+# Real output captured from kiro-cli 2.10.0 (2026-07-04)
+# stdout: ANSI-colored prompt prefix + response text
 KIRO_STDOUT = "\x1b[38;5;141m> \x1b[0mHELLO_KIRO_TEST\x1b[0m\x1b[0m\n"
+# stderr: trust-all banner + checkpoint status + credits/time
 KIRO_STDERR = (
+    "\x1b[32mAll tools are now trusted (\x1b[0m\x1b[31m!\x1b[0m\x1b[32m)."
+    " Kiro will execute tools without asking for confirmation.\x1b[0m\n"
+    "Agents can sometimes do unexpected things so understand the risks.\n\n"
+    "Learn more at \x1b[38;5;141mhttps://kiro.dev/docs/cli/chat/security/"
+    "#using-tools-trust-all-safely\x1b[0m\n\n\n"
     "\x1b[38;5;12mCheckpoints are not available in this directory.\n\x1b[39m\n"
     "\x1b[38;5;252m\x1b[0m\x1b[?25l\x1b[0m\x1b[0m\n"
-    "\x1b[38;5;8m\n \u25b8 Credits: 0.08 \u2022 Time: 3s\n\n\x1b[0m\n"
+    "\x1b[38;5;8m\n \u25b8 Credits: 0.06 \u2022 Time: 2s\n\n\x1b[0m\n"
 )
 
 
@@ -25,8 +32,8 @@ def test_strip_ansi_removes_escape_codes():
 
 def test_parse_stderr_extracts_credits_and_time():
     meta = _parse_stderr(KIRO_STDERR)
-    assert meta["credits"] == 0.08
-    assert meta["duration_seconds"] == 3
+    assert meta["credits"] == 0.06
+    assert meta["duration_seconds"] == 2
 
 
 def test_success_run():
@@ -37,8 +44,8 @@ def test_success_run():
         result = KiroExecutor().run(Node(id="n1"), "do it", cwd=".")
     assert result.ok is True
     assert result.text == "HELLO_KIRO_TEST"
-    assert result.usage == {"credits": 0.08}
-    assert result.meta["duration_seconds"] == 3
+    assert result.usage == {"credits": 0.06}
+    assert result.meta["duration_seconds"] == 2
 
 
 def test_command_flags():
@@ -78,3 +85,8 @@ def test_nonzero_exit_is_failure():
         result = KiroExecutor().run(Node(id="n1"), "do it", cwd=".")
     assert result.ok is False
     assert result.exit_code == 1
+
+
+def test_funding_label():
+    """KiroExecutor exposes a funding label for the runner/archive layer."""
+    assert KiroExecutor().funding == "kiro/credits"

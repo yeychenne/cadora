@@ -8,6 +8,10 @@ running a container, database, or frontend build.
 and is deliberately kept small. Portable run evidence (`cadora report`, roadmap) is where export
 and sharing will live; backend-native dashboards are consumed as data sources, not competed with.
 
+**Cost sources:** Claude Code reports dollars directly; Codex reports tokens only, so Codex node
+costs are computed from the public OpenAI rate table and flagged as estimated in
+`cadora usage` / `--json` (`cost_estimated`).
+
 ## Start the dashboard
 
 From the workspace where your `runs/` archive lives:
