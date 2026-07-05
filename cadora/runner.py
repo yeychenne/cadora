@@ -19,6 +19,14 @@ from cadora.archive import RunArchive
 from cadora.executors.base import ExecutionResult, NodeExecutor
 from cadora.gates import GATE_BLOCKED_PREREQUISITE, GateResult, ShellGate
 from cadora.integrity import IntegrityReport, repair_prompt, scan_toolchain_integrity
+from cadora.remediation import (
+    STATE_COMPLETED_GREEN,
+    STATE_HONEST_BLOCKED,
+    RemediationOutcome,
+    RemediationPolicy,
+    needs_remediation,
+    run_remediation,
+)
 from cadora.review import (
     REVIEW_ABORT,
     REVIEW_APPROVE,
@@ -75,6 +83,7 @@ def run_topology(
     hitl: bool = False,
     review_fn=None,
     construction_executor: NodeExecutor | None = None,
+    remediation_policy: RemediationPolicy | None = None,
 ) -> Path:
     if integrity_mode not in {"off", "audit", "enforce", "repair"}:
         raise ValueError(f"invalid integrity mode: {integrity_mode!r}")
@@ -168,6 +177,30 @@ def run_topology(
                     or integrity_blocked
                 )
 
+                remediation_outcome: RemediationOutcome | None = None
+                if failed and needs_remediation(
+                    gate_result, integrity, integrity_mode, remediation_policy
+                ):
+                    gate_obj = gates.get(node.gate) if node.gate else None
+                    remediation_outcome = run_remediation(
+                        node,
+                        node_executor,
+                        node_cwd,
+                        gate_obj,
+                        gate_result,
+                        integrity,
+                        integrity_mode,
+                        remediation_policy,
+                    )
+                    gate_result = remediation_outcome.final_gate
+                    integrity = remediation_outcome.final_integrity
+                    if remediation_outcome.state == STATE_COMPLETED_GREEN:
+                        failed = False
+
+                node_cost = result.cost_usd
+                if remediation_outcome is not None and remediation_outcome.cost_usd is not None:
+                    node_cost = (node_cost or 0.0) + remediation_outcome.cost_usd
+
                 if failed:
                     archive.record(
                         result,
@@ -177,16 +210,18 @@ def run_topology(
                         repair=repair_result,
                         reviews=review_history,
                         attempts=attempt_results,
+                        remediation=remediation_outcome,
                     )
                     out = archive.finalize(False)
                     reason = _failure_reason(
-                        node, result, gate_result, integrity_blocked, repair_failed
+                        node, result, gate_result, integrity_blocked, repair_failed,
+                        remediation_outcome,
                     )
                     telemetry.node_recorded(
                         node.id,
                         ok=False,
                         model=result.model,
-                        cost_usd=result.cost_usd,
+                        cost_usd=node_cost,
                         usage=result.usage,
                         gate=asdict(gate_result) if gate_result else None,
                         integrity=asdict(integrity) if integrity else None,
@@ -194,7 +229,7 @@ def run_topology(
                         error=reason,
                     )
                     telemetry.run_completed(False, error=f"node {node.id!r}: {reason}")
-                    _log(_node_line(node, result, gate_result, integrity, repair_result))
+                    _log(_node_line(node, result, gate_result, integrity, repair_result, remediation_outcome))
                     _log(f"✗ stopped at node {node.id!r}: {reason}  ->  {out}")
                     raise SystemExit(f"node {node.id!r}: {reason}")
 
@@ -219,13 +254,14 @@ def run_topology(
                                 repair=repair_result,
                                 reviews=review_history,
                                 attempts=attempt_results,
+                                remediation=remediation_outcome,
                             )
                             out = archive.finalize(False)
                             telemetry.node_recorded(
                                 node.id,
                                 ok=False,
                                 model=result.model,
-                                cost_usd=result.cost_usd,
+                                cost_usd=node_cost,
                                 usage=result.usage,
                                 gate=asdict(gate_result) if gate_result else None,
                                 integrity=asdict(integrity) if integrity else None,
@@ -251,13 +287,14 @@ def run_topology(
                             repair=repair_result,
                             reviews=review_history,
                             attempts=attempt_results,
+                            remediation=remediation_outcome,
                         )
                         out = archive.finalize(False)
                         telemetry.node_recorded(
                             node.id,
                             ok=False,
                             model=result.model,
-                            cost_usd=result.cost_usd,
+                            cost_usd=node_cost,
                             usage=result.usage,
                             gate=asdict(gate_result) if gate_result else None,
                             integrity=asdict(integrity) if integrity else None,
@@ -282,18 +319,19 @@ def run_topology(
                     repair=repair_result,
                     reviews=review_history,
                     attempts=attempt_results,
+                    remediation=remediation_outcome,
                 )
                 telemetry.node_recorded(
                     node.id,
                     ok=True,
                     model=result.model,
-                    cost_usd=result.cost_usd,
+                    cost_usd=node_cost,
                     usage=result.usage,
                     gate=asdict(gate_result) if gate_result else None,
                     integrity=asdict(integrity) if integrity else None,
                     review=review_history[-1].decision if review_history else None,
                 )
-                _log(_node_line(node, result, gate_result, integrity, repair_result))
+                _log(_node_line(node, result, gate_result, integrity, repair_result, remediation_outcome))
                 break
 
     out = archive.finalize(True)
@@ -326,6 +364,7 @@ def _node_line(
     gate: GateResult | None,
     integrity: IntegrityReport | None = None,
     repair: ExecutionResult | None = None,
+    remediation: RemediationOutcome | None = None,
 ) -> str:
     bits = [f"  {'✓' if result.ok else '✗'} {node.id}"]
     if result.cost_usd is not None:
@@ -340,6 +379,8 @@ def _node_line(
         bits.append(f"integrity:{mark}")
     if repair is not None:
         bits.append(f"repair:{'ok' if repair.ok else 'FAILED'}")
+    if remediation is not None:
+        bits.append(f"remediate:{remediation.state} x{len(remediation.attempts)}")
     return "   ".join(bits)
 
 
@@ -365,11 +406,26 @@ def _failure_reason(
     gate: GateResult | None,
     integrity_blocked: bool,
     repair_failed: bool,
+    remediation: RemediationOutcome | None = None,
 ) -> str:
     if not result.ok:
         return "executor failed"
     if repair_failed:
         return "integrity repair failed"
+    base = _gate_failure_reason(node, gate, integrity_blocked)
+    if remediation is not None and remediation.state == STATE_HONEST_BLOCKED:
+        return (
+            f"{base} — remediation exhausted after {len(remediation.attempts)} attempt(s) "
+            f"({remediation.blocked_reason})"
+        )
+    return base
+
+
+def _gate_failure_reason(
+    node: Node,
+    gate: GateResult | None,
+    integrity_blocked: bool,
+) -> str:
     if gate and not gate.passed:
         if gate.status == GATE_BLOCKED_PREREQUISITE:
             missing = ", ".join(gate.missing_prerequisites) or "gate tooling"

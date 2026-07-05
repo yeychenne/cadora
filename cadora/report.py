@@ -66,6 +66,7 @@ def build_report(run_dir: str | Path) -> dict:
                 integrity_failed_nodes += 1
         for review in node.get("human_reviews") or []:
             review_decisions.append({"node_id": node_id, **review})
+        remediation = node.get("remediation")
         nodes.append(
             {
                 "node_id": node_id,
@@ -76,6 +77,15 @@ def build_report(run_dir: str | Path) -> dict:
                 "gate": gate,
                 "integrity": integrity,
                 "human_reviews": node.get("human_reviews") or [],
+                "remediation": (
+                    {
+                        "state": remediation.get("state"),
+                        "attempts": remediation.get("attempts"),
+                        "blocked_reason": remediation.get("blocked_reason"),
+                    }
+                    if remediation
+                    else None
+                ),
                 "cost_usd": usage.cost_usd if usage else node.get("cost_usd"),
                 "cost_estimated": usage.cost_estimated if usage else False,
                 "credits": usage.credits if usage else None,
@@ -112,6 +122,10 @@ def build_report(run_dir: str | Path) -> dict:
             "integrity_findings": integrity_findings,
             "integrity_failed_nodes": integrity_failed_nodes,
             "human_review_decisions": len(review_decisions),
+            "remediated_nodes": sum(1 for n in nodes if n["remediation"]),
+            "remediation_green": sum(
+                1 for n in nodes if (n["remediation"] or {}).get("state") == "completed-green"
+            ),
             "cost_usd": round(total_cost, 4),
             "credits": round(total_credits, 2),
             "estimated_cost_nodes": sum(1 for n in nodes if n["cost_estimated"]),
@@ -235,6 +249,14 @@ def _integrity_cell(integrity: dict | None) -> str:
     return _pill(f"{findings} finding(s)", "ok" if passed else "bad")
 
 
+def _remediation_cell(remediation: dict | None) -> str:
+    if not remediation:
+        return '<span class="muted">—</span>'
+    tone = "ok" if remediation.get("state") == "completed-green" else "bad"
+    text = f"{remediation.get('state')} x{remediation.get('attempts')}"
+    return _pill(text, tone)
+
+
 def render_html(report: dict) -> str:
     run = report["run"]
     summary = report["summary"]
@@ -278,6 +300,7 @@ def render_html(report: dict) -> str:
             f"<td>{_pill('ok', 'ok') if node['ok'] else _pill('failed', 'bad')}</td>"
             f"<td>{_gate_cell(node['gate'])}</td>"
             f"<td>{_integrity_cell(node['integrity'])}</td>"
+            f"<td>{_remediation_cell(node['remediation'])}</td>"
             f"<td>{reviews or '—'}</td>"
             f'<td class="num">{node["context_tokens"]:,}</td>'
             f'<td class="num">{escape(cost_text)}</td>'
@@ -336,7 +359,7 @@ def render_html(report: dict) -> str:
 {cards}
 <h2>Nodes</h2>
 <table><tr><th>node</th><th>backend</th><th>model</th><th>result</th><th>gate</th>
-<th>integrity</th><th>reviews</th><th>ctx tokens</th><th>cost</th></tr>
+<th>integrity</th><th>remediation</th><th>reviews</th><th>ctx tokens</th><th>cost</th></tr>
 {"".join(rows)}</table>
 {findings_html}
 {reviews_html}

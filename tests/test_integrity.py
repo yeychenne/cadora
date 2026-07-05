@@ -70,3 +70,60 @@ def test_cli_integrity_clean_workspace(tmp_path, capsys):
 
     assert cli.main(["integrity", str(tmp_path)]) == 0
     assert "toolchain integrity ok" in capsys.readouterr().out
+
+
+# --- stub-implementation (hollow-code) detection ------------------------------------------
+
+def _write(tmp_path, name, src):
+    (tmp_path / name).write_text(src)
+
+
+def test_stub_implementations_block_when_code_is_hollow(tmp_path):
+    _write(tmp_path, "app.py",
+           "def compute():\n    raise NotImplementedError\n\n"
+           "def render():\n    pass\n\n"
+           "def save():\n    ...\n")
+    report = scan_toolchain_integrity(tmp_path)
+    assert "stub-implementation" in _rules(report)
+    assert report.passed is False  # blocking
+    f = next(x for x in report.findings if x.rule == "stub-implementation")
+    assert "3 function" in f.detail and "compute()" in f.evidence
+
+
+def test_real_code_is_not_flagged(tmp_path):
+    _write(tmp_path, "app.py",
+           "def add(a, b):\n    return a + b\n\n"
+           "def greet(name):\n    return f'hi {name}'\n")
+    assert "stub-implementation" not in _rules(scan_toolchain_integrity(tmp_path))
+
+
+def test_single_placeholder_is_below_threshold(tmp_path):
+    _write(tmp_path, "app.py",
+           "def real(a):\n    return a * 2\n\n"
+           "def later():\n    pass  # one placeholder is normal\n")
+    assert "stub-implementation" not in _rules(scan_toolchain_integrity(tmp_path))
+
+
+def test_abstract_and_protocol_stubs_are_legitimate(tmp_path):
+    _write(tmp_path, "iface.py",
+           "from abc import ABC, abstractmethod\n"
+           "from typing import Protocol\n\n"
+           "class Base(ABC):\n"
+           "    @abstractmethod\n    def a(self): ...\n"
+           "    @abstractmethod\n    def b(self): raise NotImplementedError\n\n"
+           "class P(Protocol):\n    def c(self): ...\n    def d(self): ...\n")
+    # 4 stub bodies, but all abstract/Protocol → not hollow, no finding.
+    assert "stub-implementation" not in _rules(scan_toolchain_integrity(tmp_path))
+
+
+def test_stub_finding_engages_remediation_under_enforce(tmp_path):
+    from cadora.gates import GateResult
+    from cadora.remediation import RemediationPolicy, needs_remediation
+
+    _write(tmp_path, "app.py", "def a():\n    pass\n\ndef b():\n    ...\n")
+    integrity = scan_toolchain_integrity(tmp_path)
+    assert integrity.passed is False
+    gate_ok = GateResult(name="build-test", passed=True)  # tests pass over the stubs
+    policy = RemediationPolicy(max_attempts=2)
+    # The hollow-code finding must trigger the loop even though the gate is green.
+    assert needs_remediation(gate_ok, integrity, "enforce", policy) is True

@@ -15,6 +15,7 @@ from pathlib import Path
 from cadora.executors.base import ExecutionResult
 from cadora.gates import GateResult
 from cadora.integrity import IntegrityReport
+from cadora.remediation import RemediationOutcome
 from cadora.review import ReviewResult, format_review_history
 
 
@@ -39,6 +40,7 @@ class RunArchive:
         repair: ExecutionResult | None = None,
         reviews: list[ReviewResult] | None = None,
         attempts: list[ExecutionResult] | None = None,
+        remediation: RemediationOutcome | None = None,
     ) -> None:
         node_dir = self.dir / result.node_id
         node_dir.mkdir(exist_ok=True)
@@ -95,6 +97,51 @@ class RunArchive:
         if reviews:
             entry["human_reviews"] = [asdict(review) for review in reviews]
             (node_dir / "human-review.md").write_text(format_review_history(reviews))
+        if remediation is not None and remediation.attempts:
+            remediation_dir = node_dir / "remediation"
+            remediation_dir.mkdir(exist_ok=True)
+            trail = []
+            for attempt in remediation.attempts:
+                execution_entry = {
+                    k: v for k, v in asdict(attempt.execution).items() if k != "events"
+                }
+                trail.append(
+                    {
+                        "number": attempt.number,
+                        "prompt": attempt.prompt,
+                        "execution": execution_entry,
+                        "gate": asdict(attempt.gate) if attempt.gate else None,
+                        "integrity": asdict(attempt.integrity) if attempt.integrity else None,
+                        "cost_usd": attempt.cost_usd,
+                    }
+                )
+                (remediation_dir / f"{attempt.number}-prompt.txt").write_text(attempt.prompt)
+                (remediation_dir / f"{attempt.number}-output.txt").write_text(
+                    attempt.execution.text or ""
+                )
+                if attempt.execution.events:
+                    (remediation_dir / f"{attempt.number}-events.jsonl").write_text(
+                        "\n".join(json.dumps(e) for e in attempt.execution.events)
+                    )
+            remediation_costs = [
+                a.cost_usd for a in remediation.attempts if a.cost_usd is not None
+            ]
+            remediation_cost = sum(remediation_costs) if remediation_costs else None
+            entry["remediation"] = {
+                "state": remediation.state,
+                "blocked_reason": remediation.blocked_reason,
+                "attempts": len(remediation.attempts),
+                "cost_usd": remediation_cost,
+                "final_gate": (
+                    asdict(remediation.final_gate) if remediation.final_gate else None
+                ),
+                "final_integrity": (
+                    asdict(remediation.final_integrity) if remediation.final_integrity else None
+                ),
+                "trail": trail,
+            }
+            if result.cost_usd is not None or remediation_cost is not None:
+                entry["cost_usd"] = (result.cost_usd or 0.0) + (remediation_cost or 0.0)
         self.manifest["nodes"].append(entry)
 
     def finalize(self, ok: bool) -> Path:

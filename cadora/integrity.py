@@ -8,6 +8,7 @@ pass is allowed to act on them.
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 from dataclasses import dataclass, field
@@ -70,10 +71,102 @@ def scan_toolchain_integrity(workspace: str | Path) -> IntegrityReport:
     findings.extend(_find_shadow_tools(root))
     findings.extend(_find_typescript_build_substitutions(root))
     findings.extend(_find_external_workspace_tools(root))
+    findings.extend(_find_stub_implementations(root))
     return IntegrityReport(
         passed=not any(f.severity == "blocking" for f in findings),
         findings=findings,
     )
+
+
+# Stub-implementation detection ------------------------------------------------------------
+#
+# A build can pass its tests and still be hollow: functions whose body is only `pass`, `...`,
+# or `raise NotImplementedError` — code that looks implemented but isn't, and that weak tests
+# won't catch. The deterministic build/test gate misses this (the tests are green); integrity
+# catches it, and — being a blocking finding — it feeds the remediation loop under enforce/repair
+# to drive the stubs to real code. Abstract methods, Protocols, overloads, and .pyi stubs are
+# legitimate and excluded, so this fires on genuine hollowness, not on interfaces.
+
+_STUB_THRESHOLD = 2  # below this, a placeholder or two is normal; at/above, the code is hollow
+_LEGIT_STUB_DECORATORS = {"abstractmethod", "abstractproperty", "overload", "abc.abstractmethod"}
+_INTERFACE_BASES = {"Protocol", "ABC", "ABCMeta"}
+
+
+def _decorator_name(node) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return f"{_decorator_name(node.value)}.{node.attr}" if isinstance(node.value, ast.Name) else node.attr
+    if isinstance(node, ast.Call):
+        return _decorator_name(node.func)
+    return ""
+
+
+def _base_name(node) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    if isinstance(node, ast.Subscript):  # e.g. Protocol[...]
+        return _base_name(node.value)
+    return ""
+
+
+def _is_stub_body(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    body = list(fn.body)
+    if body and isinstance(body[0], ast.Expr) and isinstance(getattr(body[0], "value", None), ast.Constant) \
+            and isinstance(body[0].value.value, str):
+        body = body[1:]  # strip a leading docstring
+    if len(body) != 1:
+        return False
+    stmt = body[0]
+    if isinstance(stmt, ast.Pass):
+        return True
+    if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and stmt.value.value is ...:
+        return True
+    if isinstance(stmt, ast.Raise) and stmt.exc is not None:
+        exc = stmt.exc.func if isinstance(stmt.exc, ast.Call) else stmt.exc
+        return isinstance(exc, ast.Name) and exc.id == "NotImplementedError"
+    return False
+
+
+def _find_stub_implementations(root: Path) -> list[IntegrityFinding]:
+    """Flag genuinely hollow code — a threshold of non-abstract stub function bodies."""
+    stubs: list[str] = []
+    for py in sorted(root.rglob("*.py")):
+        rel = py.relative_to(root)
+        if py.suffix == ".pyi" or _EXCLUDED_PARTS.intersection(rel.parts):
+            continue
+        try:
+            tree = ast.parse(py.read_text(encoding="utf-8", errors="replace"))
+        except (SyntaxError, ValueError):
+            continue
+        # Classes that ARE interfaces: their stub methods are legitimate — skip them.
+        interface_fns: set[int] = set()
+        for cls in (n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)):
+            if {_base_name(b) for b in cls.bases}.intersection(_INTERFACE_BASES):
+                interface_fns.update(id(m) for m in ast.walk(cls))
+        for fn in (n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))):
+            if id(fn) in interface_fns:
+                continue
+            if _LEGIT_STUB_DECORATORS.intersection(_decorator_name(d) for d in fn.decorator_list):
+                continue
+            if _is_stub_body(fn):
+                stubs.append(f"{rel}:{fn.lineno} {fn.name}()")
+    if len(stubs) < _STUB_THRESHOLD:
+        return []
+    return [
+        IntegrityFinding(
+            rule="stub-implementation",
+            severity="blocking",
+            path=stubs[0].split(":")[0],
+            detail=(
+                f"{len(stubs)} function(s) have a stub body (pass / ... / raise NotImplementedError) "
+                "— the code looks implemented but isn't; tests that pass over stubs verify nothing"
+            ),
+            evidence="; ".join(stubs[:8]) + (" …" if len(stubs) > 8 else ""),
+        )
+    ]
 
 
 def repair_prompt(report: IntegrityReport, gate_detail: str = "") -> str:

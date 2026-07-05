@@ -22,10 +22,17 @@ from the outside:
   exit codes and test counts, never the agent's claims. A test runner that executes **zero tests**
   is reported `vacuous` and **blocks the run**. A missing toolchain is `blocked_prerequisite`,
   not a fake failure — classified for Python, Node, Go, and Rust.
+- **Drive to completion, honestly** — a failed gate needn't be the end. With `--remediate N`,
+  Cadora feeds the exact gate failure to a fresh, constrained session and re-runs the *same* gate,
+  up to N bounded attempts, until it genuinely passes (**`completed-green`**) or it stops with the
+  full attempt trail (**`honest-blocked`**). It never weakens the gate or accepts the agent's
+  claim of success — the gate becomes the engine of completion, not just a tripwire. Opt-in; bound
+  spend with `--remediate-max-cost`.
 - **Tamper detection** — `cadora integrity` detects generated packages and scripts that
-  impersonate real tools, unrecognized build substitutions, and tests run against another
-  project's environment. Modes: `audit` (record), `enforce` (block), `repair` (one constrained
-  fix session, then re-verify).
+  impersonate real tools, unrecognized build substitutions, tests run against another project's
+  environment, and **hollow code** — a threshold of stub function bodies (`pass` / `...` /
+  `raise NotImplementedError`) that the passing gate misses. Modes: `audit` (record), `enforce`
+  (block), `repair` (one constrained fix session, then re-verify).
 - **Fail-closed human review** — mark nodes `review: true` and run `--hitl`: the operator must
   approve, request bounded revisions, or abort; closed stdin aborts rather than silently
   approving. Every decision, comment, and revision cost is archived. The review surface is
@@ -183,13 +190,11 @@ New to Cadora, or bringing it to a hackathon? Start with the
 
 ## Status
 
-**v0.6.0** — the hackathon-readiness release: trust-gated autonomous runs, one cost ledger across
-`archive` / `report` / `eval` / `compare` / `usage` / dashboard, full advertised-backend coverage
-in `cadora doctor`, fail-closed localhost guards for the dashboard and MCP server, and a
-tester-ready onboarding kit. It includes the v0.5.0 multi-backend foundation
-(`--construction-executor`), per-node cost attribution, evidence packs, `eval` (+ opt-in LLM
-judge), `compare`, `deliverable`, Kiro credits, and the experimental GLM and AI-DLC v2 paths.
-180+ tests, `ruff` clean, CI on Python 3.10–3.12.
+**v0.7.0** — the drive-to-completion release: a failed build/test gate is fed back to a fresh
+constrained session and re-run, bounded, until it genuinely passes (`--remediate N`) — the gate
+becomes the engine of completion, never a fake green. On top of v0.6.0's evidence pack, `eval`
+(+ judge), `compare`, `deliverable`, `doctor` (all backends), Kiro credits, trust gate, and the
+onboarding kit. 190+ tests, `ruff` clean, CI on Python 3.10–3.12.
 
 **Roadmap:** signed evidence packs, full MCP auth, CI secrets-scanner + lockfile hardening, a
 backend contract matrix, a container sandbox wrapper, and additional backend/method packs as they

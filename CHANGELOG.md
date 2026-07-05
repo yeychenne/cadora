@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+## v0.7.0 — 2026-07-05
+
+Drive-to-completion release: the deterministic gate becomes the engine of completion — a failed
+gate is fed back to a fresh constrained session and re-run, bounded, until it genuinely passes or
+stops honestly.
+
+### Added
+- **Hollow-code detection (`stub-implementation` integrity finding).** `cadora integrity` now
+  catches genuinely hollow code — a threshold of functions whose body is only `pass`, `...`, or
+  `raise NotImplementedError` — the blind spot the build/test gate misses (stubbed code with weak
+  tests still goes green). Abstract methods, `Protocol`s, `@overload`, and `.pyi` are excluded, so
+  it fires on real hollowness, not interfaces. As a blocking finding it composes with the
+  remediation loop: under `--integrity-mode enforce`/`repair` a hollow-but-passing build is driven
+  to real code; under the default `audit` it's recorded, not blocking.
+- **Drive to completion — `cadora run --remediate N`.** When the deterministic build/test gate
+  fails, Cadora now feeds the *exact* gate failure into a fresh, constrained session and re-runs
+  the **same** gate — up to N bounded attempts — terminating in **`completed-green`** or
+  **`honest-blocked`** with the full per-attempt trail archived (prompt, output, gate re-run,
+  cost). The gate is never weakened and "green" is never the agent's claim: it's the same gate
+  genuinely passing, and a false-green guard test pins that. `vacuous` gates are remediable;
+  `blocked_prerequisite` stays terminal. Opt-in (default off); bound spend with
+  `--remediate-max-cost`. The loop lives in `cadora/remediation.py`; the runner wires it in.
+  Proven on a real docs-not-code run that previously blocked with nothing runnable — remediation
+  drove it to a gated green in one attempt.
+
 ## v0.6.0 — 2026-07-05
 
 The hackathon-readiness release: trust-gated autonomous runs, one cost ledger across

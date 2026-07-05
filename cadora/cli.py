@@ -73,6 +73,14 @@ def cmd_run(args) -> int:
         )
         for g in gate_names
     }
+    remediation_policy = None
+    if getattr(args, "remediate", 0):
+        from cadora.remediation import RemediationPolicy
+
+        remediation_policy = RemediationPolicy(
+            max_attempts=args.remediate,
+            max_cost_usd=getattr(args, "remediate_max_cost", None),
+        )
     run_id = args.run_id or _default_run_id()
     out = run_topology(
         topology,
@@ -84,6 +92,7 @@ def cmd_run(args) -> int:
         integrity_mode=args.integrity_mode,
         hitl=args.hitl,
         construction_executor=construction_executor,
+        remediation_policy=remediation_policy,
     )
     print(f"run complete: {out}")
     return 0
@@ -370,6 +379,10 @@ def cmd_archive_show(args) -> int:
             parts.append(f"review:{reviews[-1].get('decision', '?')}")
         if len(node.get("attempts") or []) > 1:
             parts.append(f"attempts={len(node['attempts'])}")
+        remediation = node.get("remediation")
+        if remediation:
+            reason = f"({remediation['blocked_reason']})" if remediation.get("blocked_reason") else ""
+            parts.append(f"remediate:{remediation['state']}{reason} x{remediation['attempts']}")
         print("   ".join(parts))
         node_dir = Path(args.archive_dir) / str(m.get("run_id")) / str(node.get("node_id"))
         arts = [
@@ -388,6 +401,8 @@ def cmd_archive_show(args) -> int:
             arts.append("aidlc-docs/")
         if node.get("attempts"):
             arts.append("attempts/")
+        if remediation:
+            arts.append("remediation/")
         if arts:
             print(f"      {node_dir}/{{{','.join(arts)}}}")
     total_credits = _total_credits(m)
@@ -576,6 +591,23 @@ def main(argv=None) -> int:
         action="store_true",
         help="activate explicit `review: true` topology gates; approve, request a same-stage "
         "revision, or abort before downstream work starts",
+    )
+    r.add_argument(
+        "--remediate",
+        type=int,
+        default=0,
+        metavar="N",
+        help="on a failed/vacuous gate (or a blocking integrity finding), run up to N "
+        "remediation attempts in a fresh constrained session before giving up "
+        "(default: 0 = off)",
+    )
+    r.add_argument(
+        "--remediate-max-cost",
+        type=float,
+        default=None,
+        metavar="USD",
+        help="stop remediation honestly (honest-blocked) if its attempts' summed cost "
+        "would exceed this ceiling",
     )
     r.add_argument(
         "--yes",
