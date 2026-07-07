@@ -2,7 +2,8 @@
 
 import pytest
 
-from cadora.topology import Node, Topology, load_topology, topo_sort
+from cadora.cli import _build_gates
+from cadora.topology import GateSpec, Node, Topology, load_topology, topo_sort
 
 
 def _topo(*nodes: Node) -> Topology:
@@ -79,3 +80,56 @@ def test_phased_topology_example_loads():
         assert len(loaded.nodes) == 4
         phases = [n.phase for n in loaded.nodes]
         assert phases == ["inception", "inception", "construction", "construction"]
+
+
+# --- per-gate-type commands -----------------------------------------------------
+
+
+def test_load_topology_parses_per_gate_commands(tmp_path):
+    p = tmp_path / "t.yaml"
+    p.write_text(
+        "name: demo\n"
+        "gates:\n"
+        '  build-test: "ruff check . && pytest -q"\n'
+        "  artifact-check:\n"
+        '    cmd: "test -f aidlc-docs/design.md"\n'
+        "    setup: off\n"  # bare YAML `off` -> boolean; must coerce to the "off" mode
+        "nodes:\n"
+        "  - id: design\n    gate: artifact-check\n"
+        "  - id: build\n    phase: construction\n    gate: build-test\n    depends_on: [design]\n"
+    )
+    t = load_topology(p)
+    assert t.gates["build-test"].cmd == "ruff check . && pytest -q"
+    assert t.gates["build-test"].setup is None  # falls back to the run-level --gate-setup
+    assert t.gates["artifact-check"].cmd == "test -f aidlc-docs/design.md"
+    assert t.gates["artifact-check"].setup == "off"
+
+
+def test_topology_without_gates_map_is_empty(tmp_path):
+    p = tmp_path / "t.yaml"
+    p.write_text("name: d\nnodes:\n  - id: a\n")
+    assert load_topology(p).gates == {}
+
+
+def test_gate_spec_rejects_invalid_setup():
+    with pytest.raises(ValueError, match="setup"):
+        GateSpec(cmd="x", setup="sometimes")
+
+
+def test_build_gates_uses_per_gate_override_and_falls_back():
+    topo = Topology(
+        name="t",
+        nodes=[
+            Node(id="design", gate="artifact-check"),
+            Node(id="build", phase="construction", gate="build-test", depends_on=["design"]),
+        ],
+        gates={"artifact-check": GateSpec(cmd="test -f design.md", setup="off")},
+    )
+    gates = _build_gates(topo, default_cmd="ruff && pytest", default_setup="auto",
+                         default_wheelhouse=None)
+    # the inception gate runs its own cheap command with no venv setup…
+    assert gates["artifact-check"].command == "test -f design.md"
+    assert gates["artifact-check"].setup_mode == "off"
+    # …while an un-overridden gate falls back to the run-level command/setup.
+    assert gates["build-test"].command == "ruff && pytest"
+    assert gates["build-test"].setup_mode == "auto"

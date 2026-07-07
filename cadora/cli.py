@@ -22,6 +22,27 @@ def _default_run_id() -> str:
     return time.strftime("run-%Y%m%d-%H%M%S")
 
 
+def _build_gates(topology, default_cmd, default_setup, default_wheelhouse):
+    """Register every gate the topology references.
+
+    A gate named in the topology's top-level ``gates:`` map runs its own command / setup /
+    wheelhouse; every other gate falls back to the run-level ``--gate-cmd`` / ``--gate-setup`` /
+    ``--gate-wheelhouse``. This lets a `build-test` gate run ``ruff && pytest`` while an inception
+    `artifact-check` gate runs a cheap ``test -f <deliverable>`` with ``setup: off`` — instead of
+    one global command crashing on markdown-only phases.
+    """
+    gates = {}
+    for name in {n.gate for n in topology.nodes if n.gate}:
+        spec = topology.gates.get(name)
+        gates[name] = ShellGate(
+            name,
+            spec.cmd if spec and spec.cmd else default_cmd,
+            setup_mode=spec.setup if spec and spec.setup else default_setup,
+            wheelhouse=spec.wheelhouse if spec and spec.wheelhouse else default_wheelhouse,
+        )
+    return gates
+
+
 def cmd_run(args) -> int:
     topology = load_topology(args.topology)
 
@@ -62,17 +83,7 @@ def cmd_run(args) -> int:
             timeout=args.timeout,
             model=args.construction_model,
         )
-    # Register every gate the topology references, all running the configured command.
-    gate_names = {n.gate for n in topology.nodes if n.gate}
-    gates = {
-        g: ShellGate(
-            g,
-            args.gate_cmd,
-            setup_mode=args.gate_setup,
-            wheelhouse=args.gate_wheelhouse,
-        )
-        for g in gate_names
-    }
+    gates = _build_gates(topology, args.gate_cmd, args.gate_setup, args.gate_wheelhouse)
     remediation_policy = None
     if getattr(args, "remediate", 0):
         from cadora.remediation import RemediationPolicy
@@ -93,6 +104,7 @@ def cmd_run(args) -> int:
         hitl=args.hitl,
         construction_executor=construction_executor,
         remediation_policy=remediation_policy,
+        max_parallel=args.max_parallel,
     )
     print(f"run complete: {out}")
     return 0
@@ -591,6 +603,15 @@ def main(argv=None) -> int:
         action="store_true",
         help="activate explicit `review: true` topology gates; approve, request a same-stage "
         "revision, or abort before downstream work starts",
+    )
+    r.add_argument(
+        "--max-parallel",
+        type=int,
+        default=1,
+        metavar="N",
+        help="run up to N independent nodes in a dependency wave concurrently (default: 1 = "
+        "sequential). Only the agent execution is parallelized; gates, integrity, review, and "
+        "archiving stay sequential and deterministic",
     )
     r.add_argument(
         "--remediate",

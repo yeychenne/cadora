@@ -39,12 +39,46 @@ class Node:
 
 
 @dataclass
+class GateSpec:
+    """A per-gate command override declared in the topology's top-level ``gates:`` map.
+
+    Lets different gate names run different commands — e.g. ``build-test`` runs
+    ``ruff check . && pytest -q`` while an inception ``artifact-check`` runs a cheap
+    ``test -f aidlc-docs/design.md`` with ``setup: off`` (no venv). Any field left unset
+    falls back to the run-level ``--gate-cmd`` / ``--gate-setup`` / ``--gate-wheelhouse``.
+    """
+
+    cmd: str | None = None
+    setup: str | None = None  # "off" | "auto"
+    wheelhouse: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.setup is not None and self.setup not in {"off", "auto"}:
+            raise ValueError(f"gate setup must be 'off' or 'auto', got {self.setup!r}")
+
+
+@dataclass
 class Topology:
     name: str
     nodes: list[Node] = field(default_factory=list)
+    gates: dict[str, GateSpec] = field(default_factory=dict)
 
     def by_id(self) -> dict[str, Node]:
         return {n.id: n for n in self.nodes}
+
+
+def _parse_gate_spec(name: str, value) -> GateSpec:
+    if isinstance(value, str):
+        return GateSpec(cmd=value)
+    if isinstance(value, dict):
+        setup = value.get("setup")
+        if isinstance(setup, bool):
+            # YAML 1.1 parses a bare `off`/`on` as boolean — accept it as the setup mode.
+            setup = "off" if setup is False else "auto"
+        return GateSpec(cmd=value.get("cmd"), setup=setup, wheelhouse=value.get("wheelhouse"))
+    raise ValueError(
+        f"gate {name!r}: spec must be a command string or a mapping, got {type(value).__name__}"
+    )
 
 
 def load_topology(path: str | Path) -> Topology:
@@ -52,7 +86,8 @@ def load_topology(path: str | Path) -> Topology:
 
     data = yaml.safe_load(Path(path).read_text())
     nodes = [Node(**n) for n in data.get("nodes", [])]
-    return Topology(name=data.get("name", Path(path).stem), nodes=nodes)
+    gates = {name: _parse_gate_spec(name, spec) for name, spec in (data.get("gates") or {}).items()}
+    return Topology(name=data.get("name", Path(path).stem), nodes=nodes, gates=gates)
 
 
 def topo_sort(topology: Topology) -> list[list[Node]]:

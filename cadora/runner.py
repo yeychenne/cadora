@@ -8,10 +8,13 @@ record to the archive. A blocking gate failure (or executor failure) stops the r
 from __future__ import annotations
 
 import contextlib
+import hashlib
+import inspect
 import itertools
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
 
@@ -84,9 +87,11 @@ def run_topology(
     review_fn=None,
     construction_executor: NodeExecutor | None = None,
     remediation_policy: RemediationPolicy | None = None,
+    max_parallel: int = 1,
 ) -> Path:
     if integrity_mode not in {"off", "audit", "enforce", "repair"}:
         raise ValueError(f"invalid integrity mode: {integrity_mode!r}")
+    max_parallel = max(1, max_parallel)
     gates = gates or {}
     review_fn = review_fn or _stdin_review
     reviews: dict[str, str] = {}
@@ -109,7 +114,17 @@ def run_topology(
     )
 
     for wave in topo_sort(topology):
-        # TODO: run nodes within a wave concurrently — they are independent.
+        # Independent nodes in a wave: pre-run their INITIAL agent execution concurrently — the
+        # minutes-long part. Gates, integrity, remediation, review, and archiving stay sequential
+        # and deterministic in the per-node loop below, so the manifest order and all fail-closed
+        # semantics are unchanged; only wall-clock improves.
+        prepared = (
+            _execute_wave_concurrently(
+                wave, outputs, reviews, executor, construction_executor, cwd, hitl, max_parallel
+            )
+            if max_parallel > 1 and len(wave) > 1
+            else {}
+        )
         for node in wave:
             node_cwd = node.cwd or cwd
             # Phase-aware routing: construction nodes use a dedicated executor if configured.
@@ -134,8 +149,16 @@ def run_topology(
                     node.id,
                     model=node.model or getattr(node_executor, "model", None),
                 )
-                with _stage_progress(node, node_executor):
-                    result = node_executor.run(node, prompt, cwd=node_cwd)
+                if not revision_comments and node.id in prepared:
+                    # Initial execution already run concurrently for this wave; the review-doc
+                    # snapshot was taken there too (so the HITL gate scopes correctly).
+                    pre_review_docs, result = prepared[node.id]
+                else:
+                    # Snapshot review docs BEFORE this attempt so the HITL gate can surface
+                    # exactly what this stage (or its revision) produced — not the whole tree.
+                    pre_review_docs = _doc_snapshot(node_cwd) if (hitl and node.review) else None
+                    with _stage_progress(node, node_executor):
+                        result = node_executor.run(node, prompt, cwd=node_cwd)
                 result.executor = node_executor.name  # per-node backend, for cost attribution
                 attempt_results.append(result)
                 gate_result = gates[node.gate].check(node_cwd) if node.gate else None
@@ -235,7 +258,8 @@ def run_topology(
 
                 if hitl and node.review:
                     telemetry.review_waiting(node.id)
-                    review = review_fn(node, node_cwd)
+                    documents = _changed_docs(node_cwd, pre_review_docs or {})
+                    review = _invoke_review(review_fn, node, node_cwd, documents)
                     if not isinstance(review, ReviewResult):
                         raise TypeError("review_fn must return ReviewResult")
                     review_history.append(review)
@@ -340,6 +364,37 @@ def run_topology(
     return out
 
 
+def _execute_wave_concurrently(
+    wave, outputs, reviews, executor, construction_executor, cwd, hitl, max_parallel
+) -> dict[str, tuple[dict[str, str] | None, ExecutionResult]]:
+    """Run the INITIAL agent execution of a wave's independent nodes concurrently.
+
+    Only the (minutes-long) executor call is parallelized; every gate / integrity / remediation /
+    review / archive step stays sequential and deterministic in the caller. Same-wave nodes are
+    independent by construction (no ``depends_on`` among them) and neither ``outputs`` nor
+    ``reviews`` is mutated until the whole wave is processed, so these concurrent reads are safe.
+
+    Returns ``{node.id: (pre_review_docs, result)}`` — the review-doc snapshot is taken here (before
+    the execution) so a concurrently-run review node still scopes its HITL gate correctly.
+    """
+
+    def _run(node: Node) -> tuple[str, tuple[dict[str, str] | None, ExecutionResult]]:
+        node_cwd = node.cwd or cwd
+        node_executor = (
+            construction_executor
+            if construction_executor and node.phase == "construction"
+            else executor
+        )
+        pre_review_docs = _doc_snapshot(node_cwd) if (hitl and node.review) else None
+        result = node_executor.run(node, _render(node, outputs, reviews), cwd=node_cwd)
+        result.executor = node_executor.name
+        return node.id, (pre_review_docs, result)
+
+    _log(f"▶ wave · {len(wave)} independent nodes running concurrently (max {max_parallel})")
+    with ThreadPoolExecutor(max_workers=min(max_parallel, len(wave))) as pool:
+        return dict(pool.map(_run, wave))
+
+
 def _render(node: Node, outputs: dict[str, str], reviews: dict[str, str] | None = None) -> str:
     """Compose a node's prompt with its upstream outputs and any human review of them.
 
@@ -436,12 +491,92 @@ def _gate_failure_reason(
     return "run blocked"
 
 
-def _stdin_review(node: Node, node_cwd: str) -> ReviewResult:
-    """Read an explicit review decision; unavailable or closed input fails closed."""
-    docs = Path(node_cwd) / "aidlc-docs"
+_REVIEW_DOC_DIR = "aidlc-docs"
+_REVIEW_PREVIEW_CHARS = 1200
+
+
+def _doc_snapshot(node_cwd: str) -> dict[str, str]:
+    """Content-hash every review document under the workspace's doc dir."""
+    root = Path(node_cwd) / _REVIEW_DOC_DIR
+    snapshot: dict[str, str] = {}
+    if not root.is_dir():
+        return snapshot
+    for path in root.rglob("*"):
+        if path.is_file():
+            try:
+                snapshot[str(path.relative_to(node_cwd))] = hashlib.sha256(
+                    path.read_bytes()
+                ).hexdigest()
+            except OSError:
+                continue
+    return snapshot
+
+
+def _changed_docs(node_cwd: str, before: dict[str, str]) -> list[tuple[str, str]]:
+    """``(relpath, "new"|"modified")`` for docs written or changed since ``before``.
+
+    This is how the HITL gate surfaces *the document to review*: the artifact(s) THIS
+    stage actually produced, not the whole (growing) doc tree.
+    """
+    after = _doc_snapshot(node_cwd)
+    changed: list[tuple[str, str]] = []
+    for relpath in sorted(after):
+        if relpath not in before:
+            changed.append((relpath, "new"))
+        elif after[relpath] != before[relpath]:
+            changed.append((relpath, "modified"))
+    return changed
+
+
+def _invoke_review(review_fn, node: Node, node_cwd: str, documents: list[tuple[str, str]]):
+    """Call ``review_fn``, passing the scoped documents only if it accepts a third arg.
+
+    Keeps backward compatibility with 2-arg ``review_fn(node, cwd)`` callbacks.
+    """
+    try:
+        accepts_documents = len(inspect.signature(review_fn).parameters) >= 3
+    except (TypeError, ValueError):
+        accepts_documents = False
+    if accepts_documents:
+        return review_fn(node, node_cwd, documents)
+    return review_fn(node, node_cwd)
+
+
+def _surface_documents(node_cwd: str, documents: list[tuple[str, str]] | None) -> None:
+    """Print the specific document(s) this stage produced, with a short preview each."""
+    docs_dir = Path(node_cwd) / _REVIEW_DOC_DIR
+    if not documents:
+        _log(f"Review the documents in: {docs_dir}")
+        return
+    _log(f"This stage produced {len(documents)} document(s) to review:")
+    for relpath, kind in documents:
+        _log(f"  [{kind:>8}] {relpath}")
+    for relpath, kind in documents:
+        full = Path(node_cwd) / relpath
+        _log(f"\n----- {relpath} ({kind}) -----")
+        try:
+            text = full.read_text()
+        except OSError as exc:
+            _log(f"(could not read: {exc})")
+            continue
+        if len(text) > _REVIEW_PREVIEW_CHARS:
+            _log(text[:_REVIEW_PREVIEW_CHARS].rstrip() + f"\n… [preview truncated — full document at {full}]")
+        else:
+            _log(text)
+    _log("")
+
+
+def _stdin_review(
+    node: Node, node_cwd: str, documents: list[tuple[str, str]] | None = None
+) -> ReviewResult:
+    """Read an explicit review decision; unavailable or closed input fails closed.
+
+    Surfaces the specific document(s) this stage produced (path + a short preview)
+    instead of only pointing at the doc directory.
+    """
     _log("")
     _log(f"=== HITL REVIEW GATE — stage {node.id!r} complete ===")
-    _log(f"Review the documents in: {docs}")
+    _surface_documents(node_cwd, documents)
     if not sys.stdin.isatty():
         return ReviewResult(
             REVIEW_ABORT,

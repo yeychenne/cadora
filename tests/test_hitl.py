@@ -1,6 +1,7 @@
 """HITL review-gate tests using structured decisions and a fake executor."""
 
 import json
+import time
 
 import pytest
 
@@ -11,7 +12,14 @@ from cadora.review import (
     REVIEW_REQUEST_CHANGES,
     ReviewResult,
 )
-from cadora.runner import MAX_REVIEW_REVISIONS, _stdin_review, run_topology
+from cadora.runner import (
+    MAX_REVIEW_REVISIONS,
+    _changed_docs,
+    _doc_snapshot,
+    _invoke_review,
+    _stdin_review,
+    run_topology,
+)
 from cadora.topology import Node, Topology
 
 
@@ -170,3 +178,93 @@ def test_noninteractive_stdin_aborts_instead_of_approving(tmp_path):
     result = _stdin_review(Node(id="requirements", review=True), str(tmp_path))
     assert result.decision == REVIEW_ABORT
     assert "not a TTY" in result.comments
+
+
+# --- scoped document surfacing at the HITL gate ---------------------------------
+
+
+def test_changed_docs_detects_new_and_modified(tmp_path):
+    docs = tmp_path / "aidlc-docs"
+    docs.mkdir()
+    (docs / "requirements.md").write_text("v1")
+    before = _doc_snapshot(str(tmp_path))
+    (docs / "design.md").write_text("brand new")            # new
+    (docs / "requirements.md").write_text("v2")             # modified
+    changed = _changed_docs(str(tmp_path), before)
+    assert ("aidlc-docs/design.md", "new") in changed
+    assert ("aidlc-docs/requirements.md", "modified") in changed
+    assert len(changed) == 2  # nothing else surfaced
+
+
+def test_changed_docs_ignores_untouched_documents(tmp_path):
+    docs = tmp_path / "aidlc-docs"
+    docs.mkdir()
+    (docs / "a.md").write_text("same")
+    before = _doc_snapshot(str(tmp_path))
+    assert _changed_docs(str(tmp_path), before) == []  # nothing written since the snapshot
+
+
+def test_stdin_review_surfaces_stage_documents(tmp_path, capsys):
+    docs = tmp_path / "aidlc-docs"
+    docs.mkdir()
+    (docs / "design.md").write_text("# Architecture\nThe design decision is X.")
+    # stdin is not a TTY under pytest -> aborts, but must surface the docs first.
+    _stdin_review(
+        Node(id="architect", review=True),
+        str(tmp_path),
+        documents=[("aidlc-docs/design.md", "new")],
+    )
+    err = capsys.readouterr().err
+    assert "1 document(s) to review" in err
+    assert "aidlc-docs/design.md" in err
+    assert "The design decision is X." in err  # content preview, not just the path
+
+
+def test_invoke_review_is_backward_compatible():
+    node = Node(id="n", review=True)
+    two_arg_calls: list[tuple[str, str]] = []
+    three_arg_docs: list = []
+
+    _invoke_review(
+        lambda n, c: two_arg_calls.append((n.id, c)) or ReviewResult(REVIEW_APPROVE),
+        node,
+        "/cwd",
+        [("aidlc-docs/x.md", "new")],
+    )
+
+    def three_arg(n, c, documents):
+        three_arg_docs.append(documents)
+        return ReviewResult(REVIEW_APPROVE)
+
+    _invoke_review(three_arg, node, "/cwd", [("aidlc-docs/x.md", "new")])
+
+    assert two_arg_calls == [("n", "/cwd")]  # legacy 2-arg callback still works
+    assert three_arg_docs == [[("aidlc-docs/x.md", "new")]]  # 3-arg callback gets scoped docs
+
+
+def test_channel_scopes_artifacts_to_stage_documents(tmp_path):
+    import threading
+
+    from cadora.mcp.channel import ReviewChannel, channel_review_fn
+
+    channel = ReviewChannel()
+    review_fn = channel_review_fn(channel)
+    documents = [("aidlc-docs/design.md", "new"), ("aidlc-docs/nfr.md", "modified")]
+    holder: dict = {}
+
+    def run():
+        holder["result"] = review_fn(Node(id="architect", review=True), str(tmp_path), documents)
+
+    thread = threading.Thread(target=run)
+    thread.start()
+    for _ in range(200):
+        if channel.pending() is not None:
+            break
+        time.sleep(0.01)
+    request = channel.pending()
+    assert request is not None
+    # Scoped to THIS stage's documents, not the whole aidlc-docs tree.
+    assert request.artifacts == ["aidlc-docs/design.md", "aidlc-docs/nfr.md"]
+    channel.respond(ReviewResult(REVIEW_APPROVE))
+    thread.join(timeout=2)
+    assert holder["result"].decision == REVIEW_APPROVE

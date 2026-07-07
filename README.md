@@ -190,7 +190,10 @@ New to Cadora, or bringing it to a hackathon? Start with the
 
 ## Status
 
-**v0.7.0** — the drive-to-completion release: a failed build/test gate is fed back to a fresh
+**v0.7.1** — the field-feedback release: per-gate-type commands (a topology `gates:` map),
+genuinely parallel waves (`cadora run --max-parallel N`), and a scoped HITL review surface —
+hardened across a full day of real multi-project runs. Built on **v0.7.0**, the drive-to-completion
+release: a failed build/test gate is fed back to a fresh
 constrained session and re-run, bounded, until it genuinely passes (`--remediate N`) — the gate
 becomes the engine of completion, never a fake green. On top of v0.6.0's evidence pack, `eval`
 (+ judge), `compare`, `deliverable`, `doctor` (all backends), Kiro credits, trust gate, and the

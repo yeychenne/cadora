@@ -74,7 +74,7 @@ class ShellGate:
             env=env,
         )
         detail = (proc.stdout + proc.stderr)[-4000:]
-        missing = _missing_prerequisites(detail)
+        missing = _missing_prerequisites(detail, Path(cwd))
         if proc.returncode == 0:
             # Substance, not presence: a gate that invoked a test runner but executed ZERO
             # tests (e.g. `go test` / `cargo test` / `jest --passWithNoTests` all exit 0 with
@@ -107,7 +107,7 @@ def _prepare_python_gate(
     if requirements is None:
         return None
 
-    cadora_dir = cwd / ".cadora"
+    cadora_dir = _gate_env_root(cwd)
     venv = cadora_dir / "gate-venv"
     python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     bin_dir = python.parent
@@ -127,21 +127,29 @@ def _prepare_python_gate(
             return os.environ.copy(), "\n".join(setup_lines), error
 
     if not stamp.is_file() or stamp.read_text() != fingerprint:
-        install = [str(python), "-m", "pip", "install"]
+        base = [str(python), "-m", "pip", "install"]
+        index_args: list[str] = []
         if wheelhouse:
-            install.extend(["--no-index", "--find-links", str(Path(wheelhouse).resolve())])
+            index_args = ["--no-index", "--find-links", str(Path(wheelhouse).resolve())]
             setup_lines.append(f"wheelhouse: {Path(wheelhouse).resolve()}")
-        if (cwd / "pyproject.toml").is_file():
-            install.extend(["-e", "."])
-        install.extend(["-r", str(requirements)])
-        provisioned = subprocess.run(
-            install,
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-        )
+        editable = _project_is_installable(cwd)
+        install = base + index_args + (["-e", "."] if editable else []) + ["-r", str(requirements)]
+        provisioned = subprocess.run(install, cwd=cwd, capture_output=True, text=True)
         output = (provisioned.stdout + provisioned.stderr)[-4000:]
         setup_lines.append("provision: " + " ".join(install))
+        if provisioned.returncode != 0 and editable:
+            # The tree declares an installable package but `pip install -e .` failed —
+            # a very common agent slip (e.g. a flat layout with several top-level
+            # packages and no explicit `packages` config, so setuptools auto-discovery
+            # refuses). Don't let that sink the whole gate environment: retry with the
+            # dev requirements alone so the tooling still lands and the gate can run. If
+            # the tests genuinely needed the install, they now fail as a *remediable*
+            # gate failure rather than a terminal "missing tooling" block.
+            setup_lines.append("editable install failed; retrying with requirements only")
+            install = base + index_args + ["-r", str(requirements)]
+            provisioned = subprocess.run(install, cwd=cwd, capture_output=True, text=True)
+            output = (output + "\n--- fallback ---\n" + provisioned.stdout + provisioned.stderr)[-4000:]
+            setup_lines.append("provision: " + " ".join(install))
         if provisioned.returncode != 0:
             return os.environ.copy(), "\n".join(setup_lines), output
         cadora_dir.mkdir(parents=True, exist_ok=True)
@@ -161,6 +169,43 @@ def _dev_requirements(cwd: Path) -> Path | None:
         if candidate.is_file():
             return candidate
     return None
+
+
+def _gate_env_root(cwd: Path) -> Path:
+    """Directory holding the cached gate virtualenv — deliberately OUTSIDE the workspace.
+
+    If the venv lived inside ``cwd`` (e.g. ``cwd/.cadora/gate-venv``), any gate that globs
+    the tree — ``ruff check .``, ``mypy .``, ``coverage`` — would scan Cadora's own
+    provisioned third-party code and false-fail on it. Keyed by the resolved workspace path
+    so the cache stays stable across runs of the same workspace. Override the base location
+    with ``$CADORA_GATE_CACHE``.
+    """
+    key = hashlib.sha256(str(cwd).encode()).hexdigest()[:16]
+    override = os.environ.get("CADORA_GATE_CACHE")
+    base = Path(override) if override else Path.home() / ".cache" / "cadora" / "gate-venvs"
+    return base / key
+
+
+def _project_is_installable(cwd: Path) -> bool:
+    """True when the workspace declares an installable Python package.
+
+    A ``pyproject.toml`` that only carries ``[tool.*]`` config (very common — agents
+    write one just for pytest/ruff settings) is NOT installable: ``pip install -e .``
+    would trigger setuptools flat-layout auto-discovery and abort on a multi-package
+    tree, taking the whole gate environment down with it. Only attempt the editable
+    install when there's a real build declaration (``[build-system]``/``[project]``,
+    or a setup.py/setup.cfg).
+    """
+    if (cwd / "setup.py").is_file() or (cwd / "setup.cfg").is_file():
+        return True
+    pyproject = cwd / "pyproject.toml"
+    if not pyproject.is_file():
+        return False
+    try:
+        text = pyproject.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return bool(re.search(r"(?m)^[ \t]*\[(?:build-system|project)\b", text))
 
 
 def _is_python_gate(command: str) -> bool:
@@ -236,7 +281,7 @@ _MISSING_PATTERNS = (
 )
 
 
-def _missing_prerequisites(detail: str) -> list[str]:
+def _missing_prerequisites(detail: str, cwd: Path | None = None) -> list[str]:
     missing: set[str] = set()
     if "unrecognized arguments:" in detail and any(
         option in detail for option in ("--cov", "--cov-report", "--cov-fail-under")
@@ -246,7 +291,25 @@ def _missing_prerequisites(detail: str) -> list[str]:
         for match in pattern.finditer(detail):
             name = match.group("name").split("==", 1)[0]
             missing.add(name.replace("_", "-"))
+    if cwd is not None:
+        # An unimportable package that actually lives in the workspace is a fixable
+        # packaging/config bug (e.g. no `pythonpath`/install so `import pkg` fails under the
+        # bare `pytest` console script) — a *remediable* gate failure, not a terminal
+        # missing external prerequisite. Only genuinely-external names stay prerequisites.
+        missing = {name for name in missing if not _is_local_module(cwd, name)}
     return sorted(missing)
+
+
+def _is_local_module(cwd: Path, name: str) -> bool:
+    """True when ``name`` names a top-level package/module living in the workspace."""
+    top = name.replace("-", "_").split(".")[0]
+    if not top:
+        return False
+    return (
+        (cwd / top).is_dir()
+        or (cwd / f"{top}.py").is_file()
+        or (cwd / "src" / top).is_dir()
+    )
 
 
 # TODO: ReviewerGate — spawn a reviewer subagent (/security-review style) for

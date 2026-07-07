@@ -2,6 +2,47 @@
 
 ## Unreleased
 
+## v0.7.1 — 2026-07-07
+
+The field-feedback release from a full day of real multi-project hackathon runs: gates and
+provisioning that survive real-world layouts, genuinely parallel waves, and a clearer review
+surface.
+
+### Added
+- **Per-gate-type commands in the topology (`gates:` map).** A topology can now declare a command
+  per gate name — e.g. `build-test` runs `ruff check . && pytest -q` while an inception
+  `artifact-check` runs a cheap `test -f aidlc-docs/design.md` with `setup: off` (no venv). Gates
+  not named in the map fall back to the run-level `--gate-cmd` / `--gate-setup`. Fixes the #1 field
+  pain — one global `--gate-cmd` (ruff+pytest) crashed on inception phases that produce only
+  markdown, forcing users to strip gates off every inception node.
+- **Wave concurrency — `cadora run --max-parallel N`.** Independent nodes in a dependency wave now
+  run their agent execution **concurrently** (up to N at once) instead of strictly one at a time,
+  cutting wall-clock on wide topologies toward the slowest node per wave. Only the executor call is
+  parallelized; gates, integrity scanning, remediation, human review, and archiving stay
+  **sequential and deterministic**, so manifest order and every fail-closed guarantee are
+  unchanged. Dependencies are always respected. Opt-in: default `1` (sequential).
+
+### Changed
+- **HITL review gate surfaces the stage's own document(s).** When a `review: true` node pauses for
+  human review, Cadora now shows exactly what *that stage* produced instead of only naming the doc
+  directory: the CLI lists each new/modified file under `aidlc-docs/` with a short content preview,
+  and the MCP `review_gate` scopes its `artifacts` to those documents rather than the whole tree.
+  Backward compatible — existing 2-arg `review_fn(node, cwd)` callbacks are unaffected.
+
+### Fixed
+- **`--gate-setup auto` robustness (three fixes from a three-backend field test).** (1) `pip
+  install -e .` is attempted only when the workspace actually declares an installable package
+  (`[build-system]`/`[project]`, `setup.py`, or `setup.cfg`) — agents routinely write a tool-only
+  `pyproject.toml`, which made setuptools flat-layout discovery abort the whole provision and
+  block the gate on "missing tooling"; if an editable install fails anyway, provisioning retries
+  with the dev requirements alone so the gate can still run. (2) The gate virtualenv moved out of
+  the workspace (`~/.cache/cadora/gate-venvs/<hash>`, override with `CADORA_GATE_CACHE`) so
+  `.`-globbing gates (`ruff check .`, `mypy .`) no longer scan Cadora's own provisioned
+  third-party code and false-fail. (3) A gate failure caused by an unimportable package that
+  lives *in the workspace* is now a remediable `GATE_FAILED` (fixable packaging bug —
+  `--remediate` can drive it) instead of a terminal `blocked_prerequisite`; missing *external*
+  dependencies remain terminal.
+
 ## v0.7.0 — 2026-07-05
 
 Drive-to-completion release: the deterministic gate becomes the engine of completion — a failed

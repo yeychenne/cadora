@@ -75,13 +75,15 @@ class ReviewChannel:
 def channel_review_fn(channel: ReviewChannel):
     """Return a runner-compatible ``review_fn(node, cwd)`` backed by ``channel``."""
 
-    def review_fn(node, node_cwd: str) -> ReviewResult:
+    def review_fn(node, node_cwd: str, documents=None) -> ReviewResult:
         docs = Path(node_cwd) / "aidlc-docs"
-        artifacts = (
-            sorted(str(p.relative_to(node_cwd)) for p in docs.rglob("*.md"))
-            if docs.is_dir()
-            else []
-        )
+        if documents:
+            # Scope the review surface to the document(s) THIS stage produced.
+            artifacts = [relpath for relpath, _kind in documents]
+        elif docs.is_dir():
+            artifacts = sorted(str(p.relative_to(node_cwd)) for p in docs.rglob("*.md"))
+        else:
+            artifacts = []
         return channel.request_review(
             ReviewRequest(node_id=node.id, docs_dir=str(docs), artifacts=artifacts)
         )

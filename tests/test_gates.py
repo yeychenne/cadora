@@ -36,7 +36,9 @@ def test_executed_test_failure_is_not_a_prerequisite_block(tmp_path):
     assert result.missing_prerequisites == []
 
 
-def test_auto_setup_uses_cached_isolated_python_environment(tmp_path):
+def test_auto_setup_uses_cached_isolated_python_environment(tmp_path, monkeypatch):
+    cache = tmp_path / "gate-cache"
+    monkeypatch.setenv("CADORA_GATE_CACHE", str(cache))
     (tmp_path / "requirements-dev.txt").write_text("")
     command = (
         "python -c \"import os, pathlib; "
@@ -48,14 +50,18 @@ def test_auto_setup_uses_cached_isolated_python_environment(tmp_path):
     second = gate.check(str(tmp_path))
 
     assert first.status == GATE_PASSED
-    assert ".cadora/gate-venv" in first.setup_detail
+    # The gate venv lives OUTSIDE the workspace so `.`-globbing gates never scan it.
+    assert not (tmp_path / ".cadora").exists()
+    assert any(cache.glob("*/gate-venv"))
     assert second.status == GATE_PASSED
     assert "provision: cached" in second.setup_detail
 
 
 def test_auto_setup_handles_relative_cwd(tmp_path, monkeypatch):
-    # Regression: a relative cwd must not double the provisioning paths — the gate-venv was created
-    # at <cwd>/<cwd>/.cadora and `pip install -r <cwd>/requirements-dev.txt` could not be opened.
+    # Regression: a relative cwd must not double the provisioning paths —
+    # `pip install -r <cwd>/requirements-dev.txt` must resolve against the absolute cwd.
+    cache = tmp_path / "gate-cache"
+    monkeypatch.setenv("CADORA_GATE_CACHE", str(cache))
     ws = tmp_path / "ws"
     ws.mkdir()
     (ws / "requirements-dev.txt").write_text("")
@@ -69,8 +75,56 @@ def test_auto_setup_handles_relative_cwd(tmp_path, monkeypatch):
 
     assert result.status == GATE_PASSED
     assert "Could not open requirements file" not in result.detail
-    assert (ws / ".cadora" / "gate-venv").is_dir()  # created at the correct, non-doubled path
+    assert any(cache.glob("*/gate-venv"))  # provisioned (outside the workspace)
     assert not (ws / "ws").exists()  # no doubled path
+
+
+def test_tool_only_pyproject_skips_editable_install(tmp_path, monkeypatch):
+    # A pyproject carrying only [tool.*] config (agents write one just for pytest/ruff) is NOT
+    # an installable package: `pip install -e .` would trip setuptools flat-layout discovery on
+    # a multi-package tree and abort the WHOLE provision. Cadora must skip the editable install
+    # and still land the tooling.
+    monkeypatch.setenv("CADORA_GATE_CACHE", str(tmp_path / "gate-cache"))
+    (tmp_path / "requirements-dev.txt").write_text("")
+    (tmp_path / "pyproject.toml").write_text("[tool.ruff]\nline-length = 100\n")
+    for pkg in ("pkg_a", "pkg_b"):  # two top-level packages — the flat-layout landmine
+        (tmp_path / pkg).mkdir()
+        (tmp_path / pkg / "__init__.py").write_text("")
+
+    result = ShellGate("test", "python -c \"print('ok')\"", setup_mode="auto").check(str(tmp_path))
+
+    assert result.status == GATE_PASSED
+    assert "-e ." not in result.setup_detail  # editable install was not attempted
+
+
+def test_local_package_import_error_is_remediable_not_terminal(tmp_path):
+    # An unimportable package that lives in the workspace is a fixable packaging/config bug
+    # (remediable GATE_FAILED), not a terminal missing external prerequisite.
+    (tmp_path / "mypkg").mkdir()
+    (tmp_path / "mypkg" / "__init__.py").write_text("")
+    python = shlex.quote(sys.executable)
+    command = (
+        f"{python} -c \"import sys; "
+        "sys.stderr.write('No module named ' + chr(39) + 'mypkg' + chr(39)); sys.exit(1)\""
+    )
+    result = ShellGate("test", command).check(str(tmp_path))
+
+    assert result.status == GATE_FAILED
+    assert result.missing_prerequisites == []
+
+
+def test_external_missing_module_stays_a_prerequisite_block(tmp_path):
+    # A missing EXTERNAL dependency (no such package in the workspace) stays terminal —
+    # remediation shouldn't burn attempts trying to author a third-party library.
+    python = shlex.quote(sys.executable)
+    command = (
+        f"{python} -c \"import sys; "
+        "sys.stderr.write('No module named ' + chr(39) + 'boto3' + chr(39)); sys.exit(1)\""
+    )
+    result = ShellGate("test", command).check(str(tmp_path))
+
+    assert result.status == GATE_BLOCKED_PREREQUISITE
+    assert result.missing_prerequisites == ["boto3"]
 
 
 def test_auto_setup_failure_is_reported_without_running_gate(tmp_path):
