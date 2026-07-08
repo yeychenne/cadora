@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cadora — the neutral conductor</title>
+<meta name="description" content="One conductor for every coding agent: any frontier model, your own subscriptions, the AI-DLC method, and proof you can ship.">
+<style>
+  :root{
+    --bg:#fbfcfc; --panel:#ffffff; --ink:#1a2330; --muted:#58626f; --faint:#8b95a1;
+    --line:#e7eaee; --accent:#2f6f56; --accent-tint:#eef4f1; --amber:#8a6314; --red:#9a3b3b;
+    --code:#f4f6f7;
+    --sans:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    font-size:17px;line-height:1.62;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:0 1.4rem}
+  a{color:var(--accent);text-decoration:none;border-bottom:1px solid #cfe0d8}
+  a:hover{border-bottom-color:var(--accent)}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+  code,.mono{font-family:var(--mono);font-size:.86em}
+  code{background:var(--code);padding:.08em .34em;border-radius:4px}
+  h1,h2,h3{line-height:1.2;text-wrap:balance;font-weight:650}
+  .eyebrow{font:600 .72rem/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--faint)}
+
+  /* masthead */
+  header{padding:4.2rem 0 2.4rem;border-bottom:1px solid var(--line);text-align:center}
+  header .mark{font:650 1.5rem/1 var(--sans);letter-spacing:-.01em}
+  header .mark b{color:var(--accent)}
+  header h1{font-size:clamp(1.7rem,4.4vw,2.35rem);margin:.9rem 0 .5rem;letter-spacing:-.015em}
+  header p.lede{font-size:1.06rem;color:var(--muted);max-width:56ch;margin:.2rem auto 1.3rem}
+  .meta{display:flex;gap:.55rem;justify-content:center;flex-wrap:wrap;font:600 .72rem/1 var(--mono);color:var(--muted)}
+  .meta span{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:.34rem .7rem}
+
+  section{padding:2.6rem 0;border-bottom:1px solid var(--line)}
+  section > h2{font-size:1.28rem;margin:.35rem 0 1.1rem;letter-spacing:-.01em}
+  .sub{color:var(--muted);margin:-.6rem 0 1.4rem}
+
+  /* pillars */
+  .pillars{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  @media(max-width:620px){.pillars{grid-template-columns:1fr}}
+  .pillar{background:var(--panel);padding:1.25rem 1.3rem;transition:background .18s}
+  .pillar:hover{background:#fcfefd}
+  .pillar .n{font:600 .72rem/1 var(--mono);color:var(--accent);letter-spacing:.06em}
+  .pillar h3{font-size:1.02rem;margin:.5rem 0 .4rem}
+  .pillar p{margin:0;font-size:.93rem;color:var(--muted);line-height:1.55}
+
+  /* run flow */
+  .flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;margin:.4rem 0 1rem}
+  .step{flex:1 1 0;min-width:92px;text-align:center;position:relative;padding:.2rem .1rem}
+  .chip{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:.6rem .3rem;
+    transition:border-color .35s ease,background .35s ease,color .35s ease}
+  .chip .t{font:600 .8rem/1.2 var(--sans)}
+  .chip .s{font:600 .62rem/1 var(--mono);letter-spacing:.05em;color:var(--faint);text-transform:uppercase;display:block;margin-top:.32rem}
+  .step:not(:last-child)::after{content:"";position:absolute;top:50%;right:-1px;width:0;height:0}
+  .arrow{align-self:center;color:var(--faint);font-family:var(--mono);padding:0 .1rem;flex:0 0 auto}
+  .flow.on .chip{border-color:#bcd6c9;background:var(--accent-tint)}
+  .flow.on .step.gate .chip{border-color:var(--accent);background:var(--accent);color:#fff}
+  .flow.on .step.gate .chip .s{color:#cfe7dc}
+  .flow.on .step.pack .chip{border-color:var(--accent)}
+  .flow .step{opacity:.55;transition:opacity .4s ease}
+  .flow.on .step{opacity:1}
+  .flow.on .step:nth-child(1){transition-delay:.0s}
+  .flow.on .step:nth-child(3){transition-delay:.12s}
+  .flow.on .step:nth-child(5){transition-delay:.24s}
+  .flow.on .step:nth-child(7){transition-delay:.36s}
+  .flow.on .step:nth-child(9){transition-delay:.48s}
+  .caption{font-size:.86rem;color:var(--muted);font-style:italic;margin-top:.2rem}
+
+  /* verify widget */
+  .verify{border:1px solid var(--line);border-radius:10px;background:var(--panel);overflow:hidden}
+  .verify .files{font-family:var(--mono);font-size:.78rem;color:var(--muted);padding:.9rem 1.1rem;border-bottom:1px solid var(--line)}
+  .verify .files div{display:flex;justify-content:space-between;gap:1rem;padding:.12rem 0;white-space:nowrap;overflow:hidden}
+  .verify .files .h{text-overflow:ellipsis;overflow:hidden}
+  .verify .files div.bad .h{color:var(--red);text-decoration:line-through}
+  .verify .bar{display:flex;align-items:center;gap:.7rem;padding:.8rem 1.1rem;flex-wrap:wrap}
+  .verify button{font:600 .82rem/1 var(--sans);border:1px solid var(--line);background:var(--panel);
+    color:var(--ink);padding:.5rem .9rem;border-radius:7px;cursor:pointer;transition:border-color .15s,background .15s}
+  .verify button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .verify button:hover{border-color:var(--accent)}
+  .verdict{font:600 .84rem/1 var(--mono);margin-left:auto;padding:.4rem .7rem;border-radius:6px}
+  .verdict.ok{color:var(--accent);background:var(--accent-tint)}
+  .verdict.no{color:var(--red);background:#f7ecec}
+  .verdict.idle{color:var(--faint)}
+
+  /* backends */
+  .tiers{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.2rem}
+  .tier{font:600 .78rem/1 var(--mono);border:1px solid var(--line);border-radius:999px;padding:.4rem .8rem;background:var(--panel)}
+  .tier b{color:var(--accent)}
+  .tier.exp b{color:var(--amber)}
+  .legend{font-size:.85rem;color:var(--muted);margin-top:.7rem}
+
+  .note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:8px;padding:1rem 1.2rem;font-size:.93rem;color:var(--muted)}
+  .note b{color:var(--ink)}
+
+  footer{padding:2.4rem 0 3.2rem;text-align:center;color:var(--faint);font-size:.85rem}
+  footer .links{display:flex;gap:1.1rem;justify-content:center;flex-wrap:wrap;margin-bottom:.9rem;font-family:var(--mono);font-size:.82rem}
+
+  .reveal{opacity:0;transform:translateY(10px);transition:opacity .5s ease,transform .5s ease}
+  .reveal.in{opacity:1;transform:none}
+  @media(prefers-reduced-motion:reduce){
+    .reveal,.flow .step,.chip{transition:none}
+    .reveal{opacity:1;transform:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="mark"><b>Cadora</b></div>
+    <h1>The neutral conductor</h1>
+    <p class="lede">One conductor for every coding agent — drive the top frontier models through a single
+      workflow, on the subscriptions you already pay for, following the AI-DLC method, with proof you can ship.</p>
+    <div class="meta"><span>open source · MIT</span><span>v0.9.0</span><span>a capstone, not a platform</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="reveal">
+    <p class="sub">Cadora sits <em>above</em> the coding-agent CLIs and drives them through a workflow you
+      declare — so the <em>how</em> of delivery stays yours. It is the conductor, not the agent: it doesn't
+      implement the agent loop, and it isn't an in-IDE assistant. It's the layer that turns
+      <em>“an AI wrote it”</em> into a run you can repeat, compare, cost, and prove.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="eyebrow">what it gives you</div>
+    <h2>Four things, one layer</h2>
+    <div class="pillars">
+      <div class="pillar">
+        <div class="n">01</div><h3>Every frontier model</h3>
+        <p>Claude Code, Codex, Kiro, and more through the same topology. A/B on identical work, or
+          phase-split a run — design on one model, build on another. No lock-in.</p>
+      </div>
+      <div class="pillar">
+        <div class="n">02</div><h3>Your own subscriptions</h3>
+        <p>Subscription-funded by default — metered API is an explicit opt-in. Mix vendors and funding, with
+          one cross-vendor cost ledger showing what each run spent.</p>
+      </div>
+      <div class="pillar">
+        <div class="n">03</div><h3>A real method</h3>
+        <p>Aligned with the AWS AI-DLC lifecycle — inception → construction → operations — a structured,
+          repeatable workflow. Method-agnostic too: BMAD, or your own.</p>
+      </div>
+      <div class="pillar">
+        <div class="n">04</div><h3>Proof you can ship</h3>
+        <p>Deterministic gates decide “green,” not the agent. Every run is a signed, checksummed evidence
+          pack — tamper-evident and attributable, verifiable after it leaves your machine.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="eyebrow">how a run works</div>
+    <h2>Declared, gated, recorded</h2>
+    <p class="sub">You declare the steps; the gate — not the agent — decides whether each one is done.</p>
+    <div class="flow" id="flow" aria-label="run flow: vision, design, build, gate, signed pack">
+      <div class="step"><div class="chip"><span class="t">vision</span><span class="s">spec</span></div></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="step"><div class="chip"><span class="t">design</span><span class="s">inception</span></div></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="step"><div class="chip"><span class="t">build</span><span class="s">construction</span></div></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="step gate"><div class="chip"><span class="t">gate ✓</span><span class="s">proven</span></div></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="step pack"><div class="chip"><span class="t">signed pack</span><span class="s">evidence</span></div></div>
+    </div>
+    <p class="caption">One topology, any model, on your own subscriptions — one cost ledger, one signed proof.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="eyebrow">proof, not promise</div>
+    <h2>Verify the pack</h2>
+    <p class="sub">A run's evidence is checksummed and signed. Recompute the hashes and any change shows —
+      an unsigned pack still verifies its integrity; a signed one is attributable too.</p>
+    <div class="verify" id="verify">
+      <div class="files" id="files">
+        <div><span class="h">manifest.json</span><span>a3f1…9c</span></div>
+        <div><span class="h">nodes/build/output.txt</span><span>7be0…41</span></div>
+        <div><span class="h">report.json</span><span>d29c…08</span></div>
+        <div><span class="h">checksums.txt.sig</span><span>ssh-ed25519</span></div>
+      </div>
+      <div class="bar">
+        <button class="primary" id="btnVerify">cadora verify</button>
+        <button id="btnTamper">tamper a file</button>
+        <span class="verdict idle" id="verdict">— not run —</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="eyebrow">backends</div>
+    <h2>Verified and experimental</h2>
+    <div class="tiers">
+      <span class="tier"><b>verified</b> · claude</span>
+      <span class="tier"><b>verified</b> · codex</span>
+      <span class="tier"><b>verified</b> · kiro</span>
+      <span class="tier exp"><b>experimental</b> · glm</span>
+      <span class="tier exp"><b>experimental</b> · antigravity</span>
+    </div>
+    <p class="legend">Every backend runs the same topology, gates, integrity scan, and archive —
+      so results A/B-compare directly. <code>cadora doctor</code> prints each tier and version status.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="eyebrow">honest status</div>
+    <h2>Where this is</h2>
+    <p class="note">Cadora is a working reference implementation of the neutral-conductor idea — shipped,
+      tested, backend-neutral. It is offered as the <b>capstone of an exploration, not a finished commercial
+      platform</b>. The LLM-as-judge gate is a deliberate stub; the load-bearing parts — the gates, the
+      integrity scan, the signed evidence, the cost ledger — are real. <b>The vision stands on its own; the
+      tool shows it holds.</b></p>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="links">
+      <a href="https://github.com/yeychenne/cadora">GitHub</a>
+      <a href="vision.md">The vision</a>
+      <a href="verification-gates.md">How gates decide green</a>
+    </div>
+    <div>Cadora · MIT · “Green means proven, not claimed.”</div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // scroll reveal
+  var els = document.querySelectorAll('.reveal');
+  if ('IntersectionObserver' in window && !reduce) {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (e.isIntersecting){
+          e.target.classList.add('in');
+          if (e.target.querySelector('#flow')) e.target.querySelector('#flow').classList.add('on');
+          io.unobserve(e.target);
+        }
+      });
+    }, {threshold:.2});
+    els.forEach(function(el){ io.observe(el); });
+  } else {
+    els.forEach(function(el){ el.classList.add('in'); });
+    var f = document.getElementById('flow'); if (f) f.classList.add('on');
+  }
+
+  // verify micro-interaction — the hash floor catches a tampered file
+  var tampered = false, verdict = document.getElementById('verdict'), files = document.getElementById('files');
+  document.getElementById('btnTamper').addEventListener('click', function(){
+    var rows = files.querySelectorAll('div'); var row = rows[1];
+    tampered = !tampered;
+    row.classList.toggle('bad', tampered);
+    this.textContent = tampered ? 'restore file' : 'tamper a file';
+    verdict.className = 'verdict idle'; verdict.textContent = '— not run —';
+  });
+  document.getElementById('btnVerify').addEventListener('click', function(){
+    if (tampered){
+      verdict.className = 'verdict no';
+      verdict.textContent = 'NOT VERIFIED · hash mismatch';
+    } else {
+      verdict.className = 'verdict ok';
+      verdict.textContent = 'VERIFIED · signed';
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+# Cadora topology: DESIGN WAVE — an inception design phase driven by OpenDesign.
+#
+# A design-first wave that produces real design artifacts before construction, using OpenDesign
+# (open-source, agent-native design workspace — https://github.com/nexu-io/open-design) as the tool
+# the design node drives. It captures the brand/design in `DESIGN.md` and exports a working
+# prototype, then a build node implements against that design — and Cadora's gates check the
+# artifacts either way.
+#
+# RESTRICTED TO --executor claude. OpenDesign drives a coding-agent CLI as its design engine and has
+# no Amazon Bedrock adapter today, so run this on the Claude path (subscription or a supported BYOK
+# provider), not the Bedrock/SigV4 default:
+#
+#   cadora run examples/design-wave.topology.yaml --executor claude --cwd ws/ --yes
+#
+# Prerequisites in the runner: the OpenDesign CLI `od` on PATH with its local daemon started
+# (`od` is local-first). `cadora doctor` does not check `od`; provision it in your workspace.
+name: design-wave
+
+# Inception gates are artifact checks (setup: off); the build gate provisions a venv (setup: auto).
+gates:
+  has-design:
+    cmd: "test -s DESIGN.md && ls design/*.html >/dev/null 2>&1"
+    setup: off
+  build-test:
+    cmd: "ruff check . && pytest -q"
+    setup: auto
+
+nodes:
+  - id: design
+    role: designer
+    phase: inception
+    prompt: |
+      Design the interface for the product described in `vision.md` using OpenDesign (the `od` CLI,
+      already installed with its daemon running). Steps:
+        1. Establish the brand/design system and write it to `DESIGN.md` (OpenDesign's brand schema:
+           color, type, spacing, layout, components, motion, voice).
+        2. Generate a working prototype with an OpenDesign plugin — e.g.
+           `od plugin run web-prototype --brief "<the screens this product needs>"` — and export the
+           result into `design/` as HTML (`od export`).
+      Keep the design concrete and specific to the product, not generic. Your gate checks that
+      `DESIGN.md` and an exported `design/*.html` exist.
+    tools: [Read, Write, Bash]
+    gate: has-design
+
+  - id: build
+    role: engineer
+    phase: construction
+    prompt: |
+      Implement the product per `DESIGN.md` and the prototype in `design/`. Build the application
+      code and a real test suite; add `requirements-dev.txt` (pytest, ruff) and a `pyproject.toml`.
+      Match the design's structure and components. Write complete, working files — no stubs — and run
+      the suite until green.
+    tools: [Read, Write, Edit, Bash]
+    depends_on: [design]
+    gate: build-test

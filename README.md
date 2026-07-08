@@ -1,56 +1,75 @@
 # Cadora
 
-**Ship agent-built software you can prove — deterministic gates, tamper detection, run evidence,
-and per-node cost attribution, across coding-agent CLIs.**
+**One conductor for every coding agent.** Cadora drives the top frontier models — **Claude Code,
+OpenAI Codex, Amazon Kiro**, and more — through a single declared workflow, on the **subscriptions
+you already pay for**, following the **AWS AI-DLC** method, and it **proves** what got built. It
+sits *above* the vendors: neutral verdicts, one cost ledger, no lock-in.
 
-Coding agents can build real software. Cadora is the **audit-grade conductor** that proves what
-they built: it drives headless coding-agent CLIs (**Claude Code**, **OpenAI Codex**) through a
-declared multi-step workflow, refuses to take the agent's word for the result, and captures the
-whole run — artifacts, events, human decisions, and **to-the-node cost** — as inspectable
-evidence.
+Cadora is the **conductor, not the agent** — it doesn't implement the agent loop (the backend CLI
+does) and isn't an in-IDE assistant. It's the layer that turns *"an AI wrote it"* into a run you can
+**repeat, compare, cost, and prove**.
 
-Cadora is the **conductor, not the agent**: it doesn't implement the agent loop (the backend CLI
-does), and it isn't an in-IDE assistant. It sits *above* the vendors, which is exactly what makes
-its verdicts neutral and its cost ledger cross-vendor.
+> Read the vision: [**The Neutral Conductor**](docs/vision.md) &nbsp;·&nbsp; or skim the
+> [**one-page overview**](docs/index.html) — an interactive HTML version of this README (open in a browser)
 
-## Why it exists
+## What Cadora gives you
 
-A vendor's tool verifying that vendor's agent is the fox auditing the henhouse. Cadora verifies
-from the outside:
+**Every frontier model, one workflow.** Drive Claude Code, OpenAI Codex, and Amazon Kiro (plus
+experimental GLM and Antigravity) through the *same* declared topology. A/B two models on identical
+work and compare on equal terms, or **phase-split** a run — inception on one, construction on another
+(`--construction-executor`). Adding a backend is one class; there's no lock-in. Use the best model
+for each step.
 
-- **Deterministic, fail-closed gates** — Cadora re-runs your build and tests itself and reads
-  exit codes and test counts, never the agent's claims. A test runner that executes **zero tests**
-  is reported `vacuous` and **blocks the run**. A missing toolchain is `blocked_prerequisite`,
-  not a fake failure — classified for Python, Node, Go, and Rust.
-- **Drive to completion, honestly** — a failed gate needn't be the end. With `--remediate N`,
-  Cadora feeds the exact gate failure to a fresh, constrained session and re-runs the *same* gate,
-  up to N bounded attempts, until it genuinely passes (**`completed-green`**) or it stops with the
-  full attempt trail (**`honest-blocked`**). It never weakens the gate or accepts the agent's
-  claim of success — the gate becomes the engine of completion, not just a tripwire. Opt-in; bound
-  spend with `--remediate-max-cost`.
-- **Tamper detection** — `cadora integrity` detects generated packages and scripts that
-  impersonate real tools, unrecognized build substitutions, tests run against another project's
-  environment, and **hollow code** — a threshold of stub function bodies (`pass` / `...` /
-  `raise NotImplementedError`) that the passing gate misses. Modes: `audit` (record), `enforce`
-  (block), `repair` (one constrained fix session, then re-verify).
-- **Fail-closed human review** — mark nodes `review: true` and run `--hitl`: the operator must
-  approve, request bounded revisions, or abort; closed stdin aborts rather than silently
-  approving. Every decision, comment, and revision cost is archived. The review surface is
-  pluggable over **MCP** — run `cadora mcp` and drive `start_run` / `review_gate` /
-  `submit_review` / `get_artifact` / `run_status` from any MCP client (Claude Code, Claude
-  Desktop, Codex CLI, or a networked client). See [docs/hitl-mcp.md](docs/hitl-mcp.md).
-- **Per-node cost attribution, cross-vendor** — every node records its backend, model, tokens,
-  and dollars, split by funding source (subscription vs metered API). `cadora usage` and the
-  local dashboard's FinOps panel aggregate by model / backend / funding / day — one ledger even
-  when design runs on Claude and code runs on Codex.
+**Run on the subscriptions you already pay for.** Subscription-funded by default — metered API is an
+explicit opt-in, never a surprise bill — so a whole delivery runs on the seats you already have. Mix
+vendors and funding sources, and get **one cross-vendor cost ledger**: `cadora usage` and the
+dashboard's FinOps panel show what every run spent, by model, backend, funding source, and day.
 
-The evidence of a run *is* the archive: `runs/<id>/manifest.json` + per-stage artifacts + the
-event stream + gate/integrity/review outcomes + cost. Inspect with `cadora archive ls / show`
-or the dashboard — and hand it to someone with **`cadora report <run-id>`**: a portable
-**evidence pack** (self-contained `report.html` + `report.json` + a SHA-256 `checksums.txt`
-covering every archived file), verifiable after it leaves your machine
-(`shasum -a 256 -c`). The pack states exactly what it claims — and that it's checksummed,
-not signed.
+**A real method, not a wall of prompts.** Cadora is aligned with the **AWS AI-DLC** lifecycle —
+inception → construction → operations — so a run is a structured, phase-gated workflow you can reason
+about and repeat. It's method-agnostic too: drive BMAD, or your own topology. (The AI-DLC and shape
+topologies live in [`examples/`](examples/).)
+
+**Proof you can ship.** *"It works"* is a claim — Cadora turns it into **evidence**. Deterministic,
+fail-closed gates decide "green" from real exit codes and test counts (a suite that ran zero tests
+is blocked; a package that won't build fails), tamper detection catches impersonated tools and hollow
+stubbed-out code, and every run becomes a **signed, checksummed evidence pack** you can hand to an
+auditor — verifiable after it leaves your machine. Fail-closed human review (`--hitl`) sits wherever
+judgment is required.
+
+```mermaid
+flowchart LR
+    TOP["your topology<br/>(one AI-DLC workflow)"] --> ANY["run each step on<br/>any model · any subscription"]
+    ANY --> M1["Claude Code"]
+    ANY --> M2["OpenAI Codex"]
+    ANY --> M3["Amazon Kiro"]
+    M1 --> OUT["same gates · one cost ledger<br/>one signed evidence pack"]
+    M2 --> OUT
+    M3 --> OUT
+```
+
+*One topology, any model, on your own subscriptions — with one cost ledger and one signed proof.*
+
+**Go deeper:** [the vision](docs/vision.md) · [how gates decide *green*](docs/verification-gates.md)
+
+## How a run works
+
+You declare the steps as a small YAML DAG. Cadora runs independent steps concurrently, gates each
+one, and rolls the whole run into a single signed evidence pack.
+
+```mermaid
+flowchart LR
+    V(["vision / spec"]) --> D["design<br/>gate: artifacts"]
+    D --> BA["build A<br/>gate: tests"]
+    D --> BB["build B<br/>gate: tests"]
+    BA --> INT["integrate<br/>gate: build + test"]
+    BB --> INT
+    INT --> DEP["deploy<br/>gate: security"]
+    DEP --> PACK[["signed<br/>evidence pack"]]
+```
+
+Runnable topologies for each shape — sequential, parallel fan-out, fan-in, a prep phase, and a
+deploy target — live in [`examples/`](examples/).
 
 ## Backends
 
@@ -196,18 +215,24 @@ New to Cadora, or bringing it to a hackathon? Start with the
 
 ## Status
 
-**v0.9.0** — the capstone release: agent-built software you can *prove*, end to end. Evidence packs
-are now **signed** as well as checksummed — `cadora sign` / `cadora verify` add a detached signature
-over the SHA-256 manifest (OpenSSH by default, pluggable; `verify` exits non-zero on tamper or a bad
-signature), so a green run is tamper-evident **and attributable**. Backends carry explicit **support
-tiers** (`cadora doctor`: three verified — claude/codex/kiro — plus experimental), the MCP HTTP
-transport takes a **bearer token** for safe network exposure, and a release **secrets scanner**
-guards every build. Ships a full **topology examples library** across all three lifecycle phases — a
-mission-prep prep phase (Senior PM ∥ DE), the three canonical DAG shapes, and a security-gated
-AgentCore deploy target. On **v0.8.x**'s run-detail dashboard, headless HITL, run resumption
-(`--resume-from`), and the packaging false-green fix; **v0.7.x**'s per-gate commands, parallel waves,
-and drive-to-completion (`--remediate`); and v0.6.0's evidence pack, `eval` (+ judge), `compare`,
-`deliverable`, `doctor`. 270+ tests, `ruff` clean, CI on Python 3.10–3.12.
+**v0.10.0** — the capstone release. One conductor across **every frontier model** (claude / codex /
+kiro verified, plus experimental), running on **the subscriptions you already pay for** with one
+cross-vendor cost ledger, driving a **real method** (AWS AI-DLC, or your own), and leaving **proof
+you can ship**: evidence packs are now **signed** as well as checksummed — `cadora sign` /
+`cadora verify` add a detached signature over the SHA-256 manifest (OpenSSH by default, pluggable;
+`verify` exits non-zero on tamper or a bad signature), so a green run is tamper-evident **and
+attributable**. Backends carry explicit **support tiers** (`cadora doctor`), the MCP HTTP transport
+takes a **bearer token**, and a release **secrets scanner** guards every build. Ships a full
+**topology examples library** across all three lifecycle phases — a mission-prep prep phase (Senior
+PM ∥ DE), the three canonical DAG shapes, and a security-gated AgentCore deploy target — plus the
+[vision paper](docs/vision.md) and a [one-page overview](docs/index.html). On **v0.8.x**'s
+run-detail dashboard, headless HITL, run resumption (`--resume-from`), and the packaging
+false-green fix; **v0.7.x**'s per-gate commands, parallel waves, and drive-to-completion
+(`--remediate`); and v0.6.0's evidence pack, `eval` (+ judge), `compare`, `deliverable`, `doctor`.
+270+ tests, `ruff` clean, CI on Python 3.10–3.12.
+
+> **v0.9.0 is superseded and yanked** — it was published from an incomplete pre-release build (the
+> code was correct; the packaged docs were stale). Use **v0.10.0**.
 
 **Roadmap:** dependency lockfile hardening, a
 backend contract matrix, a container sandbox wrapper, and additional backend/method packs as they

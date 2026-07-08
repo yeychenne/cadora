@@ -1,13 +1,18 @@
 # Changelog
 
-## v0.9.0 — 2026-07-08
+## v0.10.0 — 2026-07-08
 
-The capstone release — the audit-grade thesis completed, the honesty gaps closed, and a full
-topology examples library. Evidence packs are now **signed** as well as checksummed
-(`cadora sign` / `cadora verify`); backends carry explicit **support tiers**; the MCP HTTP
-transport takes a **bearer token**; a release **secrets scanner** guards every build; and
+The capstone release — the audit-grade thesis completed, the honesty gaps closed, a full topology
+examples library, and the final documentation. Evidence packs are now **signed** as well as
+checksummed (`cadora sign` / `cadora verify`); backends carry explicit **support tiers**; the MCP
+HTTP transport takes a **bearer token**; a release **secrets scanner** guards every build;
 `examples/` gains a prep phase, the three canonical DAG shapes, and a security-gated AgentCore
-deploy target — one per lifecycle phase.
+deploy target — one per lifecycle phase; and the README and vision paper are rebalanced around the
+four things a neutral conductor gives you.
+
+> **Supersedes v0.9.0.** That version was published from an incomplete pre-release build: the code
+> was correct and complete, but the packaged README and docs were stale. PyPI releases are
+> immutable, so v0.9.0 is yanked and replaced by v0.10.0 — identical code, final documentation.
 
 ### Added
 - **Signed evidence packs — `cadora sign` / `cadora verify`.** The evidence pack was already
@@ -56,6 +61,19 @@ deploy target — one per lifecycle phase.
   resource, a missing `aws:SourceAccount` confused-deputy guard, or any long-term static credential**
   — enforcing SigV4-only, least-privilege deployment. Rounds out the phase coverage (inception /
   construction / operations) and pairs with `cadora gate-check` to audit a `deploy/` folder with no agent.
+- **Vision paper — "The Neutral Conductor" (`docs/vision.md`).** The thesis in full: the three things
+  a conductor *above* the vendors gives you — **freedom** (any frontier model, on the subscriptions
+  you already pay for), **method** (the AWS AI-DLC lifecycle, or your own), and **proof** (a
+  deterministic verdict + signed evidence). Honest about its own boundaries.
+- **Rebalanced, value-first README + a one-page HTML overview (`docs/index.html`).** The README now
+  leads with four co-equal pillars — every frontier model · your own subscriptions · a real method
+  (AI-DLC) · proof you can ship — with Mermaid diagrams. `docs/index.html` is a self-contained,
+  dependency-free rendering of the same (animated run-flow, interactive `cadora verify`).
+- **`verify-with-cadora` skill, an OpenDesign design wave, and an OpenWork desktop note.**
+  `examples/skills/verify-with-cadora/SKILL.md` hands an in-session change to Cadora for deterministic
+  external gates + a signed pack; `examples/design-wave.topology.yaml` drives OpenDesign in an
+  inception design phase (claude-only); `docs/experimental-openwork.md` documents config-only wiring
+  of Cadora's MCP into a desktop shell.
 
 ## v0.8.1 — 2026-07-08
 
