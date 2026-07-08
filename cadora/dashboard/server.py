@@ -26,7 +26,9 @@ def serve_dashboard(
     """
     handler = make_handler(archive_dir)
     httpd = ThreadingHTTPServer((host, port), handler)
+    resolved = Path(archive_dir).resolve()
     print(f"cadora dashboard: http://{host}:{httpd.server_port}/")
+    print(f"  serving archive: {resolved}  ({'ok' if resolved.is_dir() else 'MISSING — no runs here'})")
     if host not in {"127.0.0.1", "localhost", "::1"}:
         print(
             f"WARNING: dashboard bound to {host} (non-loopback) with no authentication; "
@@ -86,6 +88,9 @@ def make_handler(archive_dir: str | Path):
                 return
             if parts[3] == "events" and len(parts) == 4:
                 self._json(_read_jsonl(archive_root / run_id / "run-events.jsonl"))
+                return
+            if parts[3] == "input" and len(parts) == 4:
+                self._json(_read_json(archive_root / run_id / "run-input.json"))
                 return
             if len(parts) >= 6 and parts[3] == "nodes":
                 node_id = _safe_segment(parts[4])

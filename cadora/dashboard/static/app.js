@@ -17,6 +17,69 @@ const escapeHtml = (value) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
+const previewKindFor = (path) =>
+  ["md", "markdown"].includes(String(path).split(".").pop().toLowerCase()) ? "markdown" : "text";
+
+// Minimal, XSS-safe markdown -> HTML: escape first, then emit only our own tags (no raw HTML from
+// the artifact ever renders). Covers the common AI-DLC doc shapes: headings, bold, inline/fenced
+// code, unordered lists, and http(s) links.
+const mdInline = (s) =>
+  s
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(
+      /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener">$1</a>',
+    );
+
+const renderMarkdown = (raw) => {
+  const out = [];
+  let inCode = false;
+  let inList = false;
+  const closeList = () => {
+    if (inList) {
+      out.push("</ul>");
+      inList = false;
+    }
+  };
+  for (const line of escapeHtml(raw).split("\n")) {
+    if (line.trim().startsWith("```")) {
+      if (inCode) out.push("</code></pre>");
+      else {
+        closeList();
+        out.push('<pre class="md-code"><code>');
+      }
+      inCode = !inCode;
+      continue;
+    }
+    if (inCode) {
+      out.push(line);
+      continue;
+    }
+    const heading = line.match(/^(#{1,6})\s+(.*)$/);
+    if (heading) {
+      closeList();
+      const level = heading[1].length;
+      out.push(`<h${level} class="md-h">${mdInline(heading[2])}</h${level}>`);
+      continue;
+    }
+    const item = line.match(/^\s*[-*]\s+(.*)$/);
+    if (item) {
+      if (!inList) {
+        out.push('<ul class="md-ul">');
+        inList = true;
+      }
+      out.push(`<li>${mdInline(item[1])}</li>`);
+      continue;
+    }
+    closeList();
+    out.push(line.trim() === "" ? "" : `<p class="md-p">${mdInline(line)}</p>`);
+  }
+  if (inCode) out.push("</code></pre>");
+  closeList();
+  return out.join("\n");
+};
+
 const statusOf = (run) => {
   if (run.status?.status) return run.status.status;
   if (run.manifest?.ok === true) return "completed";
@@ -393,10 +456,49 @@ const selectedNode = (nodes) => {
   return nodes.find((node) => nodeIdOf(node) === selectedNodeId) || nodes[0];
 };
 
+// --- Run input: the prompt(s) given at entry (+ vision if present) ---------
+const renderRunInput = (input) => {
+  if (!input || (!input.vision && !(input.roots || []).length)) return "";
+  const vision = input.vision
+    ? `<div class="input-vision"><span class="label">vision.md</span><pre>${escapeHtml(input.vision)}</pre></div>`
+    : "";
+  const roots = (input.roots || [])
+    .map(
+      (root) =>
+        `<div class="root-prompt"><strong>${escapeHtml(root.node_id)}</strong><pre>${escapeHtml(root.prompt || "(no prompt)")}</pre></div>`,
+    )
+    .join("");
+  return `
+    <details class="panel run-input">
+      <summary class="panel-title"><h2>Run input</h2><span>the prompt given at entry</span></summary>
+      ${vision}
+      ${roots ? `<div class="input-roots"><span class="label">Entry node prompt${(input.roots || []).length === 1 ? "" : "s"}</span>${roots}</div>` : ""}
+    </details>`;
+};
+
+// --- Failure analysis: why a node failed (reason + gate detail + integrity) --
+const nodeFailure = (node) => {
+  if (String(node.status || "").toLowerCase() !== "failed") return "";
+  const gate = node.gate;
+  const gateDetail = gate && typeof gate === "object" && gate.passed === false ? gate.detail : null;
+  const findings = (node.integrity && node.integrity.findings) || [];
+  return `
+    <div class="node-failure">
+      <div class="fail-reason">✗ ${escapeHtml(node.error || "node failed")}</div>
+      ${gateDetail ? `<div class="fail-block"><span class="label">gate ${escapeHtml(gateStatus(node) || "")} output</span><pre>${escapeHtml(String(gateDetail).slice(-2000))}</pre></div>` : ""}
+      ${findings.length ? `<div class="fail-block"><span class="label">integrity findings</span><ul>${findings.map((finding) => `<li><strong>${escapeHtml(finding.rule || "")}</strong> ${escapeHtml(finding.detail || finding.path || "")}</li>`).join("")}</ul></div>` : ""}
+    </div>`;
+};
+
 const loadRunDetail = async (runId) => {
   const response = await fetch(`/api/runs/${encodeURIComponent(runId)}`);
   const data = await response.json();
+  const inputResponse = await fetch(`/api/runs/${encodeURIComponent(runId)}/input`);
+  const runInput = inputResponse.ok ? await inputResponse.json() : null;
   const nodes = nodesOf(data);
+  const failedNode = nodes.find((n) => String(n.status || "").toLowerCase() === "failed");
+  const runError =
+    data.status?.error || data.manifest?.error || (failedNode ? failedNode.error : null);
   const node = selectedNode(nodes);
   const nodeId = node ? nodeIdOf(node) : "";
   const [nodeEventsResponse, outputResponse, artifacts] = nodeId
@@ -425,6 +527,8 @@ const loadRunDetail = async (runId) => {
           <span>${nodes.length} node${nodes.length === 1 ? "" : "s"}</span>
         </div>
       </div>
+      ${runError && (runStatus === "failed" || failedNode) ? `<div class="failure-banner">✗ <strong>${escapeHtml((failedNode && nodeIdOf(failedNode)) || "run")}</strong> — ${escapeHtml(runError)}</div>` : ""}
+      ${renderRunInput(runInput)}
       <div class="run-workspace">
         <section class="panel canvas-panel">
           <div class="panel-title"><h2>DAG Progress</h2><span>click a node</span></div>
@@ -442,9 +546,12 @@ const loadRunDetail = async (runId) => {
               <span>model <strong>${escapeHtml(node.model || "unknown")}</strong></span>
               <span>backend <strong>${escapeHtml(node.executor || "—")}</strong></span>
               <span>cost <strong>$${Number(node.cost_usd || 0).toFixed(4)}</strong></span>
+              ${node.credits != null ? `<span>credits <strong>${escapeHtml(node.credits)}</strong></span>` : ""}
+              <span>duration <strong>${node.duration_seconds != null ? escapeHtml(node.duration_seconds) + "s" : "—"}</strong></span>
               <span>context <strong>${fmtTokens(node.context_tokens)}</strong></span>
               <span>review <strong>${escapeHtml(node.review || "none")}</strong></span>
             </div>
+            ${nodeFailure(node)}
             <div class="tabs">
               ${["activity", "output", "artifacts", "raw"].map((tab) => `<button class="${selectedTab === tab ? "active" : ""}" data-tab="${tab}">${tab}</button>`).join("")}
             </div>
@@ -486,7 +593,10 @@ const loadRunDetail = async (runId) => {
         `/api/runs/${encodeURIComponent(runId)}/nodes/${encodeURIComponent(nodeId)}/artifacts/${encodeURIComponent(path)}`,
       );
       const text = artifactResponse.ok ? await artifactResponse.text() : "Could not load artifact";
-      document.getElementById("tab-body").innerHTML = `<pre>${escapeHtml(text)}</pre>`;
+      document.getElementById("tab-body").innerHTML =
+        artifactResponse.ok && previewKindFor(path) === "markdown"
+          ? `<div class="md-view">${renderMarkdown(text)}</div>`
+          : `<pre>${escapeHtml(text)}</pre>`;
     });
   });
 };

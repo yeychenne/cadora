@@ -21,6 +21,7 @@ GATE_PASSED = "passed"
 GATE_FAILED = "failed"
 GATE_BLOCKED_PREREQUISITE = "blocked_prerequisite"
 GATE_VACUOUS = "vacuous"
+GATE_PACKAGING = "packaging_failed"
 
 
 @dataclass
@@ -54,7 +55,7 @@ class ShellGate:
         if self.setup_mode == "auto" and _is_python_gate(self.command):
             prepared = _prepare_python_gate(Path(cwd), self.wheelhouse)
             if prepared is not None:
-                env, setup_detail, setup_error = prepared
+                env, setup_detail, setup_error, build_failure = prepared
                 if setup_error:
                     return GateResult(
                         name=self.name,
@@ -62,6 +63,20 @@ class ShellGate:
                         detail=setup_error,
                         status=GATE_BLOCKED_PREREQUISITE,
                         missing_prerequisites=_missing_prerequisites(setup_error),
+                        setup_detail=setup_detail,
+                    )
+                if build_failure:
+                    # The workspace declares an installable package that does NOT build
+                    # (setuptools flat-layout auto-discovery refused). Dev tooling was
+                    # provisioned so the gate *could* run, but a green here would certify a
+                    # package `pip install .` / `python -m build` cannot produce — a false
+                    # pass. Fail as a remediable packaging defect instead of running the
+                    # command and greening on tests that happened to import from the cwd.
+                    return GateResult(
+                        name=self.name,
+                        passed=False,
+                        detail=build_failure,
+                        status=GATE_PACKAGING,
                         setup_detail=setup_detail,
                     )
 
@@ -100,7 +115,7 @@ class ShellGate:
 
 def _prepare_python_gate(
     cwd: Path, wheelhouse: str | None
-) -> tuple[dict[str, str], str, str] | None:
+) -> tuple[dict[str, str], str, str, str] | None:
     """Provision a cached isolated Python gate environment when the project declares one."""
     cwd = cwd.resolve()  # absolute: these paths are passed to subprocess(cwd=cwd); relative ones double
     requirements = _dev_requirements(cwd)
@@ -114,6 +129,7 @@ def _prepare_python_gate(
     stamp = cadora_dir / "gate-requirements.sha256"
     fingerprint = _requirements_fingerprint(cwd, requirements, wheelhouse)
     setup_lines = [f"gate environment: {venv}", f"requirements: {requirements.name}"]
+    build_failure = ""
 
     if not python.is_file():
         created = subprocess.run(
@@ -124,7 +140,7 @@ def _prepare_python_gate(
         )
         if created.returncode != 0:
             error = (created.stdout + created.stderr)[-4000:]
-            return os.environ.copy(), "\n".join(setup_lines), error
+            return os.environ.copy(), "\n".join(setup_lines), error, ""
 
     if not stamp.is_file() or stamp.read_text() != fingerprint:
         base = [str(python), "-m", "pip", "install"]
@@ -138,29 +154,35 @@ def _prepare_python_gate(
         output = (provisioned.stdout + provisioned.stderr)[-4000:]
         setup_lines.append("provision: " + " ".join(install))
         if provisioned.returncode != 0 and editable:
-            # The tree declares an installable package but `pip install -e .` failed —
-            # a very common agent slip (e.g. a flat layout with several top-level
-            # packages and no explicit `packages` config, so setuptools auto-discovery
-            # refuses). Don't let that sink the whole gate environment: retry with the
-            # dev requirements alone so the tooling still lands and the gate can run. If
-            # the tests genuinely needed the install, they now fail as a *remediable*
-            # gate failure rather than a terminal "missing tooling" block.
+            # The tree declares an installable package but `pip install -e .` failed. Retry
+            # with the dev requirements alone so the tooling still lands and the gate can run.
+            # But distinguish WHY it failed: the setuptools flat-layout auto-discovery panic
+            # (several top-level packages, no explicit `packages` config) means the package
+            # genuinely does NOT build — record it as a remediable *packaging defect* so the
+            # gate FAILS (and --remediate fixes the pyproject) instead of false-greening the
+            # moment the tooling-only fallback lets tests that import from cwd pass.
+            if _is_flat_layout_failure(output):
+                build_failure = _PACKAGING_HINT + "\n\n--- pip install -e . ---\n" + output
             setup_lines.append("editable install failed; retrying with requirements only")
             install = base + index_args + ["-r", str(requirements)]
             provisioned = subprocess.run(install, cwd=cwd, capture_output=True, text=True)
             output = (output + "\n--- fallback ---\n" + provisioned.stdout + provisioned.stderr)[-4000:]
             setup_lines.append("provision: " + " ".join(install))
         if provisioned.returncode != 0:
-            return os.environ.copy(), "\n".join(setup_lines), output
-        cadora_dir.mkdir(parents=True, exist_ok=True)
-        stamp.write_text(fingerprint)
+            return os.environ.copy(), "\n".join(setup_lines), output, ""
+        if not build_failure:
+            # Cache only a HEALTHY provision. On a packaging defect, skip the stamp so every
+            # run re-derives the failure (until the pyproject is fixed and its fingerprint
+            # changes) — a cached stamp must never resurrect the false-green.
+            cadora_dir.mkdir(parents=True, exist_ok=True)
+            stamp.write_text(fingerprint)
     else:
         setup_lines.append("provision: cached")
 
     env = os.environ.copy()
     env["VIRTUAL_ENV"] = str(venv)
     env["PATH"] = str(bin_dir) + os.pathsep + env.get("PATH", "")
-    return env, "\n".join(setup_lines), ""
+    return env, "\n".join(setup_lines), "", build_failure
 
 
 def _dev_requirements(cwd: Path) -> Path | None:
@@ -206,6 +228,26 @@ def _project_is_installable(cwd: Path) -> bool:
     except OSError:
         return False
     return bool(re.search(r"(?m)^[ \t]*\[(?:build-system|project)\b", text))
+
+
+# The setuptools flat-layout auto-discovery panic — "Multiple top-level packages (or modules)
+# discovered in a flat-layout: [...]". A declared package that trips this genuinely does not build.
+_FLAT_LAYOUT_RE = re.compile(r"discovered in a flat-layout", re.IGNORECASE)
+
+_PACKAGING_HINT = (
+    "packaging: `pip install -e .` failed — setuptools flat-layout auto-discovery found "
+    "multiple top-level packages and refused to guess which to ship. The project declares an "
+    "installable package but does not build (`pip install .` / `python -m build` fail the same "
+    "way). Declare the packages explicitly — e.g. `[tool.setuptools.packages.find]` (with "
+    "`where`/`include`/`exclude`), `[tool.setuptools] packages`/`py-modules`, or move the code "
+    "under `src/`. Dev tooling was still provisioned so the gate could run; this is a packaging "
+    "defect, not a passing build."
+)
+
+
+def _is_flat_layout_failure(output: str) -> bool:
+    """True when a ``pip install -e .`` failure is the setuptools flat-layout auto-discovery panic."""
+    return bool(_FLAT_LAYOUT_RE.search(output))
 
 
 def _is_python_gate(command: str) -> bool:

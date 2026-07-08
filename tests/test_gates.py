@@ -1,14 +1,17 @@
 """Deterministic shell-gate classification and prerequisite setup tests."""
 
 import shlex
+import subprocess
 import sys
 
 from cadora.gates import (
     GATE_BLOCKED_PREREQUISITE,
     GATE_FAILED,
+    GATE_PACKAGING,
     GATE_PASSED,
     GATE_VACUOUS,
     ShellGate,
+    _is_flat_layout_failure,
 )
 
 
@@ -200,3 +203,54 @@ def test_node_missing_module_is_a_prerequisite_block(tmp_path):
 
     assert result.status == GATE_BLOCKED_PREREQUISITE
     assert "jest" in result.missing_prerequisites
+
+
+def test_flat_layout_failure_matcher():
+    err = "error: Multiple top-level packages discovered in a flat-layout: ['pkg_a', 'pkg_b']."
+    assert _is_flat_layout_failure(err) is True
+    assert _is_flat_layout_failure("Multiple top-level modules discovered in a flat-layout: ['a']")
+    # unrelated install failures must NOT be misclassified as a packaging defect
+    assert _is_flat_layout_failure("ERROR: Could not find a version that satisfies boto3") is False
+    assert _is_flat_layout_failure("SyntaxError: invalid syntax") is False
+
+
+def test_declared_package_that_fails_to_build_is_packaging_failure_not_greened(tmp_path, monkeypatch):
+    # A pyproject that DECLARES an installable package ([build-system]+[project]) in a flat layout
+    # with several top-level packages and no explicit `packages` config: `pip install -e .` panics
+    # on setuptools auto-discovery. The tooling-only fallback must NOT let the gate green on tests
+    # that import from cwd — the package does not build, so this is a remediable packaging failure.
+    monkeypatch.setenv("CADORA_GATE_CACHE", str(tmp_path / "gate-cache"))
+    (tmp_path / "requirements-dev.txt").write_text("")
+    (tmp_path / "pyproject.toml").write_text(
+        '[build-system]\nrequires = ["setuptools>=68"]\nbuild-backend = "setuptools.build_meta"\n'
+        '[project]\nname = "app"\nversion = "0.1.0"\n'
+    )
+    for pkg in ("pkg_a", "pkg_b"):  # multiple top-level packages — the flat-layout landmine
+        (tmp_path / pkg).mkdir()
+        (tmp_path / pkg / "__init__.py").write_text("")
+
+    flat_layout_err = "error: Multiple top-level packages discovered in a flat-layout: ['pkg_a', 'pkg_b']."
+    ran_gate_command = {"value": False}
+
+    def fake_run(cmd, *args, **kwargs):
+        parts = cmd if isinstance(cmd, list) else shlex.split(cmd)
+        if "venv" in parts:  # `python -m venv <path>` — pretend it was created
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        if "-e" in parts:  # `pip install -e . -r ...` — the editable install that panics
+            return subprocess.CompletedProcess(cmd, 1, "", flat_layout_err)
+        if "pip" in parts and "install" in parts:  # fallback: tooling-only install succeeds
+            return subprocess.CompletedProcess(cmd, 0, "installed tooling", "")
+        ran_gate_command["value"] = True  # the gate command itself (should NOT run)
+        return subprocess.CompletedProcess(cmd, 0, "1 passed", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = ShellGate("test", "pytest -q", setup_mode="auto").check(str(tmp_path))
+
+    assert result.passed is False
+    assert result.status == GATE_PACKAGING
+    assert "flat-layout" in result.detail
+    assert "packages.find" in result.detail  # the actionable fix hint reaches remediation
+    assert ran_gate_command["value"] is False  # failed fast; never greened on the cwd-imported tests
+    # cache not poisoned: no stamp written, so a re-run re-derives the failure until pyproject is fixed
+    assert not any((tmp_path / "gate-cache").glob("*/gate-requirements.sha256"))

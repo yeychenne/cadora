@@ -26,6 +26,8 @@ class RunTelemetry:
             "started_at": None,
             "completed_at": None,
             "error": None,
+            "resumed_from": None,
+            "skipped_nodes": [],
             "nodes": {
                 node.id: {
                     "node_id": node.id,
@@ -37,6 +39,8 @@ class RunTelemetry:
                     "completed_at": None,
                     "model": node.model,
                     "cost_usd": None,
+                    "credits": None,
+                    "duration_seconds": None,
                     "generation_tokens": 0,
                     "context_tokens": 0,
                     "gate": None,
@@ -75,6 +79,25 @@ class RunTelemetry:
         self.emit("run_completed" if ok else "run_failed", error=error)
         self._write_status()
 
+    def mark_resume(self, resume_from: str | None, skipped_nodes: list[str]) -> None:
+        """Record run-level resume metadata: which node the run resumed from and what it skipped."""
+        self.status["resumed_from"] = resume_from
+        self.status["skipped_nodes"] = list(skipped_nodes)
+        self.emit("run_resumed", resume_from=resume_from, skipped=list(skipped_nodes))
+        self._write_status()
+
+    def node_skipped(self, node_id: str, *, reason: str = "") -> None:
+        """Mark a node as not executed in this run (``--resume-from`` / ``--skip``).
+
+        Distinct from ``completed`` — the node did not run here; its artifacts are trusted to
+        already exist in the workspace.
+        """
+        node = self._node(node_id)
+        node["status"] = "skipped"
+        node["skipped_reason"] = reason
+        self.emit("node_skipped", node_id=node_id, reason=reason)
+        self._write_status()
+
     def node_started(self, node_id: str, *, model: str | None = None) -> None:
         ts = _now()
         node = self._node(node_id)
@@ -102,8 +125,10 @@ class RunTelemetry:
         node = self._node(node_id)
         node["status"] = "completed" if ok else "failed"
         node["completed_at"] = ts
+        node["duration_seconds"] = _duration(node.get("started_at"), ts)
         node["model"] = model or node.get("model")
         node["cost_usd"] = cost_usd
+        node["credits"] = (usage or {}).get("credits")
         node["gate"] = gate
         node["integrity"] = integrity
         node["review"] = review
@@ -116,6 +141,8 @@ class RunTelemetry:
             node_id=node_id,
             model=node["model"],
             cost_usd=cost_usd,
+            credits=node["credits"],
+            duration_seconds=node["duration_seconds"],
             generation_tokens=generation,
             context_tokens=context,
             error=error,
@@ -183,3 +210,15 @@ def _int(value) -> int:
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _duration(started_at: str | None, completed_at: str | None) -> float | None:
+    """Wall-clock seconds between two ISO timestamps, so status.json carries per-node duration
+    live (as each node completes) instead of only in the end-of-run manifest."""
+    if not started_at or not completed_at:
+        return None
+    try:
+        delta = datetime.fromisoformat(completed_at) - datetime.fromisoformat(started_at)
+    except (ValueError, TypeError):
+        return None
+    return round(delta.total_seconds(), 3)

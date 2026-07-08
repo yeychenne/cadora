@@ -186,18 +186,27 @@ build hooks). So:
 New to Cadora, or bringing it to a hackathon? Start with the
 [getting started guide](docs/getting-started.md), the
 [hackathon quickstart](docs/hackathon-quickstart.md) (5 commands), and the
-[5-minute demo script](docs/demo-script-5min.md).
+[5-minute demo script](docs/demo-script-5min.md). Curious how gates decide *green*? Read the
+[verification-gates whitepaper](docs/verification-gates.md).
 
 ## Status
 
-**v0.7.1** — the field-feedback release: per-gate-type commands (a topology `gates:` map),
-genuinely parallel waves (`cadora run --max-parallel N`), and a scoped HITL review surface —
-hardened across a full day of real multi-project runs. Built on **v0.7.0**, the drive-to-completion
-release: a failed build/test gate is fed back to a fresh
-constrained session and re-run, bounded, until it genuinely passes (`--remediate N`) — the gate
-becomes the engine of completion, never a fake green. On top of v0.6.0's evidence pack, `eval`
-(+ judge), `compare`, `deliverable`, `doctor` (all backends), Kiro credits, trust gate, and the
-onboarding kit. 190+ tests, `ruff` clean, CI on Python 3.10–3.12.
+**v0.8.1** — an urgent gate-correctness fix: a project that *declares* an installable package but
+cannot `pip install .` (flat layout, no `packages` config) no longer false-greens — it fails as a
+remediable `packaging_failed` gate that `--remediate` repairs. Adds **run resumption**
+(`--resume-from` / `--skip`) to re-run only what a late failure left, and a
+[verification-gates whitepaper](docs/verification-gates.md). On the **v0.8.0** run-detail &
+headless-ops base: the dashboard shows the **prompt given at entry**, a **failure analysis** of why
+a run stopped, **live per-node credits and duration**, and **rendered markdown artifacts** — see
+what a run was told, why it failed, and what it cost without leaving the browser. Headless HITL
+(`cadora run --review-file`) and `cadora gate-check` (verify existing code, no executor) make review
+and verify-only runs work without a TTY, and executor failures carry the exit code, timeout, and
+stderr tail. Built on **v0.7.1**'s field-hardened per-gate commands (a topology `gates:` map),
+parallel waves (`--max-parallel N`), and scoped review;
+**v0.7.0**'s drive-to-completion loop (`--remediate N` re-runs a failed gate against a fresh session
+until it genuinely passes); and v0.6.0's evidence pack, `eval` (+ judge), `compare`, `deliverable`,
+`doctor` (all backends), Kiro credits, and trust gate. 220+ tests, `ruff` clean, CI on
+Python 3.10–3.12.
 
 **Roadmap:** signed evidence packs, full MCP auth, CI secrets-scanner + lockfile hardening, a
 backend contract matrix, a container sandbox wrapper, and additional backend/method packs as they

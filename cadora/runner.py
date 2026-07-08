@@ -11,6 +11,7 @@ import contextlib
 import hashlib
 import inspect
 import itertools
+import json
 import sys
 import threading
 import time
@@ -88,6 +89,8 @@ def run_topology(
     construction_executor: NodeExecutor | None = None,
     remediation_policy: RemediationPolicy | None = None,
     max_parallel: int = 1,
+    resume_from: str | None = None,
+    skip: list[str] | None = None,
 ) -> Path:
     if integrity_mode not in {"off", "audit", "enforce", "repair"}:
         raise ValueError(f"invalid integrity mode: {integrity_mode!r}")
@@ -101,10 +104,21 @@ def run_topology(
         raise SystemExit(
             f"topology references unregistered gate(s): {unknown}; registered: {sorted(gates)}"
         )
+    # Resolve --resume-from / --skip up front (fail fast on unknown node names, before any agent).
+    skip_ids, skipped_sorted = _compute_skip_set(topology, resume_from, skip)
 
     archive = RunArchive(archive_root, run_id, executor.name, topology.name)
     telemetry = RunTelemetry(archive_root, run_id, topology, executor.name)
     telemetry.run_started()
+    _write_run_input(archive_root, run_id, topology, cwd)
+    if resume_from or skip_ids:
+        telemetry.mark_resume(resume_from, skipped_sorted)
+        _log(
+            "↩ resume: skipping "
+            + (", ".join(skipped_sorted) or "(none)")
+            + (f" · running from {resume_from!r}" if resume_from else "")
+            + " — trusting their artifacts in the workspace"
+        )
     outputs: dict[str, str] = {}
     funding = getattr(executor, "funding", None)
     _log(
@@ -118,14 +132,23 @@ def run_topology(
         # minutes-long part. Gates, integrity, remediation, review, and archiving stay sequential
         # and deterministic in the per-node loop below, so the manifest order and all fail-closed
         # semantics are unchanged; only wall-clock improves.
+        runnable = [n for n in wave if n.id not in skip_ids]
         prepared = (
             _execute_wave_concurrently(
-                wave, outputs, reviews, executor, construction_executor, cwd, hitl, max_parallel
+                runnable, outputs, reviews, executor, construction_executor, cwd, hitl,
+                max_parallel, skip_ids,
             )
-            if max_parallel > 1 and len(wave) > 1
+            if max_parallel > 1 and len(runnable) > 1
             else {}
         )
         for node in wave:
+            if node.id in skip_ids:
+                telemetry.node_skipped(
+                    node.id,
+                    reason=(f"resumed from {resume_from!r}" if resume_from else "explicitly skipped"),
+                )
+                _log(f"↩ skip {node.id!r} — artifacts trusted in the workspace")
+                continue
             node_cwd = node.cwd or cwd
             # Phase-aware routing: construction nodes use a dedicated executor if configured.
             node_executor = (
@@ -133,7 +156,7 @@ def run_topology(
                 if construction_executor and node.phase == "construction"
                 else executor
             )
-            base_prompt = _render(node, outputs, reviews)
+            base_prompt = _render(node, outputs, reviews, skip_ids)
             revision_comments = ""
             review_history: list[ReviewResult] = []
             attempt_results: list[ExecutionResult] = []
@@ -365,7 +388,7 @@ def run_topology(
 
 
 def _execute_wave_concurrently(
-    wave, outputs, reviews, executor, construction_executor, cwd, hitl, max_parallel
+    wave, outputs, reviews, executor, construction_executor, cwd, hitl, max_parallel, skipped=None
 ) -> dict[str, tuple[dict[str, str] | None, ExecutionResult]]:
     """Run the INITIAL agent execution of a wave's independent nodes concurrently.
 
@@ -386,7 +409,7 @@ def _execute_wave_concurrently(
             else executor
         )
         pre_review_docs = _doc_snapshot(node_cwd) if (hitl and node.review) else None
-        result = node_executor.run(node, _render(node, outputs, reviews), cwd=node_cwd)
+        result = node_executor.run(node, _render(node, outputs, reviews, skipped), cwd=node_cwd)
         result.executor = node_executor.name
         return node.id, (pre_review_docs, result)
 
@@ -395,16 +418,101 @@ def _execute_wave_concurrently(
         return dict(pool.map(_run, wave))
 
 
-def _render(node: Node, outputs: dict[str, str], reviews: dict[str, str] | None = None) -> str:
+def _compute_skip_set(
+    topology: Topology, resume_from: str | None, skip: list[str] | None
+) -> tuple[set[str], list[str]]:
+    """Resolve which node ids to skip for ``--resume-from`` / ``--skip``.
+
+    ``--skip`` names nodes directly. ``--resume-from X`` skips every node that is neither ``X`` nor
+    downstream of ``X`` (``X`` and its transitive descendants run; everything earlier or unrelated
+    is trusted to already exist in the workspace). Both validate that every named node exists, so a
+    typo fails fast — before any agent runs. Returns ``(skip_ids, sorted_skip_ids)``.
+    """
+    ids = {n.id for n in topology.nodes}
+    requested = set(skip or [])
+    named = requested | ({resume_from} if resume_from else set())
+    unknown = sorted(name for name in named if name not in ids)
+    if unknown:
+        raise SystemExit(
+            f"--resume-from/--skip references unknown node(s): {unknown}; "
+            f"topology has: {sorted(ids)}"
+        )
+    skip_ids = set(requested)
+    if resume_from:
+        parents = {n.id: set(n.depends_on) for n in topology.nodes}
+
+        def _descends_from(node_id: str, target: str) -> bool:
+            seen: set[str] = set()
+            stack = list(parents.get(node_id, ()))
+            while stack:
+                cur = stack.pop()
+                if cur == target:
+                    return True
+                if cur in seen:
+                    continue
+                seen.add(cur)
+                stack.extend(parents.get(cur, ()))
+            return False
+
+        run_set = {resume_from} | {nid for nid in ids if _descends_from(nid, resume_from)}
+        skip_ids |= ids - run_set
+    skip_ids.discard(resume_from or "")  # the resume point itself always runs
+    return skip_ids, sorted(skip_ids)
+
+
+def _write_run_input(archive_root: str, run_id: str, topology: Topology, cwd: str) -> None:
+    """Capture *the prompt given at entry* into the run archive.
+
+    The DAG's entry points are the root nodes (no ``depends_on``); their prompts are what the run
+    was actually launched with. If the workspace carries a ``vision.md`` (the human's original
+    request), include it too. Surfaced by the dashboard's run-detail view; best-effort — a failure
+    here never breaks the run.
+    """
+    try:
+        roots = [
+            {"node_id": n.id, "role": n.role, "prompt": n.prompt}
+            for n in topology.nodes
+            if not n.depends_on
+        ]
+        vision = None
+        vpath = Path(cwd) / "vision.md"
+        if vpath.is_file():
+            vision = vpath.read_text(errors="replace")[:20000]
+        out = Path(archive_root) / run_id / "run-input.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(
+            json.dumps({"topology": topology.name, "roots": roots, "vision": vision}, indent=2)
+        )
+    except OSError:
+        pass
+
+
+def _render(
+    node: Node,
+    outputs: dict[str, str],
+    reviews: dict[str, str] | None = None,
+    skipped: set[str] | None = None,
+) -> str:
     """Compose a node's prompt with its upstream outputs and any human review of them.
 
     TODO: richer manifest format so downstream nodes read upstream artifacts
     by UUID-prefixed path rather than inlined text.
     """
     reviews = reviews or {}
+    skipped = skipped or set()
     parts: list[str] = []
     for dep in node.depends_on:
-        parts.append(f"## Output of upstream node `{dep}`\n{outputs.get(dep, '')}")
+        if dep in skipped:
+            # Resumed run: the upstream node did not execute here, so there is no piped output —
+            # its artifacts already live in the workspace from an earlier run. Point the agent at
+            # them rather than injecting an empty section.
+            parts.append(
+                f"## Upstream node `{dep}` (resumed — not re-run this run)\n"
+                "Its artifacts already exist in the workspace from an earlier run; "
+                "read them directly from disk as needed."
+            )
+        else:
+            parts.append(f"## Output of upstream node `{dep}`\n{outputs.get(dep, '')}")
         if reviews.get(dep):
             parts.append(
                 f"## Human review of `{dep}` — you MUST address these comments\n{reviews[dep]}"
@@ -455,6 +563,23 @@ def _gate_detail(gate: GateResult | None) -> str:
     return gate.detail if gate is not None else ""
 
 
+def _executor_error_detail(result: ExecutionResult) -> str:
+    """A short, human-readable *why* for an executor failure — timeout, exit code, stderr tail.
+
+    Turns the bare "executor failed" into e.g. "executor failed (exit 1: <stderr line>)" or
+    "executor failed (timed out after 600s)", so the archived error says what actually happened.
+    """
+    parts: list[str] = []
+    if result.meta.get("timed_out"):
+        parts.append(f"timed out after {result.meta.get('timeout_seconds')}s")
+    elif result.exit_code is not None:
+        parts.append(f"exit {result.exit_code}")
+    tail = str(result.meta.get("stderr_tail") or "").strip()
+    if tail:
+        parts.append(tail.splitlines()[-1][:200])
+    return f" ({': '.join(parts)})" if parts else ""
+
+
 def _failure_reason(
     node: Node,
     result: ExecutionResult,
@@ -464,7 +589,7 @@ def _failure_reason(
     remediation: RemediationOutcome | None = None,
 ) -> str:
     if not result.ok:
-        return "executor failed"
+        return "executor failed" + _executor_error_detail(result)
     if repair_failed:
         return "integrity repair failed"
     base = _gate_failure_reason(node, gate, integrity_blocked)
@@ -580,7 +705,8 @@ def _stdin_review(
     if not sys.stdin.isatty():
         return ReviewResult(
             REVIEW_ABORT,
-            "interactive review unavailable: stdin is not a TTY",
+            "interactive review unavailable: stdin is not a TTY — use --review-file for headless "
+            "review (poll a decision file), the MCP review surface, or --yes to auto-approve",
         )
 
     try:

@@ -268,3 +268,73 @@ def test_channel_scopes_artifacts_to_stage_documents(tmp_path):
     channel.respond(ReviewResult(REVIEW_APPROVE))
     thread.join(timeout=2)
     assert holder["result"].decision == REVIEW_APPROVE
+
+
+# --- file-based headless HITL fallback ------------------------------------------
+
+
+def _respond_when_requested(tmp_path, payload, captured=None):
+    """Wait for the request file, capture it, then drop the decision file. Returns the thread."""
+    import threading
+
+    from cadora.review import DECISION_FILE, REQUEST_FILE
+
+    def run():
+        for _ in range(200):
+            if (tmp_path / REQUEST_FILE).is_file():
+                if captured is not None:
+                    captured["request"] = json.loads((tmp_path / REQUEST_FILE).read_text())
+                (tmp_path / DECISION_FILE).write_text(json.dumps(payload))
+                return
+            time.sleep(0.01)
+
+    t = threading.Thread(target=run)
+    t.start()
+    return t
+
+
+def test_file_review_returns_the_dropped_decision(tmp_path):
+    from cadora.review import DECISION_FILE, REQUEST_FILE, file_review_fn
+
+    responder = _respond_when_requested(tmp_path, {"decision": "approve", "comments": "lgtm"})
+    result = file_review_fn(timeout=5, interval=0.02)(
+        Node(id="architect", review=True), str(tmp_path), [("aidlc-docs/design.md", "new")]
+    )
+    responder.join(timeout=2)
+    assert result.decision == REVIEW_APPROVE
+    assert result.comments == "lgtm"
+    # request + decision are consumed
+    assert not (tmp_path / REQUEST_FILE).exists()
+    assert not (tmp_path / DECISION_FILE).exists()
+
+
+def test_file_review_request_lists_the_stage_documents(tmp_path):
+    from cadora.review import file_review_fn
+
+    captured: dict = {}
+    responder = _respond_when_requested(tmp_path, {"decision": "approve"}, captured)
+    file_review_fn(timeout=5, interval=0.02)(
+        Node(id="n", review=True), str(tmp_path), [("aidlc-docs/design.md", "new")]
+    )
+    responder.join(timeout=2)
+    assert captured["request"]["node_id"] == "n"
+    assert captured["request"]["documents"] == [{"path": "aidlc-docs/design.md", "kind": "new"}]
+
+
+def test_file_review_times_out_to_abort(tmp_path):
+    from cadora.review import REQUEST_FILE, file_review_fn
+
+    result = file_review_fn(timeout=0.15, interval=0.03)(Node(id="n", review=True), str(tmp_path))
+    assert result.decision == REVIEW_ABORT
+    assert "timed out" in result.comments
+    assert not (tmp_path / REQUEST_FILE).exists()  # cleaned up on timeout
+
+
+def test_file_review_rejects_invalid_decision(tmp_path):
+    from cadora.review import file_review_fn
+
+    responder = _respond_when_requested(tmp_path, {"decision": "maybe"})
+    result = file_review_fn(timeout=5, interval=0.02)(Node(id="n", review=True), str(tmp_path))
+    responder.join(timeout=2)
+    assert result.decision == REVIEW_ABORT
+    assert "invalid decision" in result.comments

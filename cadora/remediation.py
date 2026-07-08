@@ -12,7 +12,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from cadora.executors.base import ExecutionResult, NodeExecutor
-from cadora.gates import GATE_BLOCKED_PREREQUISITE, GATE_FAILED, GATE_VACUOUS, GateResult, ShellGate
+from cadora.gates import (
+    GATE_BLOCKED_PREREQUISITE,
+    GATE_FAILED,
+    GATE_PACKAGING,
+    GATE_VACUOUS,
+    GateResult,
+    ShellGate,
+)
 from cadora.integrity import IntegrityReport, scan_toolchain_integrity
 from cadora.topology import Node
 
@@ -31,7 +38,7 @@ _INTEGRITY_ENFORCED_MODES = {"enforce", "repair"}
 class RemediationPolicy:
     max_attempts: int = 0  # 0 = disabled
     max_cost_usd: float | None = None
-    enabled_statuses: tuple[str, ...] = (GATE_FAILED, GATE_VACUOUS)
+    enabled_statuses: tuple[str, ...] = (GATE_FAILED, GATE_VACUOUS, GATE_PACKAGING)
 
 
 @dataclass

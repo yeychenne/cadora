@@ -83,6 +83,11 @@ class KiroExecutor(NodeExecutor):
         text = _strip_ansi(proc.stdout)
         meta = _parse_stderr(proc.stderr)
         meta["effort"] = self.effort
+        if proc.returncode != 0:
+            # Surface WHY Kiro failed (auth? credits? crash?) instead of a bare "executor failed".
+            tail = _strip_ansi(proc.stderr).strip()
+            if tail:
+                meta["stderr_tail"] = tail[-500:]
         return ExecutionResult(
             node_id=node.id,
             ok=proc.returncode == 0,

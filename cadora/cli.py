@@ -92,6 +92,12 @@ def cmd_run(args) -> int:
             max_attempts=args.remediate,
             max_cost_usd=getattr(args, "remediate_max_cost", None),
         )
+    review_fn = None
+    if getattr(args, "review_file", False):
+        # Headless HITL: no TTY (Quick Desktop / CI). Write a request file, poll for a decision.
+        from cadora.review import file_review_fn
+
+        review_fn = file_review_fn(timeout=args.review_timeout)
     run_id = args.run_id or _default_run_id()
     out = run_topology(
         topology,
@@ -102,12 +108,65 @@ def cmd_run(args) -> int:
         gates=gates,
         integrity_mode=args.integrity_mode,
         hitl=args.hitl,
+        review_fn=review_fn,
         construction_executor=construction_executor,
         remediation_policy=remediation_policy,
         max_parallel=args.max_parallel,
+        resume_from=getattr(args, "resume_from", None),
+        skip=_split_csv(getattr(args, "skip", None)),
     )
     print(f"run complete: {out}")
     return 0
+
+
+def _split_csv(value: str | None) -> list[str] | None:
+    """Parse a comma-separated CLI value into a clean list (``None`` when unset/empty)."""
+    if not value:
+        return None
+    items = [part.strip() for part in value.split(",") if part.strip()]
+    return items or None
+
+
+def run_gate_check(topology, cwd, gates):
+    """Run every gate the topology references against ``cwd`` — no executor.
+
+    Returns ``[(node_id, gate_name, GateResult)]``. Results are cached per (gate, cwd) so a gate
+    shared by several nodes runs once.
+    """
+    results = []
+    cache = {}
+    for node in topology.nodes:
+        if not node.gate:
+            continue
+        node_cwd = node.cwd or cwd
+        key = (node.gate, node_cwd)
+        if key not in cache:
+            cache[key] = gates[node.gate].check(node_cwd)
+        results.append((node.id, node.gate, cache[key]))
+    return results
+
+
+def cmd_gate_check(args) -> int:
+    topology = load_topology(args.topology)
+    gates = _build_gates(topology, args.gate_cmd, args.gate_setup, args.gate_wheelhouse)
+    if not gates:
+        print("no gates referenced by this topology")
+        return 0
+    failed = False
+    for node_id, gate_name, result in run_gate_check(topology, args.cwd, gates):
+        mark = "✓" if result.passed else "✗"
+        suffix = (
+            f" (exit {result.exit_code})"
+            if not result.passed and result.exit_code is not None
+            else ""
+        )
+        print(f"{mark} {node_id} · gate:{gate_name} {result.status}{suffix}")
+        if not result.passed:
+            failed = True
+            lines = (result.detail or "").strip().splitlines()
+            if lines:
+                print(f"    {lines[-1][:200]}")
+    return 1 if failed else 0
 
 
 def cmd_compare(args) -> int:
@@ -605,6 +664,21 @@ def main(argv=None) -> int:
         "revision, or abort before downstream work starts",
     )
     r.add_argument(
+        "--review-file",
+        action="store_true",
+        help="headless HITL: instead of prompting on stdin (which aborts with no TTY), write "
+        "`cadora-review-request.json` into the node workspace and poll for a "
+        "`cadora-review-decision.json` — any tool or human can drop the decision. Fails closed "
+        "on timeout",
+    )
+    r.add_argument(
+        "--review-timeout",
+        type=float,
+        default=3600.0,
+        metavar="SECONDS",
+        help="how long `--review-file` waits for a decision before aborting (default: 3600)",
+    )
+    r.add_argument(
         "--max-parallel",
         type=int,
         default=1,
@@ -612,6 +686,20 @@ def main(argv=None) -> int:
         help="run up to N independent nodes in a dependency wave concurrently (default: 1 = "
         "sequential). Only the agent execution is parallelized; gates, integrity, review, and "
         "archiving stay sequential and deterministic",
+    )
+    r.add_argument(
+        "--resume-from",
+        default=None,
+        metavar="NODE",
+        help="resume an interrupted run: skip every node upstream of NODE (trust their artifacts "
+        "already in --cwd), then run NODE and everything downstream. Re-runs NODE itself.",
+    )
+    r.add_argument(
+        "--skip",
+        default=None,
+        metavar="NODE[,NODE...]",
+        help="comma-separated node ids to skip, trusting their existing workspace artifacts "
+        "(fine-grained alternative to --resume-from)",
     )
     r.add_argument(
         "--remediate",
@@ -639,6 +727,27 @@ def main(argv=None) -> int:
         "it only at a trusted or throwaway workspace.",
     )
     r.set_defaults(func=cmd_run)
+
+    gc = sub.add_parser(
+        "gate-check",
+        help="run a topology's gates against an existing workspace — no executor, no LLM cost",
+    )
+    gc.add_argument("topology", help="path to the topology YAML")
+    gc.add_argument("--cwd", default=".", help="workspace to check the gates against")
+    gc.add_argument(
+        "--gate-cmd",
+        default="ruff check . && pytest -q",
+        help="default command for gates not overridden in the topology `gates:` map",
+    )
+    gc.add_argument(
+        "--gate-setup", default="auto", choices=["off", "auto"],
+        help="prepare an isolated Python gate env from requirements-dev.txt (default: auto)",
+    )
+    gc.add_argument(
+        "--gate-wheelhouse", default=None,
+        help="offline Python wheel directory used by automatic gate setup",
+    )
+    gc.set_defaults(func=cmd_gate_check)
 
     c = sub.add_parser("compare", help="diff two runs (cross-backend / over time)")
     c.add_argument("run_a")

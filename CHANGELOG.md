@@ -1,6 +1,83 @@
 # Changelog
 
-## Unreleased
+## v0.8.1 — 2026-07-08
+
+An urgent gate-correctness fix (a Python packaging defect could pass the gate), plus run resumption
+and a gate-design whitepaper. Ships on top of v0.8.0.
+
+### Added
+- **Run resumption — `cadora run --resume-from <node>` / `--skip <node,...>`.** When a run fails
+  late, re-run only what's left: `--resume-from build` skips every node upstream of `build`
+  (trusting their artifacts already in `--cwd`), then runs `build` and everything downstream;
+  `--skip` names nodes directly. Skipped nodes are recorded `skipped` (never `completed`) in
+  `status.json`, with run-level `resumed_from` / `skipped_nodes`; a resumed node's prompt points at
+  the upstream artifacts on disk instead of an empty piped output. Unknown node names fail fast,
+  before any agent runs. Saves the credits and the 15–20-min-per-node cost of redoing already-green
+  inception phases just to reach a failed `BUILD`.
+- **Verification-gates whitepaper (`docs/verification-gates.md`).** A from-the-code explanation of
+  how gates decide "green" — the five-value status vocabulary, prerequisite / vacuous / packaging
+  classification, out-of-workspace isolation, and the bounded remediation loop.
+
+### Fixed
+- **No more false-green on a package that does not build.** A workspace that *declares* an
+  installable package (`[build-system]`/`[project]`) but has a flat layout with several top-level
+  packages and no explicit `packages` config makes `pip install -e .` panic on setuptools
+  auto-discovery. The gate used to fall back to installing dev tooling only and then **pass** on
+  tests that import from the working directory — certifying a package that `pip install .` /
+  `python -m build` (and CDK/Lambda bundling) cannot actually produce. Cadora now records this as a
+  remediable **`packaging_failed`** gate status carrying a concrete fix hint (declare
+  `[tool.setuptools.packages.find]`, `packages`/`py-modules`, or move the code under `src/`), so
+  `--remediate` repairs the `pyproject.toml` instead of shipping a false pass. The provision cache
+  is not written on a packaging defect, so a stale stamp can never resurrect the false-green. Other
+  editable-install failures keep the tooling-only fallback (no new false-blocks in offline /
+  wheelhouse mode).
+
+## v0.8.0 — 2026-07-08
+
+The run-detail & headless-ops release: see what a run was told, why it stopped, and what it cost —
+and run review and verify-only steps in non-interactive contexts. The dashboard's run-detail view
+gains the **prompt given at entry**, a **failure analysis**, **live per-node credits and duration**,
+and **rendered markdown artifacts**; headless HITL (`cadora run --review-file`) and
+`cadora gate-check` make Cadora operable without a TTY; and executor failures now name the exit
+code, timeout, and stderr tail instead of a bare "executor failed".
+
+### Added
+- **Headless HITL — `cadora run --review-file`.** For non-interactive runs (Quick Desktop, CI,
+  background), a `review: true` gate no longer aborts on the missing TTY: Cadora writes
+  `cadora-review-request.json` into the node workspace (listing the stage's documents) and polls
+  for a `cadora-review-decision.json` — any tool or human drops
+  `{"decision": "approve"|"request_changes"|"abort", "comments": "…"}`. Fails closed: an invalid
+  or absent decision within `--review-timeout` (default 3600s) → abort. The stdin path's abort
+  message now names the escape hatches (`--review-file`, the MCP review surface, `--yes`).
+- **`cadora gate-check <topology> --cwd <workspace>`** — run a topology's gates against an
+  existing workspace with **no executor and no LLM cost**: "I already have code, just verify it."
+  Honors the per-gate `gates:` map, runs a shared gate once, and exits non-zero if any gate fails
+  (CI-ready). Fixes the field pain where verifying existing code meant re-running the whole
+  topology (which re-invoked the agent and could pile new code on top).
+- **Dashboard run-detail: entry prompt + failure analysis.** The run-detail view now shows the
+  **prompt given at entry** — the topology's root-node prompts plus the workspace `vision.md`,
+  captured to `run-input.json` at run start — and a **failure-analysis** surface on a failed run: a
+  banner naming the failing node and reason, plus a per-node block with the gate command's actual
+  output and any integrity findings (using this release's descriptive executor reason). Builds on
+  the existing DAG view, node inspector, and artifact browser; still dependency-free vanilla JS.
+- **Dashboard renders markdown artifacts.** Clicking a `.md` artifact in the run-detail inspector
+  now shows it **rendered** (headings, bold, inline/fenced code, lists, links) instead of raw text —
+  the dominant AI-DLC artifact type. Safe by construction: content is HTML-escaped before any
+  formatting, so only Cadora's own tags render (an artifact cannot inject markup). Non-markdown
+  artifacts keep the monospace raw view.
+
+### Changed
+- **Live per-node credits & duration in `status.json`.** Each node's `status.json` entry now
+  carries `credits` and `duration_seconds` the moment it completes — not only in the end-of-run
+  `manifest.json` — so live-monitoring tools and the dashboard show credit spend and per-node
+  timing *during* a run. The dashboard node inspector surfaces both, and `cadora dashboard` now
+  prints the resolved archive path it is serving (so a "no runs visible" archive-dir mismatch is
+  obvious at a glance).
+- **Descriptive executor failures.** A failed executor node is no longer recorded as a bare
+  "executor failed" — the reason now carries the exit code, the timeout (with its limit), and the
+  last stderr line, e.g. `executor failed (exit 1: kiro: not authenticated)` or
+  `executor failed (timed out after 600s)`. The Kiro backend captures a `stderr_tail` on failure so
+  the *why* (auth / credits / crash) reaches the manifest instead of vanishing.
 
 ## v0.7.1 — 2026-07-07
 
