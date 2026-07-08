@@ -1,0 +1,99 @@
+# Cadora topology shape: PARALLEL FAN-OUT -> SYNTHESIZE  (diamond: 1 -> N -> 1)
+#
+# A planning stage fans out into several INDEPENDENT build stages that don't depend on each other,
+# so Cadora places them in the same wave and — under `--max-parallel` — runs their agent sessions
+# concurrently. Only the executor calls overlap; every gate stays sequential and deterministic. A
+# final stage depends on all of them and integrates the pieces.
+#
+# Reach for it when work decomposes into parts that can be built in isolation and joined at the
+# end. Each parallel node has its OWN gate command (that's what the per-gate `gates:` map is for);
+# the join has an integration gate over the whole package.
+#
+# What it builds (neutral, self-contained): a tiny text-processing toolkit with three independent
+# pure-function modules, then a package that composes them.
+#
+# Run WITH concurrency (the point of this shape):
+#   mkdir -p /tmp/fanout-demo
+#   cadora run examples/parallel-fanout.topology.yaml \
+#     --executor claude --cwd /tmp/fanout-demo --max-parallel 3 --yes
+name: parallel-fanout
+
+gates:
+  spec-check:
+    cmd: "test -f SPEC.md"
+    setup: off
+  test-normalize:
+    cmd: "ruff check toolkit/normalize.py && pytest tests/test_normalize.py -q"
+    setup: auto
+  test-tokenize:
+    cmd: "ruff check toolkit/tokenize_words.py && pytest tests/test_tokenize.py -q"
+    setup: auto
+  test-stats:
+    cmd: "ruff check toolkit/stats.py && pytest tests/test_stats.py -q"
+    setup: auto
+  build-test:
+    cmd: "ruff check . && pytest -q"
+    setup: auto
+
+nodes:
+  - id: plan
+    role: architect
+    phase: inception
+    prompt: |
+      Write `SPEC.md` defining three INDEPENDENT, pure-function modules for a text toolkit, each
+      with an exact signature and a couple of invariants:
+        - `toolkit/normalize.py`      -> `normalize(text: str) -> str` (lowercase, collapse
+          whitespace; idempotent: normalize(normalize(x)) == normalize(x));
+        - `toolkit/tokenize_words.py` -> `tokenize(text: str) -> list[str]` (split normalized text
+          into word tokens; never emit an empty token);
+        - `toolkit/stats.py`          -> `word_count(text: str) -> dict[str, int]` (the counts sum
+          to the number of tokens).
+      The modules must NOT import one another. Add `requirements-dev.txt` (pytest, ruff). No code yet.
+    tools: [Read, Write]
+    gate: spec-check
+
+  - id: build-normalize
+    role: engineer
+    phase: construction
+    prompt: |
+      Implement `toolkit/normalize.py` exactly per `SPEC.md`, plus `tests/test_normalize.py`
+      covering its invariants (including idempotency). Do not touch the other modules. Keep your
+      gate green: `ruff check toolkit/normalize.py && pytest tests/test_normalize.py -q`.
+    tools: [Read, Write, Edit, Bash]
+    depends_on: [plan]
+    gate: test-normalize
+
+  - id: build-tokenize
+    role: engineer
+    phase: construction
+    prompt: |
+      Implement `toolkit/tokenize_words.py` exactly per `SPEC.md`, plus `tests/test_tokenize.py`
+      (no empty tokens; tokenizing already-normalized text is stable). Do not touch the other
+      modules. Keep your gate green: `ruff check toolkit/tokenize_words.py && pytest tests/test_tokenize.py -q`.
+    tools: [Read, Write, Edit, Bash]
+    depends_on: [plan]
+    gate: test-tokenize
+
+  - id: build-stats
+    role: engineer
+    phase: construction
+    prompt: |
+      Implement `toolkit/stats.py` exactly per `SPEC.md`, plus `tests/test_stats.py` (the per-word
+      counts sum to the token count). Do not touch the other modules. Keep your gate green:
+      `ruff check toolkit/stats.py && pytest tests/test_stats.py -q`.
+    tools: [Read, Write, Edit, Bash]
+    depends_on: [plan]
+    gate: test-stats
+
+  - id: integrate
+    role: engineer
+    phase: construction
+    prompt: |
+      Compose the three modules into `toolkit/__init__.py` exposing a single `analyze(text)` that
+      returns {"normalized": ..., "tokens": ..., "word_count": ...} by calling the modules in order.
+      Add `tests/test_integration.py` asserting the pipeline end-to-end and that `analyze` is
+      deterministic. Do not weaken the existing module tests. Keep the FULL suite green:
+      `ruff check . && pytest -q`.
+    tools: [Read, Write, Edit, Bash]
+    depends_on: [build-normalize, build-tokenize, build-stats]
+    gate: build-test

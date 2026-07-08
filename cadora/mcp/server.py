@@ -130,10 +130,25 @@ def build_app(executor_factory=None, *, host="127.0.0.1", port=8000):
     return app
 
 
-def serve(transport: str = "stdio", *, host: str = "127.0.0.1", port: int = 8000) -> None:
+def serve(
+    transport: str = "stdio",
+    *,
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    auth_token: str | None = None,
+) -> None:
     """Run the Cadora MCP server over the given transport (``stdio`` | ``http``).
 
     For ``http`` (remote clients) the server listens on ``host:port`` at ``/mcp``. It binds
-    localhost by default — front it with TLS + authentication before exposing it beyond the host.
+    localhost by default — front it with TLS before exposing it beyond the host. Pass
+    ``auth_token`` to require ``Authorization: Bearer <token>`` on every HTTP request.
     """
-    build_app(host=host, port=port).run(transport=_TRANSPORTS.get(transport, transport))
+    app = build_app(host=host, port=port)
+    if transport == "http" and auth_token:
+        import uvicorn
+
+        from cadora.mcp.auth import bearer_auth
+
+        uvicorn.run(bearer_auth(app.streamable_http_app(), auth_token), host=host, port=port)
+        return
+    app.run(transport=_TRANSPORTS.get(transport, transport))

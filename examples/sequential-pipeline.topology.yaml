@@ -1,0 +1,75 @@
+# Cadora topology shape: SEQUENTIAL PIPELINE  (a -> b -> c)
+#
+# The simplest shape: each stage depends on the one before it, so the run is a straight line.
+# Reach for it when every step genuinely needs the previous step's output — spec before code,
+# code before hardening. Cadora re-runs a deterministic gate after each stage and blocks on
+# failure, so a broken stage never reaches the next one.
+#
+# What it builds (a neutral, self-contained demo): a small "request scoring & decision" service —
+# validate an incoming request, compute a bounded score, then make a RULE-BASED decision. The
+# gates enforce the invariants deterministically (the score is bounded and reproducible; the
+# decision is a pure function of the score and threshold). The agent reasons; the rules decide
+# "green".
+#
+# Run (against a fresh, throwaway workspace):
+#   mkdir -p /tmp/seq-demo
+#   cadora run examples/sequential-pipeline.topology.yaml --executor claude --cwd /tmp/seq-demo --yes
+#
+# Resume a late failure without redoing the earlier stages:
+#   cadora run examples/sequential-pipeline.topology.yaml --resume-from harden --cwd /tmp/seq-demo
+name: sequential-pipeline
+
+# Deterministic gates, declared inline — each node names one. `setup: auto` provisions an isolated
+# gate venv from requirements-dev.txt; `setup: off` needs no venv.
+gates:
+  spec-check:
+    cmd: "test -f SPEC.md && grep -qi 'invariant' SPEC.md"
+    setup: off
+  build-test:
+    cmd: "ruff check . && pytest -q"
+    setup: auto
+
+nodes:
+  - id: specify
+    role: analyst
+    phase: inception
+    prompt: |
+      Write `SPEC.md` for a small "request scoring & decision" service. Define, precisely:
+        - the request schema (a few typed fields, e.g. amount, category, priority);
+        - a scoring function mapping a valid request to a score in the closed range [0.0, 1.0];
+        - a decision rule that is a PURE FUNCTION of the score: score >= THRESHOLD -> "reject",
+          otherwise "approve" (choose and state a fixed THRESHOLD, e.g. 0.7);
+        - an "Invariants" section listing the deterministic guarantees the tests must enforce:
+          the score is bounded to [0,1], scoring is deterministic (same input -> same score), and
+          the decision is consistent with the rule.
+      Keep it neutral and self-contained. Do not write code yet.
+    tools: [Read, Write]
+    gate: spec-check
+
+  - id: implement
+    role: engineer
+    phase: construction
+    prompt: |
+      Implement the service from `SPEC.md` as a small Python package `adjudicator/`:
+        - `validate(request)` — reject malformed input cleanly (raise a typed error);
+        - `score(request) -> float` — deterministic, bounded to [0.0, 1.0];
+        - `decide(request) -> dict` — returns {"score": float, "decision": "approve"|"reject"},
+          applying the SPEC's threshold rule.
+      Write a `tests/` suite that encodes the SPEC's Invariants (bounded score, determinism,
+      decision consistency with the threshold). Add `requirements-dev.txt` (pytest, ruff) and a
+      `pyproject.toml`. Write complete, working files — no stubs. Run the suite yourself until green.
+    tools: [Read, Write, Edit, Bash]
+    depends_on: [specify]
+    gate: build-test
+
+  - id: harden
+    role: engineer
+    phase: construction
+    prompt: |
+      Strengthen the suite without weakening it: add boundary tests exactly AT the threshold,
+      invalid-input tests (each must fail cleanly, not crash), and an idempotency test (scoring the
+      same request twice yields the identical score and decision). Fix any real defect the new
+      tests expose in `adjudicator/`, never the tests. Keep `ruff check . && pytest -q` green.
+    tools: [Read, Write, Edit, Bash]
+    depends_on: [implement]
+    gate: build-test

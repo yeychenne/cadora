@@ -1,0 +1,114 @@
+# Cadora topology: MISSION PREP — a vision-enrichment prep phase (run BEFORE the build)
+#
+# A dedicated "wave 1" that AMPLIFIES a thin project vision into a build-ready brief before any
+# construction begins. It reads the existing vision, researches authoritative prior art and
+# reference patterns for the project's OWN domain, enriches the vision, then assesses it through
+# TWO independent senior lenses IN PARALLEL — a Senior Product Manager and a Senior Development
+# Engineer — and consolidates the result into decision records + revised complexity signals that a
+# downstream build topology consumes. In practice this triples the depth of what the build starts
+# from: sharper scope, a justified architecture, prototyped risky assumptions, a sized plan.
+#
+# These are INCEPTION nodes: they produce Markdown, not code, so the gates are artifact checks
+# (`setup: off`) — never ruff/pytest. Running a code gate on a design phase is a category error.
+#
+# Inputs in --cwd:  vision.md  (a thin first-draft product vision; required)
+# Outputs in --cwd: mission-prep/ (research, enriched vision, PM + DE assessments, decisions) and
+#                   an enriched vision.md the next topology reads.
+#
+# Run it, then feed the enriched vision straight into a build topology:
+#   cadora run examples/mission-prep.topology.yaml --executor claude --cwd ws/ --max-parallel 2 --yes
+#   cadora run examples/sequential-pipeline.topology.yaml --executor claude --cwd ws/ --yes
+name: mission-prep
+
+# Inception phase — artifact-existence gates only, no code venv (setup: off).
+gates:
+  has-research:
+    cmd: "test -s mission-prep/research.md"
+    setup: off
+  has-enriched-vision:
+    cmd: "test -s mission-prep/enriched-vision.md"
+    setup: off
+  has-pm-assessment:
+    cmd: "test -s mission-prep/assessment-pm.md"
+    setup: off
+  has-de-assessment:
+    cmd: "test -s mission-prep/assessment-de.md"
+    setup: off
+  has-decisions:
+    cmd: "test -s mission-prep/decisions.md && test -s vision.md"
+    setup: off
+
+nodes:
+  - id: research
+    role: analyst
+    phase: inception
+    prompt: |
+      Read `vision.md` (the current, likely thin, product vision). Then research authoritative
+      prior art for THIS project's own domain — established reference architectures, well-regarded
+      open-source projects solving adjacent problems, and any de-facto patterns — and write
+      `mission-prep/research.md`. For each reference: a one-line what-it-is, why it's relevant here,
+      and the specific idea worth borrowing. Cite your sources. Stay vendor-neutral — capture
+      transferable PATTERNS, not one platform's product names. This is the raw material for
+      enriching the vision.
+    tools: [Read, Write, WebSearch, WebFetch]
+    gate: has-research
+
+  - id: enrich-vision
+    role: architect
+    phase: inception
+    prompt: |
+      Using `vision.md` and `mission-prep/research.md`, AMPLIFY the vision. Write
+      `mission-prep/enriched-vision.md`: sharpen the problem and scope, deepen the target
+      architecture (components, key flows, the genuinely hard parts), and state what changed versus
+      the thin original and WHY. Include a "Complexity signals" section rating — on a 1-3 scale with
+      a one-line justification each — complexity, ai/ml intensity, scale, and ambiguity, so a
+      downstream planner can size the build. Concrete over generic; this brief drives everything after.
+    tools: [Read, Write]
+    depends_on: [research]
+    gate: has-enriched-vision
+
+  # The two senior lenses are independent — they share a wave and run in parallel (--max-parallel 2).
+  - id: assess-pm
+    role: product-manager
+    phase: inception
+    prompt: |
+      Assess `mission-prep/enriched-vision.md` as a SENIOR PRODUCT MANAGER. Write
+      `mission-prep/assessment-pm.md` covering: the core user and their job-to-be-done; the sharpest
+      value proposition in one sentence; honest positioning against the obvious alternatives and the
+      real differentiation; scope cuts for a credible first version (build now vs defer); and the top
+      product risks, each with a mitigation. Be decisive and specific — name where the vision is
+      still hand-wavy. Keep the assessment on the product itself — users, value, scope, and product
+      risk.
+    tools: [Read, Write]
+    depends_on: [enrich-vision]
+    gate: has-pm-assessment
+
+  - id: assess-de
+    role: engineer
+    phase: inception
+    prompt: |
+      Assess `mission-prep/enriched-vision.md` as a SENIOR DEVELOPMENT ENGINEER. Write
+      `mission-prep/assessment-de.md` covering: whether the proposed architecture holds up against
+      established patterns (name the pattern it matches or knowingly diverges from); the tech-stack
+      decision with rationale and one credible alternative; the RISKY assumptions that deserve a
+      throwaway prototype/spike before committing (list them — each with what the spike would prove);
+      and build feasibility — decompose the work into sized units/waves so no single build step is
+      too large to finish reliably. Be concrete about the hard parts.
+    tools: [Read, Write]
+    depends_on: [enrich-vision]
+    gate: has-de-assessment
+
+  - id: decisions
+    role: architect
+    phase: inception
+    prompt: |
+      Reconcile the two assessments (`mission-prep/assessment-pm.md`,
+      `mission-prep/assessment-de.md`) — where they agree, where they tension — and write
+      `mission-prep/decisions.md`: a short set of decision records (each: context -> decision ->
+      consequences) resolving the open questions, then a finalized build-ready brief and the
+      confirmed complexity signals. Finally, update `vision.md` in the workspace root to the
+      enriched, decided version so the next topology builds from it. This is the hand-off to
+      construction.
+    tools: [Read, Write, Edit]
+    depends_on: [assess-pm, assess-de]
+    gate: has-decisions

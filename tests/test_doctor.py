@@ -96,7 +96,9 @@ def test_run_doctor_reports_python_first(monkeypatch):
 
     assert checks[0].backend == "python"
     assert checks[0].status == "ok"  # the test suite itself requires >=3.10
-    assert [c.backend for c in checks] == ["python", "claude", "codex", "kiro", "glm", "bun"]
+    assert [c.backend for c in checks] == [
+        "python", "claude", "codex", "kiro", "glm", "antigravity", "bun"
+    ]
 
 
 def test_glm_requires_zai_api_key_and_claude(monkeypatch):
@@ -132,3 +134,35 @@ def test_live_backends_ok_counts_usable_only():
     checks[3] = BackendCheck("kiro", "kiro-cli", "missing")
     checks[4] = BackendCheck("glm", "claude", "missing")
     assert live_backends_ok(checks) == 0
+
+
+def test_support_tiers_cover_every_registered_backend():
+    from cadora.doctor import SUPPORT
+    from cadora.executors import _REGISTRY
+
+    backends = set(_REGISTRY) - {"fixture"}  # fixture is test-only, intentionally untiered
+    assert backends == set(SUPPORT), f"tier map out of sync with registry: {backends ^ set(SUPPORT)}"
+    assert set(SUPPORT.values()) <= {"verified", "experimental"}
+
+
+def test_verified_and_experimental_split():
+    from cadora.doctor import SUPPORT, _TESTED
+
+    verified = {b for b, t in SUPPORT.items() if t == "verified"}
+    experimental = {b for b, t in SUPPORT.items() if t == "experimental"}
+    assert verified == {"claude", "codex", "kiro"}
+    assert experimental == {"glm", "antigravity"}
+    # every verified backend carries a tested version-range floor
+    assert all(_TESTED.get(b, (None, None))[0] for b in verified)
+
+
+def test_backendcheck_auto_populates_tier():
+    assert BackendCheck("claude", "claude", "ok").tier == "verified"
+    assert BackendCheck("antigravity", "agy", "missing").tier == "experimental"
+    assert BackendCheck("python", "py", "ok").tier == ""  # non-backend checks carry no tier
+
+
+def test_run_doctor_includes_antigravity(monkeypatch):
+    monkeypatch.setattr(doctor.shutil, "which", lambda _b: None)  # all missing → fast, deterministic
+    backends = {c.backend for c in run_doctor()}
+    assert {"claude", "codex", "kiro", "glm", "antigravity"} <= backends

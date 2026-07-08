@@ -1,0 +1,137 @@
+# Cadora topology: AGENTCORE DEPLOY-TARGET — an operations phase that produces (and GATES) the
+# artifacts to run a service on Amazon Bedrock AgentCore Runtime.
+#
+# This is an OPERATIONS-phase topology (the third phase, after inception and construction). It
+# drives an agent to produce the deployment artifacts for AgentCore Runtime — an arm64 container
+# with a health contract, a runtime spec with a typed request/response envelope, and a
+# least-privilege IAM role — and it lets DETERMINISTIC gates decide whether those artifacts are
+# actually deployable and safe. The standout is the security gate: it FAILS on a wildcard IAM
+# resource, a missing confused-deputy guard, or any long-term static credential — the runtime must
+# sign with its role via SigV4, never a stored key. "Green" here means "provably deployable to the
+# documented contract", not "the agent said so".
+#
+# Shape: plan -> [containerize || runtime-spec || iam-least-priv] -> verify-readiness (a diamond).
+# The three artifact stages are independent, so they run in one wave under --max-parallel.
+#
+# Inputs in --cwd:  a built service to deploy (e.g. the output of a construction topology).
+# Outputs in --cwd: deploy/ (PLAN.md, Dockerfile, runtime.yaml, contract.md, iam-policy.json,
+#                   READINESS.md).
+#
+# Run:
+#   cadora run examples/agentcore-deploy.topology.yaml --executor claude --cwd ws/ --max-parallel 3 --yes
+#
+# Verify an already-produced deploy/ folder against these gates, no agent, no LLM cost:
+#   cadora gate-check examples/agentcore-deploy.topology.yaml --cwd ws/
+name: agentcore-deploy
+
+# Deterministic deployment + security gates. They are artifact/structure checks (no venv), and the
+# gate command IS the invariant — it lives in the topology, not in an agent-written script, so the
+# agent cannot weaken it.
+gates:
+  has-plan:
+    cmd: "test -s deploy/PLAN.md"
+    setup: off
+  container-contract:
+    cmd: >-
+      test -f deploy/Dockerfile &&
+      grep -qi arm64 deploy/Dockerfile &&
+      grep -qE 'EXPOSE 8080' deploy/Dockerfile &&
+      grep -qiE '^USER ' deploy/Dockerfile &&
+      grep -qi healthcheck deploy/Dockerfile
+    setup: off
+  runtime-contract:
+    cmd: >-
+      test -f deploy/runtime.yaml &&
+      grep -qi health deploy/runtime.yaml &&
+      test -s deploy/contract.md
+    setup: off
+  iam-bounded:
+    cmd: >-
+      test -f deploy/iam-policy.json &&
+      ! grep -Eq '"Resource"[[:space:]]*:[[:space:]]*"\*"' deploy/iam-policy.json &&
+      grep -q aws:SourceAccount deploy/iam-policy.json &&
+      ! grep -rIEq 'aws_secret_access_key|BEDROCK[_-]?API[_-]?KEY|CreateServiceSpecificCredential' deploy/
+    setup: off
+  deploy-ready:
+    cmd: >-
+      test -s deploy/READINESS.md &&
+      grep -qi arm64 deploy/Dockerfile &&
+      ! grep -Eq '"Resource"[[:space:]]*:[[:space:]]*"\*"' deploy/iam-policy.json &&
+      grep -q aws:SourceAccount deploy/iam-policy.json
+    setup: off
+
+nodes:
+  - id: plan-deploy
+    role: operator
+    phase: operations
+    prompt: |
+      Read the service in the workspace. Write `deploy/PLAN.md`: the deployment target is Amazon
+      Bedrock AgentCore Runtime (serverless, managed). List the artifacts to produce and the
+      non-negotiable contracts — an arm64 container image with a GET /health on port 8080; an
+      AgentCore runtime spec with a typed request/response envelope; and a least-privilege IAM
+      runtime role. State the security posture up front: the role obtains credentials via SigV4
+      (NO long-term static keys, NO embedded API keys), scopes every permission to specific
+      resources (no wildcards), and guards the confused-deputy problem with an `aws:SourceAccount`
+      condition.
+    tools: [Read, Write]
+    gate: has-plan
+
+  # Three independent artifact stages — one wave, run concurrently under --max-parallel 3.
+  - id: containerize
+    role: operator
+    phase: operations
+    prompt: |
+      Write `deploy/Dockerfile` for the service, targeting Amazon Bedrock AgentCore Runtime: base
+      on a slim Python image built for arm64 (AgentCore requires arm64), run as a non-root `USER`,
+      `EXPOSE 8080`, and add a `HEALTHCHECK` hitting GET /health on 8080. Keep it minimal and
+      production-shaped. Embed NO credentials or API keys in the image. Your gate checks the
+      arm64 / port / non-root / health contract.
+    tools: [Read, Write, Edit]
+    depends_on: [plan-deploy]
+    gate: container-contract
+
+  - id: runtime-spec
+    role: operator
+    phase: operations
+    prompt: |
+      Write `deploy/runtime.yaml` — the AgentCore runtime spec (entry point, port 8080, the GET
+      /health contract) — and `deploy/contract.md` describing the request/response envelope: a typed
+      request model and a typed response model (structured JSON in, structured JSON out). Be explicit
+      that the response is a declared schema, never loose free text. Your gate checks the runtime
+      spec and the typed contract are present.
+    tools: [Read, Write, Edit]
+    depends_on: [plan-deploy]
+    gate: runtime-contract
+
+  - id: iam-least-priv
+    role: operator
+    phase: operations
+    prompt: |
+      Write `deploy/iam-policy.json` — the runtime IAM role's trust + permission policy — to the
+      least-privilege, defense-in-depth bar:
+        - Trust policy: principal `bedrock-agentcore.amazonaws.com`, WITH an `aws:SourceAccount`
+          condition (the confused-deputy guard).
+        - Permissions: scope every statement's `Resource` to a SPECIFIC ARN or prefix — never `"*"`.
+          Grant only what the runtime needs (e.g. S3 read on one bucket prefix; Bedrock
+          `InvokeModel` on the specific model IDs in use).
+        - NO long-term static credentials anywhere in `deploy/`: no access keys, no embedded Bedrock
+          API key, no service-specific-credential creation — the runtime signs requests with its
+          role via SigV4.
+      Your gate FAILS on a wildcard `Resource`, a missing `aws:SourceAccount` guard, or any
+      static-credential pattern.
+    tools: [Read, Write, Edit]
+    depends_on: [plan-deploy]
+    gate: iam-bounded
+
+  - id: verify-readiness
+    role: operator
+    phase: operations
+    prompt: |
+      Verify the deployment artifacts together and write `deploy/READINESS.md`: confirm the
+      container contract (arm64, /health, non-root), the runtime spec + typed envelope, and the IAM
+      role's least-privilege + confused-deputy + no-static-keys posture, each with the file and line
+      that satisfies it. If any invariant is unmet, FIX the offending artifact — never the checks.
+      Your gate re-asserts the readiness report plus the non-negotiable security invariants.
+    tools: [Read, Write, Edit]
+    depends_on: [containerize, runtime-spec, iam-least-priv]
+    gate: deploy-ready

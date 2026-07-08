@@ -104,7 +104,7 @@ def build_report(run_dir: str | Path) -> dict:
             "cadora_version": __version__,
             "claims": "deterministic gate verdicts, integrity findings, human-review "
             "decisions, and per-node cost as recorded in the run archive; "
-            "checksummed, not signed",
+            "checksummed — sign and verify with `cadora sign` / `cadora verify`",
         },
         "run": {
             "run_id": manifest.get("run_id"),
@@ -369,8 +369,9 @@ def render_html(report: dict) -> str:
 <p><b>What this pack claims:</b> {escape(pack["claims"])}.</p>
 <p><b>Verify integrity of the pack:</b> from the run directory, run
 <span class="mono">shasum -a 256 -c report/checksums.txt</span> (or
-<span class="mono">sha256sum -c</span>). Estimated costs are computed from public price tables
-where the backend reported tokens but no dollars, and are marked <i>est.</i></p>
+<span class="mono">sha256sum -c</span>), or <span class="mono">cadora verify &lt;run&gt;</span> to
+recompute the hashes and check the signature if the pack was signed. Estimated costs are computed
+from public price tables where the backend reported tokens but no dollars, and marked <i>est.</i></p>
 <p class="small">generated {escape(pack["generated_at"])} · cadora {escape(pack["cadora_version"])}</p>
 </footer>
 </body></html>

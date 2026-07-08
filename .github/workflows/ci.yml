@@ -39,3 +39,12 @@ jobs:
           grep -q "\*\*v${VER}\*\*" README.md || { echo "README Status does not name v$VER"; exit 1; }
           grep -qE "^## v${VER} — (20|TBD)" CHANGELOG.md || { echo "CHANGELOG lacks a v$VER section"; exit 1; }
           echo "consistency OK (v$VER)"
+      - name: secrets scan (dev repo only)
+        # scripts/ is export-ignored, so it is absent on the public mirror — skip cleanly there.
+        run: |
+          set -euo pipefail
+          if [ -f scripts/secrets_scan.py ]; then
+            python3 scripts/secrets_scan.py
+          else
+            echo "scripts/secrets_scan.py absent (public mirror) — skipped"
+          fi

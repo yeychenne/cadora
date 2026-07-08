@@ -1,5 +1,62 @@
 # Changelog
 
+## v0.9.0 — 2026-07-08
+
+The capstone release — the audit-grade thesis completed, the honesty gaps closed, and a full
+topology examples library. Evidence packs are now **signed** as well as checksummed
+(`cadora sign` / `cadora verify`); backends carry explicit **support tiers**; the MCP HTTP
+transport takes a **bearer token**; a release **secrets scanner** guards every build; and
+`examples/` gains a prep phase, the three canonical DAG shapes, and a security-gated AgentCore
+deploy target — one per lifecycle phase.
+
+### Added
+- **Signed evidence packs — `cadora sign` / `cadora verify`.** The evidence pack was already
+  checksummed (SHA-256 of every archived file); now a **detached signature over that manifest**
+  makes a verified pack tamper-evident **and attributable**. `cadora verify` recomputes every hash
+  (the always-on floor — an unsigned pack still verifies its integrity) and then checks the
+  signature: self-attesting against the public key that travels in the pack, or authenticated
+  against an OpenSSH `allowed_signers` file. Signing is **dependency-free by default** (OpenSSH
+  `ssh-keygen -Y`, reusing a key you already have) and **pluggable** (`--signer` / `--verifier` for
+  minisign, age, cosign). `cadora verify` exits non-zero on a hash mismatch or bad signature
+  (CI-ready). Turns "checksummed, not signed" into a delivered capability.
+- **Backend support tiers (`cadora doctor`).** Each backend now carries an explicit tier from one
+  source of truth — **verified** (`claude`, `codex`, `kiro`: live-smoke-checked against their CLI
+  contract every release, with a tested version range) or **experimental** (`glm`, `antigravity`:
+  they run, but aren't in the release smoke yet). `cadora doctor` prints each backend's tier and a
+  `N verified · M experimental` summary, and the README backend table matches. Closes the ambiguous
+  "N backends" framing — and `antigravity` was previously not checked by `doctor` at all.
+- **MCP HTTP auth — `cadora mcp --transport http --auth-token <token>`.** The MCP server is
+  loopback-only and unauthenticated by default; exposing it over HTTP used to mean acknowledging
+  "no auth." Now a bearer token (the flag or `CADORA_MCP_TOKEN`) wraps the HTTP transport in a
+  middleware that requires `Authorization: Bearer <token>` on every request — and a present token
+  **lifts the non-loopback bind refusal**, since the surface is no longer unauthenticated. A
+  standalone ASGI wrapper (constant-time compare), not coupled to the mcp SDK's auth stack; still
+  front a network-exposed server with TLS.
+- **Release secrets scanner (`scripts/secrets_scan.py`).** A value-based scan — private-key blocks,
+  AWS access-key ids, token prefixes, long quoted secret assignments (values, **not** bare keywords,
+  so gate regexes that *mention* key names don't false-trip) — runs in `release-check.sh` and CI and
+  fails the build if a real credential value is committed. Guarded to no-op on the public mirror
+  (where `scripts/` is export-ignored).
+- **Topology shape gallery (`examples/`).** Three self-contained, runnable example topologies — one
+  per canonical DAG shape (**sequential pipeline**, **parallel fan-out → synthesize**,
+  **multi-signal fan-in**) — each building a small, neutral Python service whose **deterministic
+  gates decide "green"** (an invariants suite, a rule-based decision, an aggregation identity). Gate
+  commands are declared inline in each file's `gates:` map, so `cadora run <file>` works out of the
+  box. Adds `examples/README.md` indexing the gallery and the method topologies, plus a guard test
+  that keeps every shipped example loading and topo-sorting.
+- **Mission-prep prep topology (`examples/mission-prep.topology.yaml`).** A vision-enrichment
+  "wave 1" that runs *before* a build: research the project's domain, enrich the vision, then assess
+  it through a **Senior PM and a Senior DE lens in parallel**, and consolidate into decision records
+  + revised complexity signals — leaving an enriched `vision.md` for the build topology to consume.
+  Inception-only, so its gates are artifact checks (`setup: off`), never ruff/pytest on a design phase.
+- **AgentCore deploy-target example (`examples/agentcore-deploy.topology.yaml`).** An **operations**-phase
+  topology that produces the artifacts to run a service on Amazon Bedrock AgentCore Runtime
+  (`plan → containerize ∥ runtime-spec ∥ least-priv IAM → verify`) and **gates them deterministically**.
+  The security gate is topology-owned (the agent can't weaken it) and **fails on a wildcard IAM
+  resource, a missing `aws:SourceAccount` confused-deputy guard, or any long-term static credential**
+  — enforcing SigV4-only, least-privilege deployment. Rounds out the phase coverage (inception /
+  construction / operations) and pairs with `cadora gate-check` to audit a `deploy/` folder with no agent.
+
 ## v0.8.1 — 2026-07-08
 
 An urgent gate-correctness fix (a Python packaging defect could pass the gate), plus run resumption

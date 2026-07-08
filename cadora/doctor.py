@@ -26,6 +26,18 @@ _TESTED: dict[str, tuple[str | None, str | None]] = {
     "glm": (None, None),  # uses claude CLI against Z.ai; readiness is env + claude present
 }
 
+# Support tier — the single source of truth for how mature each backend adapter is.
+# "verified": live-smoke-verified each release and carries a tested version range above.
+# "experimental": works, but is NOT in the release smoke — promotion needs a live smoke.
+# (The fixture backend is test-only and intentionally unlisted.)
+SUPPORT: dict[str, str] = {
+    "claude": "verified",
+    "codex": "verified",
+    "kiro": "verified",
+    "glm": "experimental",
+    "antigravity": "experimental",
+}
+
 
 @dataclass
 class BackendCheck:
@@ -34,6 +46,11 @@ class BackendCheck:
     status: str  # ok | missing | unparsable | untested
     version: str | None = None
     detail: str = ""
+    tier: str = ""  # verified | experimental | "" (non-backend checks: python, bun)
+
+    def __post_init__(self) -> None:
+        if not self.tier:
+            self.tier = SUPPORT.get(self.backend, "")
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -117,6 +134,7 @@ def run_doctor() -> list[BackendCheck]:
     checks.append(check_backend("codex"))
     checks.append(check_backend("kiro", "kiro-cli"))
     checks.append(check_glm())
+    checks.append(check_backend("antigravity", "agy"))
     bun = check_backend("bun")
     if not bun.detail:
         bun.detail = "runtime for the aidlc-v2 method pack's hooks (optional otherwise)"

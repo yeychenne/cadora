@@ -1,0 +1,84 @@
+# Cadora topology shape: MULTI-SIGNAL FAN-IN  (N independent roots -> 1 aggregator)
+#
+# Several INDEPENDENT producer stages (no shared parent) each compute one signal; a single
+# aggregator depends on all of them and combines the signals into one result. The producers share
+# the first wave (concurrent under `--max-parallel`); the aggregator runs once they are all green.
+#
+# The teaching point is the aggregator's gate: a DETERMINISTIC aggregation invariant — the weights
+# sum to 1, the composite IS the weighted sum, the result stays in range, the band label is a pure
+# function of the score. A rule decides the composite result, not a vibe. (This is where a bare
+# "it ran" would lie: three green signals can still be combined wrongly; the invariant catches it.)
+#
+# What it builds (neutral, self-contained): a "document quality score" from three independent
+# signal extractors, combined by a fixed-weight aggregator with a rule-based band label.
+#
+# Run WITH concurrency:
+#   mkdir -p /tmp/fanin-demo
+#   cadora run examples/fan-in-aggregation.topology.yaml \
+#     --executor claude --cwd /tmp/fanin-demo --max-parallel 3 --yes
+name: fan-in-aggregation
+
+gates:
+  test-length:
+    cmd: "ruff check signals/length.py && pytest tests/test_length.py -q"
+    setup: auto
+  test-diversity:
+    cmd: "ruff check signals/diversity.py && pytest tests/test_diversity.py -q"
+    setup: auto
+  test-structure:
+    cmd: "ruff check signals/structure.py && pytest tests/test_structure.py -q"
+    setup: auto
+  aggregation-invariant:
+    cmd: "ruff check . && pytest -q"
+    setup: auto
+
+nodes:
+  # Three independent signal extractors — no depends_on, so they share the first wave.
+  - id: signal-length
+    role: engineer
+    phase: construction
+    prompt: |
+      Create `signals/length.py` with `length_score(text: str) -> float`, a pure function returning
+      a normalized score in [0.0, 1.0] from document length (state your mapping; longer up to a cap
+      scores higher). Add `requirements-dev.txt` (pytest, ruff) if absent, and `tests/test_length.py`
+      asserting the score is bounded to [0,1] and deterministic. Do not import the other signals.
+      Keep your gate green.
+    tools: [Read, Write, Edit, Bash]
+    gate: test-length
+
+  - id: signal-diversity
+    role: engineer
+    phase: construction
+    prompt: |
+      Create `signals/diversity.py` with `diversity_score(text: str) -> float`, a pure function in
+      [0.0, 1.0] from lexical diversity (unique words / total words, normalized). Add
+      `tests/test_diversity.py` asserting bounds [0,1] and determinism. Do not import the other
+      signals. Keep your gate green.
+    tools: [Read, Write, Edit, Bash]
+    gate: test-diversity
+
+  - id: signal-structure
+    role: engineer
+    phase: construction
+    prompt: |
+      Create `signals/structure.py` with `structure_score(text: str) -> float`, a pure function in
+      [0.0, 1.0] rewarding structure (e.g. presence of sentence boundaries / paragraph breaks,
+      normalized). Add `tests/test_structure.py` asserting bounds [0,1] and determinism. Do not
+      import the other signals. Keep your gate green.
+    tools: [Read, Write, Edit, Bash]
+    gate: test-structure
+
+  - id: aggregate
+    role: engineer
+    phase: construction
+    prompt: |
+      Create `signals/aggregate.py` with `quality_score(text) -> dict` that combines the three
+      signal functions by a FIXED-WEIGHT sum whose weights sum to exactly 1.0, returning
+      {"score": float, "band": "low"|"medium"|"high"} where the band is a PURE FUNCTION of the score
+      (state fixed cut-points). Add `tests/test_aggregate.py` enforcing the aggregation invariants:
+      the weights sum to 1.0; the composite equals the weighted sum of the three signals (within a
+      tiny tolerance); the composite stays in [0,1]; the band matches the cut-points. Do not weaken
+      the per-signal tests. Keep the full suite green: `ruff check . && pytest -q`.
+    tools: [Read, Write, Edit, Bash]
+    depends_on: [signal-length, signal-diversity, signal-structure]
+    gate: aggregation-invariant

@@ -199,14 +199,15 @@ def cmd_eval(args) -> int:
 _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1", ""}
 
 
-def _guard_bind(host: str, surface: str, acknowledged: bool) -> None:
+def _guard_bind(host: str, surface: str, acknowledged: bool, *, authenticated: bool = False) -> None:
     """Refuse a non-loopback bind of an unauthenticated surface unless acknowledged.
 
-    Both the MCP server and the dashboard are localhost-only with NO authentication. Binding
-    either to a routable interface exposes it (the MCP tools read/drive runs; the dashboard
-    serves the archive). Fail closed with an explicit escape hatch.
+    Both the MCP server and the dashboard are localhost-only with NO authentication by default.
+    Binding either to a routable interface exposes it (the MCP tools read/drive runs; the dashboard
+    serves the archive). Fail closed with an explicit escape hatch — or, when the surface actually
+    carries auth (``authenticated``: e.g. the MCP server started with an ``--auth-token``), allow it.
     """
-    if host in _LOOPBACK_HOSTS or acknowledged:
+    if host in _LOOPBACK_HOSTS or acknowledged or authenticated:
         return
     raise SystemExit(
         f"refusing to bind the {surface} to {host!r}: it has NO authentication and would be "
@@ -216,10 +217,12 @@ def _guard_bind(host: str, surface: str, acknowledged: bool) -> None:
 
 
 def cmd_mcp(args) -> int:
+    from cadora.mcp.auth import resolve_token
     from cadora.mcp.server import serve
 
-    _guard_bind(args.host, "MCP server", args.i_understand_no_auth)
-    serve(transport=args.transport, host=args.host, port=args.port)
+    token = resolve_token(getattr(args, "auth_token", None))
+    _guard_bind(args.host, "MCP server", args.i_understand_no_auth, authenticated=bool(token))
+    serve(transport=args.transport, host=args.host, port=args.port, auth_token=token)
     return 0
 
 
@@ -553,6 +556,49 @@ def cmd_report(args) -> int:
     return 0
 
 
+def cmd_sign(args) -> int:
+    from cadora.signing import sign_pack
+
+    meta = sign_pack(
+        args.archive_dir, args.run_id, key=args.key, signer=args.signer, identity=args.identity
+    )
+    print(f"signed evidence pack for {args.run_id}:")
+    print(f"  signature  {meta['signature']}")
+    print(f"  signer     {meta['tool']}" + (f" · {meta['identity']}" if meta.get("identity") else ""))
+    if meta.get("fingerprint"):
+        print(f"  key        {meta['fingerprint']}")
+    print(f"  verify:    cadora verify {args.run_id} --archive-dir {args.archive_dir}")
+    return 0
+
+
+def cmd_verify(args) -> int:
+    from cadora.signing import verify_pack
+
+    try:
+        res = verify_pack(
+            args.archive_dir, args.run_id,
+            allowed_signers=args.allowed_signers, verifier=args.verifier,
+        )
+    except FileNotFoundError as exc:
+        raise SystemExit(str(exc)) from exc
+    if res.hashes_ok:
+        hashes = f"hashes    {res.checked} file(s) OK"
+    else:
+        bad = ", ".join(res.mismatched + [f"{m} (missing)" for m in res.missing])
+        hashes = f"hashes    MISMATCH: {bad[:240]}"
+    sig = {
+        "absent": "signature none (checksummed, not signed)",
+        "valid": f"signature VALID — {res.signer or 'signer'} · {res.detail}",
+        "invalid": f"signature INVALID — {res.detail}",
+        "unverified": f"signature present, unverified — {res.detail}",
+    }[res.signature]
+    print(f"evidence pack {args.run_id}:")
+    print(f"  {hashes}")
+    print(f"  {sig}")
+    print(f"  => {'VERIFIED' if res.ok else 'NOT VERIFIED'}")
+    return 0 if res.ok else 1
+
+
 def cmd_deliverable(args) -> int:
     from cadora.deliverable import write_deliverable
 
@@ -567,7 +613,7 @@ def cmd_deliverable(args) -> int:
 
 
 def cmd_doctor(args) -> int:
-    from cadora.doctor import live_backends_ok, run_doctor
+    from cadora.doctor import SUPPORT, live_backends_ok, run_doctor
 
     checks = run_doctor()
     if args.json:
@@ -577,7 +623,14 @@ def cmd_doctor(args) -> int:
         for c in checks:
             version = f" {c.version}" if c.version else ""
             detail = f"  ({c.detail})" if c.detail else ""
-            print(f"  {c.status:<10} {c.backend:<8}{version}{detail}")
+            label = c.backend + (f" ({c.tier})" if c.tier else "")
+            print(f"  {c.status:<10} {label:<26}{version}{detail}")
+        verified = sorted(b for b, t in SUPPORT.items() if t == "verified")
+        experimental = sorted(b for b, t in SUPPORT.items() if t == "experimental")
+        print(
+            f"  support: {len(verified)} verified ({', '.join(verified)}) · "
+            f"{len(experimental)} experimental ({', '.join(experimental)})"
+        )
         print("  (fixture needs no check — offline, no external contract)")
     # Exit 0 while at least one live backend is usable; 1 when none is (nothing can run).
     return 0 if live_backends_ok(checks) else 1
@@ -776,6 +829,12 @@ def main(argv=None) -> int:
     )
     m.add_argument("--port", type=int, default=8000, help="bind port for --transport http")
     m.add_argument(
+        "--auth-token",
+        default=None,
+        help="require 'Authorization: Bearer <token>' on every HTTP request (or set "
+        "CADORA_MCP_TOKEN); enables safe --transport http exposure. Still front it with TLS.",
+    )
+    m.add_argument(
         "--i-understand-no-auth",
         action="store_true",
         help="allow binding this unauthenticated surface to a non-loopback host",
@@ -825,6 +884,38 @@ def main(argv=None) -> int:
         "--out", default=None, help="output dir (default: <archive-dir>/<run-id>/report/)"
     )
     rep.set_defaults(func=cmd_report)
+
+    sgn = sub.add_parser(
+        "sign",
+        help="sign a run's evidence pack — a detached signature over its checksums (attributable)",
+    )
+    sgn.add_argument("run_id")
+    sgn.add_argument("--archive-dir", default="runs")
+    sgn.add_argument("--key", default=None, help="SSH private key to sign with (the default signer)")
+    sgn.add_argument(
+        "--identity", default=None, help="signer identity to record (e.g. you@example.com)"
+    )
+    sgn.add_argument(
+        "--signer", default=None,
+        help="external signer command instead of ssh-keygen; {file}=checksums, must write {sig}",
+    )
+    sgn.set_defaults(func=cmd_sign)
+
+    vfy = sub.add_parser(
+        "verify",
+        help="verify a run's evidence pack — recompute every hash, then check any signature",
+    )
+    vfy.add_argument("run_id")
+    vfy.add_argument("--archive-dir", default="runs")
+    vfy.add_argument(
+        "--allowed-signers", default=None,
+        help="OpenSSH allowed_signers file to authenticate the signer (default: self-attest)",
+    )
+    vfy.add_argument(
+        "--verifier", default=None,
+        help="external verifier command instead of ssh-keygen; {file}=checksums, {sig}=signature",
+    )
+    vfy.set_defaults(func=cmd_verify)
 
     dlv = sub.add_parser(
         "deliverable",
