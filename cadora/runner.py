@@ -37,7 +37,7 @@ from cadora.review import (
     REVIEW_REQUEST_CHANGES,
     ReviewResult,
 )
-from cadora.telemetry import RunTelemetry
+from cadora.telemetry import RunTelemetry, _now
 from cadora.topology import Node, Topology, topo_sort
 
 MAX_REVIEW_REVISIONS = 3
@@ -168,14 +168,20 @@ def run_topology(
                         "\n\n## Human review of your previous attempt — revise this same stage\n"
                         + revision_comments
                     )
+                # A wave node's agent already ran (concurrently) before the loop reached it, so its
+                # span must START at the real executor start captured in the worker thread —
+                # otherwise duration_seconds times only the gate step and the agent's work is
+                # attributed to no node at all.
+                from_wave = not revision_comments and node.id in prepared
                 telemetry.node_started(
                     node.id,
                     model=node.model or getattr(node_executor, "model", None),
+                    at=prepared[node.id][2] if from_wave else None,
                 )
-                if not revision_comments and node.id in prepared:
+                if from_wave:
                     # Initial execution already run concurrently for this wave; the review-doc
                     # snapshot was taken there too (so the HITL gate scopes correctly).
-                    pre_review_docs, result = prepared[node.id]
+                    pre_review_docs, result, _ = prepared[node.id]
                 else:
                     # Snapshot review docs BEFORE this attempt so the HITL gate can surface
                     # exactly what this stage (or its revision) produced — not the whole tree.
@@ -389,7 +395,7 @@ def run_topology(
 
 def _execute_wave_concurrently(
     wave, outputs, reviews, executor, construction_executor, cwd, hitl, max_parallel, skipped=None
-) -> dict[str, tuple[dict[str, str] | None, ExecutionResult]]:
+) -> dict[str, tuple[dict[str, str] | None, ExecutionResult, str]]:
     """Run the INITIAL agent execution of a wave's independent nodes concurrently.
 
     Only the (minutes-long) executor call is parallelized; every gate / integrity / remediation /
@@ -397,11 +403,15 @@ def _execute_wave_concurrently(
     independent by construction (no ``depends_on`` among them) and neither ``outputs`` nor
     ``reviews`` is mutated until the whole wave is processed, so these concurrent reads are safe.
 
-    Returns ``{node.id: (pre_review_docs, result)}`` — the review-doc snapshot is taken here (before
-    the execution) so a concurrently-run review node still scopes its HITL gate correctly.
+    Returns ``{node.id: (pre_review_docs, result, started_at)}``. The review-doc snapshot is taken
+    here (before the execution) so a concurrently-run review node still scopes its HITL gate
+    correctly, and ``started_at`` is the node's REAL executor start — captured in this thread,
+    because by the time the sequential loop reaches the node its agent has already finished. The
+    caller hands that timestamp to telemetry so ``duration_seconds`` covers the agent's work rather
+    than just the gate step.
     """
 
-    def _run(node: Node) -> tuple[str, tuple[dict[str, str] | None, ExecutionResult]]:
+    def _run(node: Node) -> tuple[str, tuple[dict[str, str] | None, ExecutionResult, str]]:
         node_cwd = node.cwd or cwd
         node_executor = (
             construction_executor
@@ -409,9 +419,10 @@ def _execute_wave_concurrently(
             else executor
         )
         pre_review_docs = _doc_snapshot(node_cwd) if (hitl and node.review) else None
+        started_at = _now()  # real agent start, inside the worker thread
         result = node_executor.run(node, _render(node, outputs, reviews, skipped), cwd=node_cwd)
         result.executor = node_executor.name
-        return node.id, (pre_review_docs, result)
+        return node.id, (pre_review_docs, result, started_at)
 
     _log(f"▶ wave · {len(wave)} independent nodes running concurrently (max {max_parallel})")
     with ThreadPoolExecutor(max_workers=min(max_parallel, len(wave))) as pool:

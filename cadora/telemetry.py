@@ -98,8 +98,15 @@ class RunTelemetry:
         self.emit("node_skipped", node_id=node_id, reason=reason)
         self._write_status()
 
-    def node_started(self, node_id: str, *, model: str | None = None) -> None:
-        ts = _now()
+    def node_started(self, node_id: str, *, model: str | None = None, at: str | None = None) -> None:
+        """Mark a node running. ``at`` overrides the start timestamp.
+
+        A node whose agent ran concurrently (in a ``--max-parallel`` wave) already finished
+        executing by the time the sequential loop reaches it, so the caller passes the *real*
+        executor start captured in the worker thread. Without it, ``duration_seconds`` would time
+        only the gate/archive step and the agent's work would be attributed to no node at all.
+        """
+        ts = at or _now()
         node = self._node(node_id)
         node["status"] = "running"
         node["started_at"] = ts

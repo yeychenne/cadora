@@ -3,6 +3,7 @@
 import json
 import threading
 import time
+from datetime import datetime
 
 from cadora.executors.base import ExecutionResult, NodeExecutor
 from cadora.runner import run_topology
@@ -119,3 +120,39 @@ def test_review_node_in_concurrent_wave_scopes_docs(tmp_path):
     assert sorted(nid for nid, _ in seen) == ["a", "b"]  # both reviewed, no crash
     assert all(isinstance(docs, list) for _, docs in seen)  # scoped docs flowed through concurrently
     assert json.loads((out / "manifest.json").read_text())["ok"] is True
+
+
+def test_wave_node_duration_covers_the_real_executor_span(tmp_path):
+    """A concurrently-executed node's recorded duration must include its agent work.
+
+    The agent runs inside ``_execute_wave_concurrently`` BEFORE the sequential loop reaches the
+    node, so starting the telemetry span at loop time would clock only the gate/archive step —
+    attributing the executor's work to no node at all. That shipped in 0.8.0 and only manifests
+    under ``--max-parallel > 1``; this is the regression test.
+    """
+    delay = 0.4
+    ex = SleepExecutor(delay=delay)
+    run_topology(
+        _two_independent(), ex, run_id="dur", cwd=str(tmp_path),
+        archive_root=str(tmp_path / "runs"), max_parallel=2,
+    )
+    nodes = json.loads((tmp_path / "runs" / "dur" / "status.json").read_text())["nodes"]
+    for nid in ("a", "b"):
+        recorded = nodes[nid]["duration_seconds"]
+        assert recorded >= delay, (
+            f"{nid}: recorded duration {recorded}s < executor delay {delay}s — "
+            "the concurrent agent span was not counted"
+        )
+
+
+def test_wave_node_recorded_spans_overlap(tmp_path):
+    """Telemetry must SHOW the concurrency: the two nodes' recorded spans overlap in time."""
+    ex = SleepExecutor(delay=0.4)
+    run_topology(
+        _two_independent(), ex, run_id="ovl", cwd=str(tmp_path),
+        archive_root=str(tmp_path / "runs"), max_parallel=2,
+    )
+    nodes = json.loads((tmp_path / "runs" / "ovl" / "status.json").read_text())["nodes"]
+    a0, a1 = (datetime.fromisoformat(nodes["a"][k]) for k in ("started_at", "completed_at"))
+    b0, b1 = (datetime.fromisoformat(nodes["b"][k]) for k in ("started_at", "completed_at"))
+    assert a0 < b1 and b0 < a1, "recorded node spans should overlap for a concurrent wave"

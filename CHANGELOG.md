@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.10.1 — 2026-07-08
+
+### Fixed
+- **Per-node `duration_seconds` was wrong for every node in a concurrent wave.** Under
+  `--max-parallel > 1` a node's agent runs inside `_execute_wave_concurrently` *before* the
+  sequential loop reaches it, so telemetry started the node's span at loop time and clocked only the
+  gate/archive step — recording, in one observed run, `0.165s` for a node that consumed 339k context
+  tokens, while the **51 seconds of real concurrent agent work was attributed to no node at all**.
+  The wave worker now captures each node's real executor start and hands it to
+  `telemetry.node_started(at=…)`, so `duration_seconds` covers the agent's work and the recorded
+  spans visibly overlap (the concurrency is now legible in `status.json` and the dashboard). Cost and
+  token figures were always correct — they come from the executor result — but duration flows into
+  the manifest and the **signed evidence pack**, so an audit-grade artifact was attesting an
+  inaccurate number. Introduced in v0.8.0; found by monitoring a live `--max-parallel 3` run on the
+  dashboard. Regression-tested: a wave node's recorded duration must cover its executor span, and
+  the recorded spans must overlap.
+
 ## v0.10.0 — 2026-07-08
 
 The capstone release — the audit-grade thesis completed, the honesty gaps closed, a full topology

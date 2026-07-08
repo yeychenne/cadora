@@ -215,7 +215,8 @@ New to Cadora, or bringing it to a hackathon? Start with the
 
 ## Status
 
-**v0.10.0** — the capstone release. One conductor across **every frontier model** (claude / codex /
+**v0.10.1** — the capstone release (0.10.1 corrects per-node duration telemetry under
+`--max-parallel`; cost and tokens were always accurate). One conductor across **every frontier model** (claude / codex /
 kiro verified, plus experimental), running on **the subscriptions you already pay for** with one
 cross-vendor cost ledger, driving a **real method** (AWS AI-DLC, or your own), and leaving **proof
 you can ship**: evidence packs are now **signed** as well as checksummed — `cadora sign` /
