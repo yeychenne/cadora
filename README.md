@@ -75,7 +75,7 @@ deploy target — live in [`examples/`](examples/).
 
 Every capability ships with three companion documents: a narrated **user journey** (a screen-by-screen
 walkthrough), a **user manual** (the command reference), and a **design spec** (the design system, for
-Figma or a design tool). Browse the whole library in **[docs/user-journeys/](https://yeychenne.github.io/cadora/docs/user-journeys/)**, or
+Figma or a design tool). Browse the whole library in **[docs/user-journeys/](docs/user-journeys/)**, or
 jump straight into a walkthrough:
 
 **The audit-grade core** —
