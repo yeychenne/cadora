@@ -31,6 +31,8 @@ cadora = "cadora.cli:main"
 [project.urls]
 Homepage = "https://github.com/yeychenne/cadora"
 Repository = "https://github.com/yeychenne/cadora"
+Documentation = "https://yeychenne.github.io/cadora/docs/index.html"
+Changelog = "https://github.com/yeychenne/cadora/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["cadora"]

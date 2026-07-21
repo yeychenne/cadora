@@ -10,7 +10,7 @@ does) and isn't an in-IDE assistant. It's the layer that turns *"an AI wrote it"
 **repeat, compare, cost, and prove**.
 
 > Read the vision: [**The Neutral Conductor**](docs/vision.md) &nbsp;·&nbsp; or skim the
-> [**one-page overview**](docs/index.html) — an interactive HTML version of this README (open in a browser)
+> [**one-page overview**](https://yeychenne.github.io/cadora/docs/index.html) — an interactive HTML version of this README (open in a browser)
 
 ## What Cadora gives you
 
@@ -75,26 +75,26 @@ deploy target — live in [`examples/`](examples/).
 
 Every capability ships with three companion documents: a narrated **user journey** (a screen-by-screen
 walkthrough), a **user manual** (the command reference), and a **design spec** (the design system, for
-Figma or a design tool). Browse the whole library in **[docs/user-journeys/](docs/user-journeys/)**, or
+Figma or a design tool). Browse the whole library in **[docs/user-journeys/](https://yeychenne.github.io/cadora/docs/user-journeys/)**, or
 jump straight into a walkthrough:
 
 **The audit-grade core** —
-[Run a gated workflow](docs/user-journeys/run-a-gated-workflow/user-journey.html) ·
-[Gates & integrity](docs/user-journeys/gates-and-integrity/user-journey.html) ·
-[Human review](docs/user-journeys/human-review/user-journey.html) ·
-[Evidence pack](docs/user-journeys/evidence-pack/user-journey.html) ·
-[Cost & FinOps](docs/user-journeys/cost-finops/user-journey.html)
+[Run a gated workflow](https://yeychenne.github.io/cadora/docs/user-journeys/run-a-gated-workflow/user-journey.html) ·
+[Gates & integrity](https://yeychenne.github.io/cadora/docs/user-journeys/gates-and-integrity/user-journey.html) ·
+[Human review](https://yeychenne.github.io/cadora/docs/user-journeys/human-review/user-journey.html) ·
+[Evidence pack](https://yeychenne.github.io/cadora/docs/user-journeys/evidence-pack/user-journey.html) ·
+[Cost & FinOps](https://yeychenne.github.io/cadora/docs/user-journeys/cost-finops/user-journey.html)
 
 **Backends, recovery & evaluation** —
-[Multi-backend executors](docs/user-journeys/multi-backend/user-journey.html) ·
-[Resume & remediation](docs/user-journeys/resume-remediation/user-journey.html) ·
-[Compare & evaluate](docs/user-journeys/compare-evaluate/user-journey.html)
+[Multi-backend executors](https://yeychenne.github.io/cadora/docs/user-journeys/multi-backend/user-journey.html) ·
+[Resume & remediation](https://yeychenne.github.io/cadora/docs/user-journeys/resume-remediation/user-journey.html) ·
+[Compare & evaluate](https://yeychenne.github.io/cadora/docs/user-journeys/compare-evaluate/user-journey.html)
 
 **Method, delivery & integration** —
-[AI-DLC method pack](docs/user-journeys/aidlc-method/user-journey.html) ·
-[Deliverable pack](docs/user-journeys/deliverable-pack/user-journey.html) ·
-[MCP server](docs/user-journeys/mcp-server/user-journey.html) ·
-[Journey-first builds](docs/user-journeys/journey-first-builds/user-journey.html)
+[AI-DLC method pack](https://yeychenne.github.io/cadora/docs/user-journeys/aidlc-method/user-journey.html) ·
+[Deliverable pack](https://yeychenne.github.io/cadora/docs/user-journeys/deliverable-pack/user-journey.html) ·
+[MCP server](https://yeychenne.github.io/cadora/docs/user-journeys/mcp-server/user-journey.html) ·
+[Journey-first builds](https://yeychenne.github.io/cadora/docs/user-journeys/journey-first-builds/user-journey.html)
 
 The manuals render on GitHub; the journeys and design specs are self-contained HTML — open them in a
 browser.
