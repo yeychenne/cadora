@@ -19,9 +19,17 @@ from cadora.topology import Topology
 class RunSession:
     """Runs a topology with HITL in a background thread; the channel relays each review gate."""
 
-    def __init__(self, topology: Topology, executor: NodeExecutor, **run_kwargs) -> None:
+    def __init__(
+        self,
+        topology: Topology,
+        executor: NodeExecutor,
+        *,
+        review_timeout: float | None = None,
+        **run_kwargs,
+    ) -> None:
         self.topology = topology
         self.executor = executor
+        self.review_timeout = review_timeout
         self.run_kwargs = run_kwargs
         self.channel = ReviewChannel()
         self.result_path: Path | None = None
@@ -35,7 +43,7 @@ class RunSession:
                     self.topology,
                     self.executor,
                     hitl=True,
-                    review_fn=channel_review_fn(self.channel),
+                    review_fn=channel_review_fn(self.channel, self.review_timeout),
                     **self.run_kwargs,
                 )
             except SystemExit as exc:

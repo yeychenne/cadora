@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The AI-DLC method, by its surfaces · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;
+    --card:#fffefb;--amber:#b3760f;
+    --scr-bg:#0f172a;--scr-canvas:#111c2f;--scr-panel:#1e2937;--scr-panel2:#162237;--scr-line:#334158;
+    --scr-text:#f5f7fb;--scr-muted:#9aa8bc;--scr-blue:#6ba5f0;--scr-green:#16c784;--scr-greensoft:#75f0a8;
+    --scr-red:#fb7185;--scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;
+    --ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}}
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;--card:#fffefb;--amber:#b3760f}
+  *{box-sizing:border-box}
+  .wrap{max-width:840px;margin:0 auto;padding:2.6rem 1.5rem 4rem;color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0 0 .5rem}
+  h1{font-size:2.1rem;letter-spacing:-.02em;margin:.1rem 0 .4rem;font-weight:640}
+  .lede{color:var(--ink-soft);margin:0;max-width:64ch}
+  h2{font-size:1.15rem;margin:2.8rem 0 .3rem;font-weight:600;letter-spacing:-.01em}
+  .sub{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 1rem}
+  .rule{height:1px;background:var(--rule);border:0;margin:.4rem 0 0}
+  /* swatches */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:.6rem}
+  .sw{border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--card)}
+  .sw .chip{height:44px}
+  .sw .lab{padding:7px 9px}
+  .sw .lab b{font-size:12px;display:block}
+  .sw .lab code{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .sw .lab span{font-size:11px;color:var(--ink-soft);display:block;margin-top:1px}
+  /* type scale */
+  table{width:100%;border-collapse:collapse;margin-top:.5rem;font-size:13px}
+  th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ink-faint);font-weight:500;padding:6px 10px;border-bottom:1px solid var(--rule)}
+  td{padding:8px 10px;border-bottom:1px solid var(--rule);color:var(--ink-soft);vertical-align:top}
+  td b{color:var(--ink)}
+  td code,.mn{font-family:var(--mono);font-size:12px;color:var(--amber)}
+  /* dashboard component render */
+  .stage{background:var(--scr-bg);border:1px solid var(--rule);border-radius:12px;padding:16px;margin-top:.8rem}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px;position:relative}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .rhead span:last-child{color:var(--scr-text);font-size:13px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .msg.err{color:var(--scr-red)}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0;color:var(--scr-muted);font-size:12px}
+  .empty{color:var(--scr-muted);font-size:12px;font-style:italic;padding:4px 2px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:130px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted)}
+  /* anatomy pins */
+  .pin{position:absolute;font-family:var(--mono);font-size:10px;font-weight:600;width:18px;height:18px;
+    border-radius:50%;background:var(--scr-amber);color:#1a1205;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 3px var(--scr-panel2)}
+  .legend{margin-top:1rem;display:grid;gap:6px}
+  .legend div{display:flex;gap:9px;font-size:13px;color:var(--ink-soft)}
+  .legend .k{font-family:var(--mono);font-size:11px;font-weight:600;width:18px;height:18px;flex:none;
+    border-radius:50%;background:var(--amber);color:var(--paper);display:flex;align-items:center;justify-content:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:.8rem}
+  .state{background:var(--scr-bg);border:1px solid var(--rule);border-radius:10px;padding:12px}
+  .state .cap{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+  .foot{margin-top:3rem;padding-top:1.1rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+</style>
+
+<style>
+  /* evidence pack — appended after the verbatim base, reusing the same --scr-* tokens */
+  /* the verify verdict, rendered as a card — semantic left accent */
+  .verdict{background:var(--scr-bg);border:1px solid var(--scr-line);border-left:4px solid var(--scr-green);
+    border-radius:10px;padding:14px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.85;
+    color:var(--scr-muted);white-space:pre-wrap;word-break:break-word;position:relative}
+  .verdict.bad{border-left-color:var(--scr-red)}
+  .verdict .id{color:var(--scr-text)}
+  .verdict .ok{color:var(--scr-greensoft)}
+  .verdict .no{color:var(--scr-red)}
+  .verdict .amber{color:var(--scr-amber)}
+  .verdict .final{font-weight:700}
+  .verdict .final.y{color:var(--scr-greensoft)}
+  .verdict .final.n{color:var(--scr-red)}
+  /* pack contents — a labeled tree */
+  .tree{background:var(--scr-bg);border:1px solid var(--scr-line);border-radius:10px;padding:14px 16px;
+    font-family:var(--mono);font-size:12.5px;line-height:1.85;color:var(--scr-muted);white-space:pre;overflow-x:auto}
+  .tree .dir{color:var(--scr-blue)}
+  .tree .f{color:var(--scr-text)}
+  .tree .sig{color:var(--scr-amber)}
+  .tree .c{color:var(--scr-muted)}
+  /* checksums.txt line anatomy */
+  .chkline{background:var(--scr-bg);border:1px solid var(--scr-line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+  .chkline code{font-family:var(--mono);font-size:12.5px;white-space:pre;display:block}
+  .chkline .hash{color:var(--scr-green)}
+  .chkline .path{color:var(--scr-text)}
+  .chkline .gap{background:var(--scr-panel);border-radius:3px}
+  /* state verdict mini-cards */
+  .vstate{background:var(--scr-canvas);border:1px solid var(--rule);border-left:4px solid var(--scr-green);
+    border-radius:10px;padding:11px 13px;font-family:var(--mono);font-size:11.5px;line-height:1.7;
+    color:var(--scr-muted);white-space:pre-wrap;word-break:break-word;margin-top:8px}
+  .vstate.no{border-left-color:var(--scr-red)}
+  .vstate.warn{border-left-color:var(--scr-amber)}
+  .vstate .ok{color:var(--scr-greensoft)}
+  .vstate .bad{color:var(--scr-red)}
+  .vstate .amber{color:var(--scr-amber)}
+  .vstate .id{color:var(--scr-text)}
+  .vstate .final{font-weight:700}
+  .vstate .final.y{color:var(--scr-greensoft)}
+  .vstate .final.n{color:var(--scr-red)}
+</style>
+
+<style>
+  /* aidlc method pack — appended after the two verbatim bases; NO new colors, only --scr-* tokens
+     and the exact literals already present in the base .node / .badge rules */
+  .lanes{display:flex;flex-direction:column;gap:9px}
+  .lane{border:1px solid var(--scr-line);border-radius:10px;background:var(--scr-panel2);padding:10px 12px;position:relative}
+  .plabel{font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;
+    color:var(--scr-muted);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .pdot{width:8px;height:8px;border-radius:50%;flex:none}
+  .prow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .hnode{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;
+    padding:7px 11px;font-size:12px;color:var(--scr-text);line-height:1.3}
+  .hnode small{display:block;color:var(--scr-muted);font-size:10px;margin-top:2px;font-family:var(--mono)}
+  .hnode.done{border-color:#1f6a49;background:#123024}
+  .hnode.done b{color:var(--scr-greensoft)}
+  .hnode.wait{border-color:#7a6320;background:#2a2410}
+  .hnode.wait b{color:var(--scr-amber)}
+  .gchip{font-size:9px;font-family:var(--mono);border-radius:4px;padding:1px 6px;white-space:nowrap;margin-left:2px}
+  .gchip.rev{background:#2a2410;color:var(--scr-amber);border:1px solid #7a6320}
+  .gchip.gate{background:#0f3d2c;color:var(--scr-greensoft);border:1px solid #1f6a49}
+  .harrow{color:var(--scr-line);font-size:12px}
+  .lane .empty{color:var(--scr-muted);font-size:11px;font-style:italic;padding:0}
+  /* node-state chips row */
+  .states-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:.6rem}
+  .nsc{border:1px solid var(--rule);border-radius:9px;background:var(--card);padding:9px 11px}
+  .nsc .box{font-family:var(--mono);font-size:13px;font-weight:700}
+  .nsc .nm{font-size:12px;color:var(--ink);font-weight:600;margin-top:2px}
+  .nsc .ds{font-size:11px;color:var(--ink-soft);margin-top:1px;line-height:1.4}
+  .b-done{color:var(--green)}.b-prog{color:var(--blue)}.b-await{color:var(--amber)}
+  .b-rev{color:var(--amber)}.b-skip{color:var(--ink-faint)}.b-none{color:var(--ink-faint)}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Design specification for Cadora's AI-DLC method pack: the color and type tokens, the anatomy of a phase-lane DAG node, the component inventory (phase lane, DAG node, rules tree, review-gate card, six-state audit checklist, two-pack comparison), the node and stage states, the phased-topology field grammar, the aidlc versus aidlc-v2 distinction, and the voice.</h2>
+  <p class="eyebrow">Cadora · design spec</p>
+  <h1>The AI-DLC method, by its surfaces</h1>
+  <p class="lede">Everything needed to render or extend the method pack's screens — the exact tokens, the phase-lane DAG node's anatomy, the component inventory, every node and stage state, the topology field grammar, and the stable-versus-experimental distinction. The rendered components are live HTML; edit them here or lift the specs into Figma.</p>
+
+  <h2>Palette</h2>
+  <p class="sub">Semantic first · green passes a gate, amber asks for review, red blocks</p>
+  <hr class="rule">
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#16c784"></div><div class="lab"><b>Green</b><code>--scr-green · #16c784</code><span>Gate passed · stage done</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fb7185"></div><div class="lab"><b>Red</b><code>--scr-red · #fb7185</code><span>Gate blocked · abort</span></div></div>
+    <div class="sw"><div class="chip" style="background:#ffd08a"></div><div class="lab"><b>Amber</b><code>--scr-amber · #ffd08a</code><span>Awaiting review · experimental</span></div></div>
+    <div class="sw"><div class="chip" style="background:#6ba5f0"></div><div class="lab"><b>Blue</b><code>--scr-blue · #6ba5f0</code><span>Phase · keys · paths</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0f172a"></div><div class="lab"><b>Ink</b><code>--scr-bg · #0f172a</code><span>Card ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#111c2f"></div><div class="lab"><b>Canvas</b><code>--scr-canvas · #111c2f</code><span>Inset · node body</span></div></div>
+    <div class="sw"><div class="chip" style="background:#162237"></div><div class="lab"><b>Panel</b><code>--scr-panel2 · #162237</code><span>Phase lane · review card</span></div></div>
+    <div class="sw"><div class="chip" style="background:#334158"></div><div class="lab"><b>Line</b><code>--scr-line · #334158</code><span>Borders · edges</span></div></div>
+    <div class="sw"><div class="chip" style="background:#f5f7fb"></div><div class="lab"><b>Text</b><code>--scr-text · #f5f7fb</code><span>Node id · command</span></div></div>
+    <div class="sw"><div class="chip" style="background:#9aa8bc"></div><div class="lab"><b>Muted</b><code>--scr-muted · #9aa8bc</code><span>Roles · labels · captions</span></div></div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">A phase carries no colour of its own — <b style="color:var(--ink)">inception</b> reads blue, <b style="color:var(--ink)">construction</b> green, <b style="color:var(--ink)">operations</b> muted, but only to key the eye. The semantic colours belong to <em>outcomes</em>: a gate that passed, a review that waits, a run that blocked.</p>
+
+  <h2>Type &amp; metrics</h2>
+  <p class="sub">Monospace is the instrument voice — node ids, phases, and events are read at the shell</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Role</th><th>Family</th><th>Size / weight</th><th>Notes</th></tr>
+    <tr><td><b>Node id</b></td><td class="mn">mono</td><td>12px / 600</td><td>The real id from the topology — <code>requirements</code>, <code>code-generation</code></td></tr>
+    <tr><td><b>Role / phase</b></td><td class="mn">mono</td><td>10px / 400</td><td>Muted; phase eyebrows are uppercase, tracked <code>.11em</code></td></tr>
+    <tr><td><b>Gate chip</b></td><td class="mn">mono</td><td>9px</td><td><code>gate: build-test</code> green · <code>review</code> amber</td></tr>
+    <tr><td><b>YAML key</b></td><td class="mn">mono</td><td>blue</td><td><code>phase</code> value amber · <code>gate</code> value green · <code>review</code> value amber</td></tr>
+    <tr><td><b>Audit event</b></td><td class="mn">mono</td><td>text</td><td>ISO timestamp · <code>event</code> · stage; count in <code>N events</code></td></tr>
+    <tr><td><b>State box</b></td><td class="mn">mono</td><td>13px / 700</td><td>Six glyphs: <code>[x] [-] [?] [R] [S] [ ]</code></td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Metric</th><th>Value</th><th>Metric</th><th>Value</th></tr>
+    <tr><td>Lane radius</td><td class="mn">10px</td><td>Node radius</td><td class="mn">8px</td></tr>
+    <tr><td>Lane padding</td><td class="mn">10px 12px</td><td>Node padding</td><td class="mn">7px 11px</td></tr>
+    <tr><td>Phase dot</td><td class="mn">8px circle</td><td>Semantic accent</td><td class="mn">1px chip border</td></tr>
+    <tr><td>State glyphs</td><td class="mn">6 (x - ? R S ␣)</td><td>Audit taxonomy</td><td class="mn">68 events</td></tr>
+  </table>
+
+  <h2>Anatomy — a phase-lane node</h2>
+  <p class="sub">One node in one phase, with its checkpoint declared</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="lanes">
+      <div class="lane">
+        <span class="pin" style="top:-9px;left:-9px">1</span>
+        <span class="pin" style="top:-9px;left:110px">2</span>
+        <div class="plabel"><span class="pdot" style="background:var(--scr-blue)"></span>phase · inception</div>
+        <div class="prow">
+          <div class="hnode wait" style="position:relative"><span class="pin" style="top:-9px;right:-9px">3</span><b>design</b><span class="gchip rev">review</span><small>role · application-design</small></div>
+          <span class="harrow">→</span>
+          <div class="hnode"><b>code-generation</b><span class="gchip gate">gate: build-test</span><small>role · code-generation</small></div>
+        </div>
+        <span class="pin" style="bottom:-9px;left:180px">4</span>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <div><span class="k">1</span><span><b style="color:var(--ink)">Phase lane</b> — <span class="mn">inception</span> / <span class="mn">construction</span> / <span class="mn">operations</span>, the three <span class="mn">.aidlc-rule-details/</span> directories. Groups nodes; keys the phase dot colour.</span></div>
+    <div><span class="k">2</span><span><b style="color:var(--ink)">Phase dot</b> — 8px, blue / green / muted. Decorative keying only; never a semantic outcome.</span></div>
+    <div><span class="k">3</span><span><b style="color:var(--ink)">Checkpoint chip</b> — <span class="mn">review</span> (amber, a <span class="mn">review: true</span> HITL gate) or <span class="mn">gate: build-test</span> (green, a deterministic gate). A node may carry either, both, or neither.</span></div>
+    <div><span class="k">4</span><span><b style="color:var(--ink)">Edge</b> — a <span class="mn">depends_on</span> arrow. The DAG is topo-sorted; a wave of independent nodes can run in parallel, gates stay sequential.</span></div>
+  </div>
+
+  <h2>Node states</h2>
+  <p class="sub">What a node looks like as the run moves through it</p>
+  <hr class="rule">
+  <div class="grid2">
+    <div class="state"><p class="cap">Pending → running → done</p>
+      <div class="lanes"><div class="lane"><div class="plabel"><span class="pdot" style="background:var(--scr-blue)"></span>phase · inception</div><div class="prow">
+        <div class="hnode done"><b>requirements</b><small>done · approved</small></div>
+        <span class="harrow">→</span>
+        <div class="hnode wait"><b>design</b><small>awaiting review</small></div>
+        <span class="harrow">→</span>
+        <div class="hnode"><b>construction</b><small>pending</small></div>
+      </div></div></div>
+    </div>
+    <div class="state"><p class="cap">Gate: passed vs blocked</p>
+      <div class="vstate">construction · <span class="id">code-generation</span>
+  <span class="ok">✓ gate build-test  PASSED</span> — tests re-run green</div>
+      <div class="vstate no">construction · <span class="id">code-generation</span>
+  <span class="bad">✗ gate build-test  BLOCKED</span> — 2 tests failed</div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">Green (<span class="mn">.done</span>) and amber (<span class="mn">.wait</span>) share one node component with one token swapped — border and label colour. A blocked gate turns the outcome card red; the deterministic gate re-runs the real build/tests, so a pass is earned, not asserted.</p>
+
+  <h2>Stage states — the six-box checklist</h2>
+  <p class="sub">The glyphs <span class="mn" style="font-size:.85em">aidlc-state.md</span> uses and <span class="mn" style="font-size:.85em">aidlc-audit</span> rolls up</p>
+  <hr class="rule">
+  <div class="states-row">
+    <div class="nsc"><div class="box b-done">[x]</div><div class="nm">done</div><div class="ds">stage complete</div></div>
+    <div class="nsc"><div class="box b-prog">[-]</div><div class="nm">in-progress</div><div class="ds">running now</div></div>
+    <div class="nsc"><div class="box b-await">[?]</div><div class="nm">awaiting-approval</div><div class="ds">held for a human</div></div>
+    <div class="nsc"><div class="box b-rev">[R]</div><div class="nm">revising</div><div class="ds">changes requested</div></div>
+    <div class="nsc"><div class="box b-skip">[S]</div><div class="nm">skipped</div><div class="ds">conditional, self-skipped</div></div>
+    <div class="nsc"><div class="box b-none">[ ]</div><div class="nm">not-started</div><div class="ds">not yet reached</div></div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">These are the exact box characters <span class="mn">aidlc-audit</span> parses (<span class="mn">x · - · ? · R · S · &nbsp;</span>) and the labels it prints. The roll-up counts each glyph — <span class="mn">done=6&nbsp; skipped=2&nbsp; awaiting-approval=1</span> — sorted so the most-advanced states lead.</p>
+
+  <h2>Topology grammar</h2>
+  <p class="sub">The fields a phased AI-DLC node declares</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Field</th><th>Values</th><th>Role</th></tr>
+    <tr><td><b><span class="mn">id</span></b></td><td class="mn">requirements · design · code-generation · build-test</td><td>Node identity; the edge target in <span class="mn">depends_on</span>.</td></tr>
+    <tr><td><b><span class="mn">phase</span></b></td><td class="mn">inception · construction · operations</td><td>Which lane. Gates routing (<span class="mn">--construction-executor</span>) reads it.</td></tr>
+    <tr><td><b><span class="mn">role</span></b></td><td class="mn">requirements-analysis · application-design · …</td><td>The AI-DLC stage the node performs.</td></tr>
+    <tr><td><b><span class="mn">depends_on</span></b></td><td class="mn">[requirements]</td><td>DAG edges; topo-sorted before the run.</td></tr>
+    <tr><td><b><span class="mn">review</span></b></td><td class="mn">true</td><td>A HITL gate. Activated by <span class="mn">--hitl</span>; pauses before downstream work.</td></tr>
+    <tr><td><b><span class="mn">gate</span></b></td><td class="mn">build-test</td><td>A deterministic gate. Re-runs the real build/tests; non-zero blocks.</td></tr>
+  </table>
+  <div class="stage" style="padding:0;overflow:hidden">
+    <div style="padding:14px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.8;color:var(--scr-text);white-space:pre;overflow-x:auto">- <span style="color:var(--scr-blue)">id</span>: design
+  <span style="color:var(--scr-blue)">phase</span>: <span style="color:var(--scr-amber)">inception</span>
+  <span style="color:var(--scr-blue)">role</span>: application-design
+  <span style="color:var(--scr-blue)">depends_on</span>: [requirements]
+  <span style="color:var(--scr-blue)">review</span>: <span style="color:var(--scr-amber)">true</span></div>
+  </div>
+
+  <h2>Two packs — aidlc vs aidlc-v2</h2>
+  <p class="sub">One stable default, one experimental pinned upstream dist</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Dimension</th><th>aidlc <span style="color:var(--green)">(stable · default)</span></th><th>aidlc-v2 <span style="color:var(--amber)">(experimental)</span></th></tr>
+    <tr><td><b>Source</b></td><td>vendored in <span class="mn">cadora/aidlc_rules/</span>, v1.0.0</td><td>pinned upstream dist, ref <span class="mn">v2.1.7</span>, commit-verified</td></tr>
+    <tr><td><b>Install</b></td><td>rules → <span class="mn">CLAUDE.md/AGENTS.md</span> + <span class="mn">.aidlc-rule-details/</span></td><td>copies <span class="mn">dist/claude</span>; writes <span class="mn">.cadora-aidlc-v2.json</span></td></tr>
+    <tr><td><b>Provider pins</b></td><td>none — runs on your funding source</td><td><b style="color:var(--amber)">stripped by default</b>, recorded; <span class="mn">--keep-provider-pins</span> opts in</td></tr>
+    <tr><td><b>Remote MCP</b></td><td>none</td><td>five servers, <b>off</b> unless <span class="mn">--keep-mcp</span></td></tr>
+    <tr><td><b>Backends</b></td><td class="mn">claude · codex · kiro</td><td class="mn">claude only</td></tr>
+    <tr><td><b>Read-back</b></td><td>run archive · <span class="mn">cadora report</span></td><td><span class="mn">cadora aidlc-audit</span> (state + 68-event trail)</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem"><b style="color:var(--ink)">The pin-strip is the protective move.</b> Upstream's shipped <span class="mn">.claude/settings.json</span> silently re-points every session at metered AWS Bedrock on <span class="mn">opus[1m]</span> / <span class="mn">effortLevel: xhigh</span>. Cadora removes <span class="mn">model, effortLevel, CLAUDE_CODE_USE_BEDROCK, AWS_REGION</span> by default and records each one — the funding source stays the one you chose. Present v2 as EXPERIMENTAL, always: it is a GA preview with weekly churn.</p>
+
+  <h2>Component inventory</h2>
+  <p class="sub">Every reusable piece these screens are built from</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Component</th><th>Class</th><th>Where</th></tr>
+    <tr><td><b>Phase lane</b></td><td class="mn">.lane · .plabel · .pdot</td><td>The three-phase DAG; one lane per phase</td></tr>
+    <tr><td><b>DAG node</b></td><td class="mn">.hnode / .hnode.done / .hnode.wait</td><td>A node with role + checkpoint chip</td></tr>
+    <tr><td><b>Vertical DAG node</b></td><td class="mn">.node / .node.on / .node.wait</td><td>Run view; badges for phase + outcome</td></tr>
+    <tr><td><b>Checkpoint chip</b></td><td class="mn">.gchip.rev · .gchip.gate</td><td>review (amber) / gate: build-test (green)</td></tr>
+    <tr><td><b>Rules tree</b></td><td class="mn">.tree</td><td>What <span class="mn">aidlc-init</span> lays into the workspace</td></tr>
+    <tr><td><b>Review-gate card</b></td><td class="mn">.callout · .rhead · .flag · .acts</td><td>The HITL pause: approve / request / abort</td></tr>
+    <tr><td><b>Six-state checklist</b></td><td class="mn">.nsc / .chk</td><td>aidlc-state.md glyphs; audit roll-up</td></tr>
+    <tr><td><b>State outcome card</b></td><td class="mn">.vstate / .vstate.no</td><td>Gate passed / blocked</td></tr>
+    <tr><td><b>Two-pack columns</b></td><td class="mn">.col · .tag.stable · .tag.exp</td><td>aidlc vs aidlc-v2</td></tr>
+  </table>
+
+  <h2>Voice</h2>
+  <p class="sub">The method is driven and gated, not claimed</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Do</th><th>Not</th></tr>
+    <tr><td>Name the phase — <span class="mn">construction · code-generation</span></td><td>“Step 3”</td></tr>
+    <tr><td>Show the real node id from a topology</td><td>Invent a friendly label</td></tr>
+    <tr><td>Mark estimates — <span class="mn">$0.55 est.</span></td><td>Imply a metered charge is exact</td></tr>
+    <tr><td>Label v2 <span class="mn">EXPERIMENTAL</span>; say what was stripped</td><td>“v2 — the new default”</td></tr>
+    <tr><td>Distinguish a <span class="mn">review</span> gate from a <span class="mn">gate</span></td><td>Blur human review into the build gate</td></tr>
+  </table>
+
+  <div class="foot">Tokens and behaviour are taken from <span class="mn">cadora/cli.py</span> (the <span class="mn">aidlc-init</span> / <span class="mn">run</span> / <span class="mn">aidlc-audit</span> parsers), <span class="mn">cadora/aidlc_v2.py</span> (the guarded installer), and the real <span class="mn">examples/aidlc-phased.topology.yaml</span>. Edit the rendered components in place, or hand the palette and metrics tables to a Figma library.</div>
+</div>
+</body>
+</html>

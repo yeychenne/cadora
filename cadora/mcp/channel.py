@@ -72,8 +72,15 @@ class ReviewChannel:
             self._has_request.clear()
 
 
-def channel_review_fn(channel: ReviewChannel):
-    """Return a runner-compatible ``review_fn(node, cwd)`` backed by ``channel``."""
+def channel_review_fn(channel: ReviewChannel, timeout: float | None = None):
+    """Return a runner-compatible ``review_fn(node, cwd)`` backed by ``channel``.
+
+    ``timeout`` bounds how long the run thread blocks on a gate; on expiry the channel fails closed
+    to an abort (see :meth:`ReviewChannel.request_review`) so a front-end that starts a run and never
+    submits cannot pin the run thread forever. ``None`` or a non-positive value waits indefinitely —
+    the explicit opt-out for a genuinely interactive client that may sit on a gate for a long time.
+    """
+    effective = timeout if (timeout and timeout > 0) else None
 
     def review_fn(node, node_cwd: str, documents=None) -> ReviewResult:
         docs = Path(node_cwd) / "aidlc-docs"
@@ -85,7 +92,8 @@ def channel_review_fn(channel: ReviewChannel):
         else:
             artifacts = []
         return channel.request_review(
-            ReviewRequest(node_id=node.id, docs_dir=str(docs), artifacts=artifacts)
+            ReviewRequest(node_id=node.id, docs_dir=str(docs), artifacts=artifacts),
+            effective,
         )
 
     return review_fn

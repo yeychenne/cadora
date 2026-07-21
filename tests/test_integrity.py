@@ -127,3 +127,45 @@ def test_stub_finding_engages_remediation_under_enforce(tmp_path):
     policy = RemediationPolicy(max_attempts=2)
     # The hollow-code finding must trigger the loop even though the gate is green.
     assert needs_remediation(gate_ok, integrity, "enforce", policy) is True
+
+
+def test_gate_venv_is_not_flagged_as_stub_implementation(tmp_path):
+    """A gate-created venv (any name) must never trip the stub scan.
+
+    Live false positive, twice: a --gate-cmd built its env as `.gatevenv`, and pytest's own
+    vendored internals (full of legitimate `...`/pass bodies) were reported as a BLOCKING
+    stub-implementation finding on two otherwise-clean runs. A venv is detected structurally
+    (pyvenv.cfg), not by name.
+    """
+    # a real, non-stub app at the workspace root
+    (tmp_path / "app.py").write_text("def real():\n    return 1 + 1\n")
+    # a custom-named venv whose site-packages carry many stub bodies (pytest-internals shaped)
+    sp = tmp_path / ".gatevenv" / "lib" / "python3.14" / "site-packages" / "_pytest"
+    sp.mkdir(parents=True)
+    (tmp_path / ".gatevenv" / "pyvenv.cfg").write_text("home = /usr/bin\n")
+    (sp / "_argcomplete.py").write_text(
+        "def a():\n    ...\n\ndef b():\n    pass\n\ndef c():\n    raise NotImplementedError\n"
+    )
+    report = scan_toolchain_integrity(tmp_path)
+    assert report.passed, [f.path for f in report.findings]
+    assert not any(f.rule == "stub-implementation" for f in report.findings)
+
+
+def test_stub_scan_still_fires_on_the_workspace_itself(tmp_path):
+    """The venv exemption must not blunt the real check: hollow app code still blocks."""
+    (tmp_path / "engine.py").write_text(
+        "def adjudicate():\n    ...\n\ndef score():\n    pass\n\ndef resolve():\n    raise NotImplementedError\n"
+    )
+    report = scan_toolchain_integrity(tmp_path)
+    assert not report.passed
+    assert any(f.rule == "stub-implementation" for f in report.findings)
+
+
+def test_nameless_env_layout_excluded_via_site_packages(tmp_path):
+    """Env layouts without pyvenv.cfg (e.g. conda) are caught by the site-packages part."""
+    (tmp_path / "app.py").write_text("def real():\n    return 2\n")
+    sp = tmp_path / "envs" / "gate" / "lib" / "site-packages" / "vendored"
+    sp.mkdir(parents=True)
+    (sp / "mod.py").write_text("def a():\n    ...\n\ndef b():\n    pass\n")
+    report = scan_toolchain_integrity(tmp_path)
+    assert report.passed, [f.path for f in report.findings]

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compare & evaluate, by their surfaces · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;
+    --card:#fffefb;--amber:#b3760f;
+    --scr-bg:#0f172a;--scr-canvas:#111c2f;--scr-panel:#1e2937;--scr-panel2:#162237;--scr-line:#334158;
+    --scr-text:#f5f7fb;--scr-muted:#9aa8bc;--scr-blue:#6ba5f0;--scr-green:#16c784;--scr-greensoft:#75f0a8;
+    --scr-red:#fb7185;--scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;
+    --ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}}
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;--card:#fffefb;--amber:#b3760f}
+  *{box-sizing:border-box}
+  .wrap{max-width:840px;margin:0 auto;padding:2.6rem 1.5rem 4rem;color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0 0 .5rem}
+  h1{font-size:2.1rem;letter-spacing:-.02em;margin:.1rem 0 .4rem;font-weight:640}
+  .lede{color:var(--ink-soft);margin:0;max-width:64ch}
+  h2{font-size:1.15rem;margin:2.8rem 0 .3rem;font-weight:600;letter-spacing:-.01em}
+  .sub{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 1rem}
+  .rule{height:1px;background:var(--rule);border:0;margin:.4rem 0 0}
+  /* swatches */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:.6rem}
+  .sw{border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--card)}
+  .sw .chip{height:44px}
+  .sw .lab{padding:7px 9px}
+  .sw .lab b{font-size:12px;display:block}
+  .sw .lab code{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .sw .lab span{font-size:11px;color:var(--ink-soft);display:block;margin-top:1px}
+  /* type scale */
+  table{width:100%;border-collapse:collapse;margin-top:.5rem;font-size:13px}
+  th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ink-faint);font-weight:500;padding:6px 10px;border-bottom:1px solid var(--rule)}
+  td{padding:8px 10px;border-bottom:1px solid var(--rule);color:var(--ink-soft);vertical-align:top}
+  td b{color:var(--ink)}
+  td code,.mn{font-family:var(--mono);font-size:12px;color:var(--amber)}
+  /* dashboard component render */
+  .stage{background:var(--scr-bg);border:1px solid var(--rule);border-radius:12px;padding:16px;margin-top:.8rem}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px;position:relative}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .rhead span:last-child{color:var(--scr-text);font-size:13px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .msg.err{color:var(--scr-red)}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0;color:var(--scr-muted);font-size:12px}
+  .empty{color:var(--scr-muted);font-size:12px;font-style:italic;padding:4px 2px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:130px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted)}
+  /* anatomy pins */
+  .pin{position:absolute;font-family:var(--mono);font-size:10px;font-weight:600;width:18px;height:18px;
+    border-radius:50%;background:var(--scr-amber);color:#1a1205;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 3px var(--scr-panel2)}
+  .legend{margin-top:1rem;display:grid;gap:6px}
+  .legend div{display:flex;gap:9px;font-size:13px;color:var(--ink-soft)}
+  .legend .k{font-family:var(--mono);font-size:11px;font-weight:600;width:18px;height:18px;flex:none;
+    border-radius:50%;background:var(--amber);color:var(--paper);display:flex;align-items:center;justify-content:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:.8rem}
+  .state{background:var(--scr-bg);border:1px solid var(--rule);border-radius:10px;padding:12px}
+  .state .cap{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+  .foot{margin-top:3rem;padding-top:1.1rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+</style>
+
+<style>
+  /* evidence pack — appended after the verbatim base, reusing the same --scr-* tokens */
+  /* the verify verdict, rendered as a card — semantic left accent */
+  .verdict{background:var(--scr-bg);border:1px solid var(--scr-line);border-left:4px solid var(--scr-green);
+    border-radius:10px;padding:14px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.85;
+    color:var(--scr-muted);white-space:pre-wrap;word-break:break-word;position:relative}
+  .verdict.bad{border-left-color:var(--scr-red)}
+  .verdict .id{color:var(--scr-text)}
+  .verdict .ok{color:var(--scr-greensoft)}
+  .verdict .no{color:var(--scr-red)}
+  .verdict .amber{color:var(--scr-amber)}
+  .verdict .final{font-weight:700}
+  .verdict .final.y{color:var(--scr-greensoft)}
+  .verdict .final.n{color:var(--scr-red)}
+  /* pack contents — a labeled tree */
+  .tree{background:var(--scr-bg);border:1px solid var(--scr-line);border-radius:10px;padding:14px 16px;
+    font-family:var(--mono);font-size:12.5px;line-height:1.85;color:var(--scr-muted);white-space:pre;overflow-x:auto}
+  .tree .dir{color:var(--scr-blue)}
+  .tree .f{color:var(--scr-text)}
+  .tree .sig{color:var(--scr-amber)}
+  .tree .c{color:var(--scr-muted)}
+  /* checksums.txt line anatomy */
+  .chkline{background:var(--scr-bg);border:1px solid var(--scr-line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+  .chkline code{font-family:var(--mono);font-size:12.5px;white-space:pre;display:block}
+  .chkline .hash{color:var(--scr-green)}
+  .chkline .path{color:var(--scr-text)}
+  .chkline .gap{background:var(--scr-panel);border-radius:3px}
+  /* state verdict mini-cards */
+  .vstate{background:var(--scr-canvas);border:1px solid var(--rule);border-left:4px solid var(--scr-green);
+    border-radius:10px;padding:11px 13px;font-family:var(--mono);font-size:11.5px;line-height:1.7;
+    color:var(--scr-muted);white-space:pre-wrap;word-break:break-word;margin-top:8px}
+  .vstate.no{border-left-color:var(--scr-red)}
+  .vstate.warn{border-left-color:var(--scr-amber)}
+  .vstate .ok{color:var(--scr-greensoft)}
+  .vstate .bad{color:var(--scr-red)}
+  .vstate .amber{color:var(--scr-amber)}
+  .vstate .id{color:var(--scr-text)}
+  .vstate .final{font-weight:700}
+  .vstate .final.y{color:var(--scr-greensoft)}
+  .vstate .final.n{color:var(--scr-red)}
+</style>
+
+<style>
+  /* compare & evaluate — appended after the verbatim base, reusing the same --scr-* tokens */
+  /* side-by-side comparison table */
+  .cmp{border:1px solid var(--scr-line);border-radius:10px;overflow:hidden;background:var(--scr-canvas)}
+  .cmp .r{display:grid;grid-template-columns:1.15fr 1fr 1fr}
+  .cmp .r>div{padding:7px 12px;border-bottom:1px solid var(--scr-line);font-size:12.5px;color:var(--scr-text)}
+  .cmp .r:last-child>div{border-bottom:0}
+  .cmp .lab{color:var(--scr-muted)}
+  .cmp .v{font-family:var(--mono)}
+  .cmp .head>div{background:var(--scr-panel);font-weight:600;font-size:12px}
+  .cmp .head .who{display:block;font-size:10px;font-weight:400;color:var(--scr-muted);margin-top:1px}
+  .cmp .sec>div{background:var(--scr-panel2);color:var(--scr-muted);font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+  /* critical / warn chips for the check-inventory table */
+  .tag2{font-family:var(--mono);font-size:10px;letter-spacing:.04em;border-radius:6px;padding:2px 8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .tag2.crit{color:var(--scr-greensoft);border-color:var(--scr-green)}
+  .tag2.warn{color:var(--scr-amber);border-color:var(--scr-amber)}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Design specification for Cadora's compare and evaluate tools: the color and type tokens, the anatomy of the eval checklist and the compare diff, the six checks and which four are CRITICAL, every verdict state, the number and glyph formats, what each command produces in text and JSON, and the voice.</h2>
+  <p class="eyebrow">Cadora · design spec</p>
+  <h1>Compare &amp; evaluate, by their surfaces</h1>
+  <p class="lede">Everything needed to render or extend the two post-run reads — the exact tokens, the anatomy of the eval checklist and the compare diff, the six checks and which four gate the verdict, every state, and the number formats. The rendered components are live HTML; edit them here or lift the specs into Figma.</p>
+
+  <h2>Palette</h2>
+  <p class="sub">Semantic first · green passes, red fails a critical, amber warns without blocking</p>
+  <hr class="rule">
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#16c784"></div><div class="lab"><b>Green</b><code>--scr-green · #16c784</code><span>✓ · PASS · outcome held</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fb7185"></div><div class="lab"><b>Red</b><code>--scr-red · #fb7185</code><span>✗ critical · FAIL · ok changed</span></div></div>
+    <div class="sw"><div class="chip" style="background:#ffd08a"></div><div class="lab"><b>Amber</b><code>--scr-amber · #ffd08a</code><span>(warn) · est. · ⚠ · Δ attention</span></div></div>
+    <div class="sw"><div class="chip" style="background:#6ba5f0"></div><div class="lab"><b>Blue</b><code>--scr-blue · #6ba5f0</code><span>Models · paths</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0f172a"></div><div class="lab"><b>Ink</b><code>--scr-bg · #0f172a</code><span>Card ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#111c2f"></div><div class="lab"><b>Canvas</b><code>--scr-canvas · #111c2f</code><span>Inset · table body</span></div></div>
+    <div class="sw"><div class="chip" style="background:#162237"></div><div class="lab"><b>Panel</b><code>--scr-panel2 · #162237</code><span>Header · section rows</span></div></div>
+    <div class="sw"><div class="chip" style="background:#334158"></div><div class="lab"><b>Line</b><code>--scr-line · #334158</code><span>Borders · grid rules</span></div></div>
+    <div class="sw"><div class="chip" style="background:#f5f7fb"></div><div class="lab"><b>Text</b><code>--scr-text · #f5f7fb</code><span>Primary · run id · values</span></div></div>
+    <div class="sw"><div class="chip" style="background:#9aa8bc"></div><div class="lab"><b>Muted</b><code>--scr-muted · #9aa8bc</code><span>Labels · captions</span></div></div>
+  </div>
+
+  <h2>Type &amp; metrics</h2>
+  <p class="sub">Monospace is the instrument voice — both tools are read at the shell</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Role</th><th>Family</th><th>Size / weight</th><th>Notes</th></tr>
+    <tr><td><b>Check row</b></td><td class="mn">mono</td><td>12.5px / 400</td><td><code>✓ &lt;name&gt;: &lt;detail&gt;</code> — one per invariant</td></tr>
+    <tr><td><b>Verdict line</b></td><td class="mn">mono</td><td>12.5px / 700</td><td><code>score P/T (NN%)  →  PASS</code> green · <code>FAIL</code> red</td></tr>
+    <tr><td><b>Node diff line</b></td><td class="mn">mono</td><td>12.5px / 400</td><td><code>A[✓ model $cost] B[✓ model $cost]</code></td></tr>
+    <tr><td><b>Cost / Δ</b></td><td class="mn">mono</td><td>amber</td><td><code>$%.4f</code>; <code>Δcost (B−A)</code> attention accent</td></tr>
+    <tr><td><b>Value</b></td><td class="mn">mono</td><td>text</td><td>Run id, executor, tokens, per-node figures</td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Metric</th><th>Value</th><th>Metric</th><th>Value</th></tr>
+    <tr><td>Card radius</td><td class="mn">10px</td><td>Verdict line-height</td><td class="mn">1.85</td></tr>
+    <tr><td>Card padding</td><td class="mn">14px 16px</td><td>State padding</td><td class="mn">11px 13px</td></tr>
+    <tr><td>Cost precision</td><td class="mn">4 decimals</td><td>Missing value</td><td class="mn">— (em dash)</td></tr>
+    <tr><td>Header separator</td><td class="mn">·  (spaced)</td><td>Verdict arrow</td><td class="mn">→  (spaced)</td></tr>
+  </table>
+
+  <h2>Anatomy — the eval checklist</h2>
+  <p class="sub">The one component a reviewer reads to accept or reject a run</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="verdict"><span class="pin" style="top:-9px;left:-9px">1</span><span class="pin" style="top:40px;left:-9px">2</span><span class="pin" style="top:132px;left:-9px">3</span><span class="pin" style="bottom:8px;right:-9px">4</span>eval <span class="id">flags-verify</span>  ·  executor=claude  ·  topology=multi-backend-feature-flags
+  <span class="ok">✓ run_ok</span>: manifest.ok=True
+  <span class="ok">✓ all_nodes_ok</span>: all nodes ok
+  <span class="ok">✓ gates_passed</span>: no failing gates
+  <span class="ok">✓ integrity_clean</span>: no integrity findings
+  <span class="amber">✓ cost_attributed: all nodes have cost (3 estimated from price table)  (warn)</span>
+  <span class="amber">✗ aidlc_artifacts: no aidlc-docs artifacts found  (warn)</span>
+  <span class="final y">  score 5/6 (83%)  →  PASS</span></div>
+  </div>
+  <div class="legend">
+    <div><span class="k">1</span><span><b style="color:var(--ink)">Header</b> — the run being scored, its executor, and its topology. One run in, one verdict out.</span></div>
+    <div><span class="k">2</span><span><b style="color:var(--ink)">CRITICAL block</b> — <span class="mn">run_ok · all_nodes_ok · gates_passed · integrity_clean</span>, in green. Every one must pass or the verdict is FAIL.</span></div>
+    <div><span class="k">3</span><span><b style="color:var(--ink)">Non-critical block</b> — <span class="mn">cost_attributed · aidlc_artifacts</span>, each tagged <span class="mn">(warn)</span> and rendered amber. Surfaced for attention; a miss never fails the run.</span></div>
+    <div><span class="k">4</span><span><b style="color:var(--ink)">Score + verdict</b> — <span class="mn">passed/total</span> across all six checks and the percentage, then <span class="mn">→ PASS</span> (green, exit 0) or <span class="mn">→ FAIL</span> (red, exit 1). Gated on the CRITICAL rows only.</span></div>
+  </div>
+
+  <h2>Anatomy — the compare diff</h2>
+  <p class="sub">Two manifests in, outcome + cost per node out</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="verdict"><span class="pin" style="top:-9px;left:-9px">1</span><span class="pin" style="top:34px;right:-9px">2</span><span class="pin" style="top:80px;left:-9px">3</span><span class="pin" style="bottom:32px;right:-9px">4</span><span class="pin" style="bottom:6px;right:-9px">5</span>compare  A=<span class="id">guardgoal-claude</span>  B=<span class="id">guardgoal-codex</span>
+  A: executor=claude topology=guardgoal ok=<span class="no">False</span> pass=4/4 cost=$14.1011 out_tok=140117
+  B: executor=codex topology=guardgoal ok=<span class="no">False</span> pass=4/4 cost=$4.9692 out_tok=50295
+  Δcost (B−A): <span class="ok">$-9.1319</span>
+  nodes:
+    · implement: A[<span class="ok">✓</span> claude-sonnet-5 $11.7842] B[<span class="ok">✓</span> gpt-5.5 $2.3543]
+    · build-test: A[<span class="ok">✓</span> claude-sonnet-5 $0.5467] B[<span class="no">✗</span> gpt-5.5 $1.6986]<span class="amber">  ⚠ ok changed</span></div>
+  </div>
+  <div class="legend">
+    <div><span class="k">1</span><span><b style="color:var(--ink)">Run ids</b> — <span class="mn">A</span> and <span class="mn">B</span>. A trailing <span class="mn">⚠ different topologies</span> line appears when they don't match.</span></div>
+    <div><span class="k">2</span><span><b style="color:var(--ink)">Per-run summary</b> — <span class="mn">executor · topology · ok · pass=n/N · cost · out_tok</span> for each side.</span></div>
+    <div><span class="k">3</span><span><b style="color:var(--ink)">Cost delta</b> — <span class="mn">Δcost (B−A)</span>, signed <span class="mn">+</span> when B costs more, negative when B is cheaper. Amber-accent metric.</span></div>
+    <div><span class="k">4</span><span><b style="color:var(--ink)">Node line</b> — <span class="mn">A[✓ model $cost] B[✓ model $cost]</span>. Missing side reads <span class="mn">· &lt;node&gt;: A only</span> / <span class="mn">B only</span>.</span></div>
+    <div><span class="k">5</span><span><b style="color:var(--ink)">ok-changed flag</b> — <span class="mn">⚠ ok changed</span> when a node passed on one run and failed on the other. The regression signal.</span></div>
+  </div>
+
+  <h2>The six checks</h2>
+  <p class="sub">Four gate the verdict · two only warn</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Check</th><th>Gates verdict</th><th>Passes when</th><th>Fails when</th></tr>
+    <tr><td><b><span class="mn">run_ok</span></b></td><td><span class="tag2 crit">critical</span></td><td class="mn">manifest.ok=True</td><td class="mn">manifest.ok=&lt;v&gt;</td></tr>
+    <tr><td><b><span class="mn">all_nodes_ok</span></b></td><td><span class="tag2 crit">critical</span></td><td class="mn">all nodes ok</td><td class="mn">failed nodes: &lt;ids&gt;</td></tr>
+    <tr><td><b><span class="mn">gates_passed</span></b></td><td><span class="tag2 crit">critical</span></td><td class="mn">no failing gates</td><td class="mn">bad gates: &lt;node:status&gt;</td></tr>
+    <tr><td><b><span class="mn">integrity_clean</span></b></td><td><span class="tag2 crit">critical</span></td><td class="mn">no integrity findings</td><td class="mn">findings in: &lt;ids&gt;</td></tr>
+    <tr><td><b><span class="mn">cost_attributed</span></b></td><td><span class="tag2 warn">warn</span></td><td class="mn">all nodes have cost</td><td class="mn">missing cost: &lt;ids&gt;</td></tr>
+    <tr><td><b><span class="mn">aidlc_artifacts</span></b></td><td><span class="tag2 warn">warn</span></td><td class="mn">AI-DLC artifacts captured</td><td class="mn">no aidlc-docs artifacts found</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem"><b style="color:var(--ink)">Verdict = pass</b> iff all four <span class="tag2 crit">critical</span> checks pass. <span class="mn">score</span> is <span class="mn">passed/total</span> across <em>all six</em> — so a run can score <span class="mn">5/6</span> and still <span class="mn">PASS</span> (a warn missed), or score <span class="mn">4/6</span> and <span class="mn">FAIL</span> (a critical missed). The two warn checks add detail — <span class="mn">(N estimated from price table)</span>, <span class="mn">(N in credits)</span> — but never change the outcome.</p>
+
+  <h2>States</h2>
+  <p class="sub">Every verdict the two tools produce</p>
+  <hr class="rule">
+  <div class="grid2">
+    <div class="state"><p class="cap">eval · PASS — all critical hold</p>
+      <div class="vstate">eval <span class="id">pr1-verify</span>:
+  <span class="ok">✓ run_ok  ✓ all_nodes_ok</span>
+  <span class="ok">✓ gates_passed  ✓ integrity_clean</span>
+  <span class="final y">  score 6/6 (100%)  →  PASS</span></div>
+    </div>
+    <div class="state"><p class="cap">eval · PASS with warnings — 5/6</p>
+      <div class="vstate warn">eval <span class="id">flags-verify</span>:
+  <span class="ok">✓ run_ok  ✓ all_nodes_ok  ✓ gates_passed  ✓ integrity_clean</span>
+  <span class="amber">✗ aidlc_artifacts: no aidlc-docs artifacts found  (warn)</span>
+  <span class="final y">  score 5/6 (83%)  →  PASS</span></div>
+    </div>
+    <div class="state"><p class="cap">eval · FAIL — a critical failed</p>
+      <div class="vstate no">eval <span class="id">guardgoal-claude</span>:
+  <span class="bad">✗ run_ok: manifest.ok=False</span>
+  <span class="bad">✗ gates_passed: bad gates: build-test:blocked_prerequisite</span>
+  <span class="final n">  score 4/6 (67%)  →  FAIL</span></div>
+    </div>
+    <div class="state"><p class="cap">compare · outcome held, price differs</p>
+      <div class="vstate">compare A=<span class="id">guardgoal-claude</span> B=<span class="id">guardgoal-codex</span>
+  <span class="ok">· implement: A[✓ … $11.7842] B[✓ … $2.3543]</span>
+  <span class="amber">Δcost (B−A): $-9.1319</span></div>
+    </div>
+    <div class="state"><p class="cap">compare · ok changed — regression</p>
+      <div class="vstate no">compare A=<span class="id">nightly-0706</span> B=<span class="id">nightly-0707</span>
+  <span class="bad">· construction: A[✓ … $0.7897] B[✗ … $1.2144]  ⚠ ok changed</span>
+  <span class="amber">Δcost (B−A): +$0.4481</span></div>
+    </div>
+    <div class="state"><p class="cap">compare · node only / topology mismatch</p>
+      <div class="vstate warn"><span class="amber">⚠ different topologies: A=guardgoal B=aidlc</span>
+  <span class="amber">· e2e-tests: B only</span></div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.8rem"><b style="color:var(--ink)">Score is not the verdict.</b> The percentage counts all six checks, but only the four critical rows decide PASS/FAIL — a green <span class="mn">→ PASS</span> can sit above an amber warn row, and a single red critical turns the bottom line red. There is no partial pass on the critical set.</p>
+
+  <h2>Number &amp; glyph formats</h2>
+  <p class="sub">The exact strings both tools emit</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Element</th><th>Format</th><th>Example</th></tr>
+    <tr><td><b>Cost</b></td><td class="mn">$%.4f · — when None</td><td class="mn">$11.7842 · —</td></tr>
+    <tr><td><b>Cost delta</b></td><td class="mn">Δcost (B−A): [+]$%.4f</td><td class="mn">+$0.4481 · $-9.1319</td></tr>
+    <tr><td><b>Pass ratio</b></td><td class="mn">pass=n/N · score P/T</td><td class="mn">pass=4/4 · 5/6</td></tr>
+    <tr><td><b>Score %</b></td><td class="mn">(NN%) rounded</td><td class="mn">(83%) · (100%)</td></tr>
+    <tr><td><b>Outcome glyph</b></td><td class="mn">✓ pass · ✗ fail</td><td class="mn">A[✓ …] B[✗ …]</td></tr>
+    <tr><td><b>Attention glyph</b></td><td class="mn">⚠ ok changed · ⚠ different topologies</td><td class="mn">⚠ ok changed</td></tr>
+    <tr><td><b>Verdict</b></td><td class="mn">→  PASS · →  FAIL</td><td class="mn">→  PASS</td></tr>
+  </table>
+
+  <h2>What each command produces</h2>
+  <p class="sub">Two verbs · compare needs two runs, eval needs one · both add <span class="mn">--json</span></p>
+  <hr class="rule">
+  <table>
+    <tr><th>Command</th><th>Emits</th><th>Exit</th></tr>
+    <tr><td><b><span class="mn">cadora compare &lt;a&gt; &lt;b&gt;</span></b></td><td>Per-run summary + per-node outcome/cost diff + <span class="mn">Δcost</span>. <span class="mn">--json</span> = structured diff.</td><td class="mn">0</td></tr>
+    <tr><td><b><span class="mn">cadora eval &lt;run&gt;</span></b></td><td>Six-check checklist + <span class="mn">score</span> + <span class="mn">verdict</span>. <span class="mn">--json</span> = <span class="mn">checks[]</span> + <span class="mn">passed/total/score/verdict</span>.</td><td class="mn">0 pass · 1 fail</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">Both take <span class="mn">--archive-dir</span> (default <span class="mn">runs</span>). Both are <b style="color:var(--ink)">pure functions over the manifests</b> — no LLM, no network — so the text and JSON are byte-stable across runs. Only <span class="mn">eval</span> sets a non-zero exit, which is the CI gate.</p>
+
+  <h2>Voice</h2>
+  <p class="sub">The output is a measurement, not a grade</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Do</th><th>Not</th></tr>
+    <tr><td>Name the check — <span class="mn">gates_passed: no failing gates</span></td><td>“Quality: good”</td></tr>
+    <tr><td>Show the delta with its sign — <span class="mn">Δcost (B−A): $-9.1319</span></td><td>“Codex is cheaper”</td></tr>
+    <tr><td>Mark estimates — <span class="mn">(3 estimated from price table)</span> · <span class="mn">est.</span></td><td>Present est. figures as measured</td></tr>
+    <tr><td>Keep warn and fail distinct — amber <span class="mn">(warn)</span> vs red critical</td><td>Fail the run on a non-critical miss</td></tr>
+    <tr><td>Keep the exact verdict glyphs — <span class="mn">→ PASS</span> / <span class="mn">→ FAIL</span></td><td>“Success!” / “Rejected”</td></tr>
+  </table>
+
+  <div class="foot">Tokens and behavior are taken verbatim from <span class="mn">cadora/compare.py</span> and <span class="mn">cadora/evaluate.py</span>. The CRITICAL set is the module's <span class="mn">_CRITICAL</span> constant. Edit the rendered components in place, or hand the palette and metrics tables to a Figma library.</div>
+</div>
+</body>
+</html>

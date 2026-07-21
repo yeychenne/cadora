@@ -113,15 +113,17 @@ class UsageSummary:
 
 
 def summarize_usage(
-    archive_root: str | Path = "runs",
+    archive_root: str | Path | list[str | Path] = "runs",
     *,
     since: str | datetime | None = None,
 ) -> UsageSummary:
-    """Aggregate token usage from every manifest under ``archive_root``."""
+    """Aggregate token usage from every manifest under ``archive_root`` (one dir or several)."""
     cutoff = parse_since(since)
+    roots = archive_root if isinstance(archive_root, list) else [archive_root]
     manifests = [
         manifest
-        for manifest in list_runs(archive_root)
+        for root in roots
+        for manifest in list_runs(root)
         if _include_manifest(manifest, cutoff)
     ]
     nodes: list[NodeUsage] = []

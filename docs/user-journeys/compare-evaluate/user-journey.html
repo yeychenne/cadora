@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Two runs, held to the same light · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec; --ink:#1b2130; --ink-soft:#4a5265; --ink-faint:#7b8496;
+    --rule:#e0dccf; --card:#fffefb; --amber:#b3760f; --amber-bg:#f6ecd6;
+    --green:#0f7a54; --red:#b23a4b; --blue:#245bb5;
+    --scr-bg:#0f172a; --scr-canvas:#111c2f; --scr-panel:#1e2937; --scr-panel2:#162237;
+    --scr-line:#334158; --scr-text:#f5f7fb; --scr-muted:#9aa8bc; --scr-blue:#6ba5f0;
+    --scr-green:#16c784; --scr-greensoft:#75f0a8; --scr-red:#fb7185; --scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+      --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;
+      --green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  }
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+    --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;--green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;
+    --rule:#e0dccf;--card:#fffefb;--amber:#b3760f;--amber-bg:#f6ecd6;--green:#0f7a54;--red:#b23a4b;--blue:#245bb5;}
+  *{box-sizing:border-box}
+  .wrap{max-width:760px;margin:0 auto;padding:3rem 1.5rem 4rem;color:var(--ink);
+    font-family:var(--sans);line-height:1.65;font-size:16px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--amber);margin:0 0 .6rem}
+  h1{font-size:2.5rem;line-height:1.05;letter-spacing:-.02em;margin:.2rem 0 .5rem;text-wrap:balance;font-weight:640}
+  .lede{font-size:1.15rem;color:var(--ink-soft);margin:0;max-width:60ch}
+  .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:1.4rem;
+    padding-top:1rem;border-top:1px solid var(--rule);display:flex;gap:1.5rem;flex-wrap:wrap}
+  .step{margin-top:3.4rem}
+  .step-head{display:flex;align-items:baseline;gap:.9rem;margin-bottom:.5rem}
+  .num{font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:600;
+    border:1px solid var(--rule);border-radius:6px;padding:2px 8px;flex:none}
+  h2{font-size:1.5rem;letter-spacing:-.01em;margin:0;font-weight:600;text-wrap:balance}
+  .step p{color:var(--ink-soft);margin:.5rem 0 0}
+  .step p strong{color:var(--ink);font-weight:600}
+  .note{font-size:.95rem;color:var(--ink-faint);border-left:2px solid var(--amber);
+    padding:.1rem 0 .1rem .9rem;margin:1.1rem 0 0}
+  /* faux browser frame holding a faithful dark-dashboard screen */
+  .screen{margin:1.4rem 0 .3rem;border-radius:12px;overflow:hidden;border:1px solid var(--rule);
+    background:var(--scr-bg);box-shadow:0 1px 0 var(--rule)}
+  .chrome{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#0b1220;border-bottom:1px solid #1e2a3d}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .url{margin-left:8px;font-family:var(--mono);font-size:11px;color:#5f6d84;background:#0f1a2c;
+    border-radius:6px;padding:3px 10px;flex:1}
+  .body{padding:14px;color:var(--scr-text);font-size:13px}
+  .hero{display:flex;justify-content:space-between;align-items:center;background:var(--scr-panel);
+    border-radius:10px;padding:11px 14px;margin-bottom:12px}
+  .hero b{font-size:15px}.hero small{color:var(--scr-muted);display:block;font-size:11px;margin-top:2px}
+  .pill{font-size:11px;padding:3px 9px;border-radius:999px}
+  .pill.run{background:#12314e;color:#7db8ff}.pill.done{background:#0f3d2c;color:var(--scr-greensoft)}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);
+    padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:150px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted);line-height:1.55}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0}
+  .prev h4{margin:2px 0 4px;font-size:13px;color:var(--scr-text)}
+  .prev p,.prev li{color:var(--scr-muted);font-size:12px;margin:2px 0}
+  .dag{display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:6px}
+  .node{width:180px;text-align:center;border-radius:8px;padding:7px;font-size:12px;
+    background:var(--scr-panel);border:1px solid var(--scr-line);color:var(--scr-muted)}
+  .node.on{background:#123024;border-color:#1f6a49;color:var(--scr-greensoft)}
+  .node .badge{font-size:9px;background:#0f3d2c;color:var(--scr-greensoft);border-radius:4px;padding:1px 6px;margin:0 2px}
+  .node.wait{background:#2a2410;border-color:#7a6320;color:var(--scr-amber)}
+  .arrow{color:var(--scr-line);font-size:12px}
+  .foot{margin-top:3.5rem;padding-top:1.2rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  a{color:var(--blue)}
+</style>
+
+<style>
+  /* evidence pack — appended after the verbatim base, reusing the same --scr-* tokens */
+  .mn{font-family:var(--mono);font-size:.9em}
+  /* terminal recreation — same dark palette, monospace, one pre-wrap region per screen */
+  .term{font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--scr-muted);
+    white-space:pre-wrap;word-break:break-word}
+  .term .p{color:var(--scr-greensoft)}          /* the $ prompt */
+  .term .cmd{color:var(--scr-text)}             /* the command you type */
+  .term .cmt{color:var(--scr-muted)}            /* # inline comment */
+  .term .path{color:var(--scr-blue)}
+  .term .ok{color:var(--scr-greensoft)}
+  .term .amber{color:var(--scr-amber)}
+  .term .bad{color:var(--scr-red)}
+  .term .verdict{color:var(--scr-greensoft);font-weight:700}
+  .term .verdict.no{color:var(--scr-red)}
+  /* mini archived-file list — a checksums.txt preview */
+  .chk{margin-top:11px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:9px 11px}
+  .chk .cap{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted);margin-bottom:6px}
+  .chk .row{display:flex;gap:12px;font-family:var(--mono);font-size:11px;padding:2px 0;line-height:1.5}
+  .chk .h{color:var(--scr-green);flex:none}
+  .chk .f{color:var(--scr-text);word-break:break-all}
+  .chk .more{color:var(--scr-muted);font-size:11px;margin-top:5px}
+  /* the sealed pack, ready to hand off */
+  .packrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .packrow .fn{font-family:var(--mono);font-size:12px;color:var(--scr-text);flex:none;min-width:150px}
+  .packrow .d{font-size:11px;color:var(--scr-muted);flex:1}
+  .packrow .tag{font-size:10px;letter-spacing:.05em;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 8px;white-space:nowrap}
+  .packrow .tag.sig{color:var(--scr-amber);border-color:var(--scr-amber)}
+  /* the arc: tamper-evident -> attributable -> verified */
+  .arc{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:1.6rem;font-family:var(--mono);font-size:12px}
+  .arc span.node{border:1px solid var(--rule);border-radius:999px;padding:4px 13px;color:var(--ink-soft)}
+  .arc span.node.on{border-color:var(--amber);color:var(--amber)}
+  .arc span.sep{color:var(--ink-faint)}
+</style>
+
+<style>
+  /* compare & evaluate — appended after the verbatim base, reusing the same --scr-* tokens */
+  .mnb{font-family:var(--mono);font-weight:600;color:var(--ink)}
+  /* side-by-side comparison, rendered as a dashboard panel */
+  .cmp{border:1px solid var(--scr-line);border-radius:10px;overflow:hidden;background:var(--scr-canvas);margin-top:2px}
+  .cmp .r{display:grid;grid-template-columns:1.15fr 1fr 1fr}
+  .cmp .r>div{padding:7px 12px;border-bottom:1px solid var(--scr-line);font-size:12px;color:var(--scr-text)}
+  .cmp .r:last-child>div{border-bottom:0}
+  .cmp .lab{color:var(--scr-muted)}
+  .cmp .v{font-family:var(--mono)}
+  .cmp .est{color:var(--scr-muted);font-size:10px;font-family:var(--sans)}
+  .cmp .head>div{background:var(--scr-panel);font-weight:600;font-size:12px}
+  .cmp .head .who{display:block;font-size:10px;font-weight:400;color:var(--scr-muted);margin-top:1px;font-family:var(--sans)}
+  .cmp .sec>div{background:var(--scr-panel2);color:var(--scr-muted);font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+  .deltabar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px;
+    background:var(--scr-panel2);border:1px solid var(--scr-amber);border-radius:9px;padding:9px 13px}
+  .deltabar b{color:var(--scr-amber);font-family:var(--mono);font-size:14px;white-space:nowrap}
+  .deltabar span{font-size:11px;color:var(--scr-muted)}
+  /* the determinism guarantee — three verb chips */
+  .gtrip{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+  .gtrip div{flex:1;min-width:130px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:9px;padding:9px 11px}
+  .gtrip b{display:block;color:var(--scr-text);font-size:12px;margin-bottom:1px}
+  .gtrip span{color:var(--scr-muted);font-size:11px}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Cadora's compare and evaluate tools, step by step: two runs of the same topology land in the archive, a dashboard holds run A (Claude) against run B (Codex) side by side, cadora compare diffs outcome and cost per node across backends, the same diff catches a node that regressed and got pricier over time, cadora eval scores one run against the AI-DLC invariants — the four CRITICAL checks (run_ok, all_nodes_ok, gates_passed, integrity_clean) gate the verdict while cost_attributed and aidlc_artifacts surface as warnings — the --json result carries the same verdict for CI, and both tools are pure functions over the manifests: no LLM, no network, reproducible and free.</h2>
+
+  <p class="eyebrow">Cadora · compare &amp; evaluate</p>
+  <h1>Two runs, held to the same light</h1>
+  <p class="lede">A run finishing green tells you one path worked. It doesn't tell you what the same spec costs on a different engine, whether it drifted since yesterday, or whether it holds the invariants you actually care about. Two post-run tools answer that: <strong>cadora compare</strong> diffs two runs, <strong>cadora eval</strong> scores one — and both are pure functions over the archived manifests. Reproducible, cheap, <strong>no LLM, no network</strong>.</p>
+  <div class="meta"><span>Surface · CLI + dashboard</span><span>Role · operator / reviewer</span><span>Captured · archived runs — guardgoal, feature-flags</span></div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">01</span><h2>Same spec, two engines — side by side</h2></div>
+    <p>You ran one topology twice: once through <strong>Claude</strong>, once through <strong>Codex</strong>. Both landed in the archive. Before trusting either, put them next to each other. Every node cleared on both runs (<span class="mn">4/4</span>) — the run-level <span class="mn">ok=False</span> is the <span class="mn">build-test</span> gate, identical on both — so what actually differs here is the <em>price</em>.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8765/compare · guardgoal</span></div>
+      <div class="body">
+        <div class="hero"><div><b>guardgoal</b><small>same topology · two backends · 4 nodes</small></div><span class="pill done">both archived</span></div>
+        <div class="cmp">
+          <div class="r head"><div>metric</div><div>run A<span class="who">claude</span></div><div>run B<span class="who">codex</span></div></div>
+          <div class="r"><div class="lab">executor</div><div class="v">claude</div><div class="v">codex</div></div>
+          <div class="r"><div class="lab">run ok</div><div class="v" style="color:var(--scr-red)">False</div><div class="v" style="color:var(--scr-red)">False</div></div>
+          <div class="r"><div class="lab">nodes passed</div><div class="v" style="color:var(--scr-greensoft)">4/4</div><div class="v" style="color:var(--scr-greensoft)">4/4</div></div>
+          <div class="r"><div class="lab">total cost</div><div class="v">$14.1011</div><div class="v">$4.9692 <span class="est">est.</span></div></div>
+          <div class="r"><div class="lab">output tokens</div><div class="v">140,117</div><div class="v">50,295</div></div>
+          <div class="r sec"><div>per-node cost</div><div>A</div><div>B</div></div>
+          <div class="r"><div class="lab">requirements</div><div class="v">$1.0560</div><div class="v">$0.4552</div></div>
+          <div class="r"><div class="lab">design</div><div class="v">$0.7142</div><div class="v">$0.4610</div></div>
+          <div class="r"><div class="lab">implement</div><div class="v">$11.7842</div><div class="v">$2.3543</div></div>
+          <div class="r"><div class="lab">build-test</div><div class="v">$0.5467</div><div class="v">$1.6986</div></div>
+        </div>
+        <div class="deltabar"><b>Δ cost (B−A)  −$9.1319</b><span>same spec, all nodes pass on both — Codex ≈65% cheaper (est.)</span></div>
+      </div>
+    </div>
+    <p class="note">Codex and GLM figures are priced from the rate table (<span class="mn">est.</span>); Claude figures are backend-reported. The comparison lines them up on one ruler either way.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">02</span><h2><span class="mn">cadora compare</span> — the diff, per node</h2></div>
+    <p>One command turns the two manifests into a per-node diff: outcome and cost, A against B, plus the run totals and the cost delta. No model runs — it's a <strong>pure function over two manifests</strong>. The story lands in the last four lines: the same spec, the same outcome on every node, and Codex about <strong>$9 cheaper</strong> for it.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora compare</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora compare guardgoal-claude guardgoal-codex --archive-dir runs</span>
+compare  A=guardgoal-claude  B=guardgoal-codex
+  A: executor=claude topology=guardgoal ok=<span class="bad">False</span> pass=4/4 cost=$14.1011 out_tok=140117
+  B: executor=codex topology=guardgoal ok=<span class="bad">False</span> pass=4/4 cost=$4.9692 out_tok=50295
+  Δcost (B−A): <span class="ok">$-9.1319</span>
+  nodes:
+    · requirements: A[<span class="ok">✓</span> claude-sonnet-5 $1.0560] B[<span class="ok">✓</span> gpt-5.5 $0.4552]
+    · design: A[<span class="ok">✓</span> claude-sonnet-5 $0.7142] B[<span class="ok">✓</span> gpt-5.5 $0.4610]
+    · implement: A[<span class="ok">✓</span> claude-sonnet-5 $11.7842] B[<span class="ok">✓</span> gpt-5.5 $2.3543]
+    · build-test: A[<span class="ok">✓</span> claude-sonnet-5 $0.5467] B[<span class="ok">✓</span> gpt-5.5 $1.6986]</div>
+      </div>
+    </div>
+    <p class="note">Every node reads <span class="mn">✓</span> on both, yet each run's <span class="mn">ok=False</span> — that's the <span class="mn">build-test</span> gate, not a failed node. Compare shows both the node outcome and the price, so you can see the outcome held identical while the cost did not. Add <span class="mn">--json</span> for the same diff structured for a script.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">03</span><h2>The same diff, over time</h2></div>
+    <p>Point <span class="mn">compare</span> at the <em>same</em> backend on two different days and it becomes a regression detector. Here last night's run was clean; tonight's <span class="mn">construction</span> node flipped to <span class="mn">✗</span> and cost more doing it. The diff flags the outcome change and the <span class="mn">+$0.45</span> drift in one place — no dashboards to scrub, no eyeballing two logs.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora compare · over time</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora compare nightly-0706 nightly-0707 --archive-dir runs</span>
+compare  A=nightly-0706  B=nightly-0707
+  A: executor=claude topology=aidlc-hitl ok=<span class="ok">True</span> pass=3/3 cost=$2.0139 out_tok=15840
+  B: executor=claude topology=aidlc-hitl ok=<span class="bad">False</span> pass=2/3 cost=$2.4620 out_tok=17020
+  Δcost (B−A): <span class="amber">+$0.4481</span>
+  nodes:
+    · requirements: A[<span class="ok">✓</span> claude-sonnet-5 $0.9451] B[<span class="ok">✓</span> claude-sonnet-5 $0.9612]
+    · design: A[<span class="ok">✓</span> claude-sonnet-5 $0.2791] B[<span class="ok">✓</span> claude-sonnet-5 $0.2864]
+    · construction: A[<span class="ok">✓</span> claude-sonnet-5 $0.7897] B[<span class="bad">✗</span> claude-sonnet-5 $1.2144]<span class="amber">  ⚠ ok changed</span></div>
+      </div>
+    </div>
+    <p class="note">A node present in only one run reads <span class="mn">· &lt;node&gt;: A only</span> (or <span class="mn">B only</span>); when the topologies don't match at all, the diff opens with <span class="mn">⚠ different topologies</span> so you never compare apples to oranges by accident.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">04</span><h2><span class="mn">cadora eval</span> — score one run against the invariants</h2></div>
+    <p>Where compare needs two runs, <strong>eval scores one</strong> against the AI-DLC / quality invariants — completion, per-node success, gate verdicts, integrity findings, cost attribution, artifact presence — again with <strong>no LLM call</strong>. Four of the checks are <strong>CRITICAL</strong> and gate the verdict; two are non-critical and only <em>warn</em>. Below, artifacts are missing and three costs are price-table estimates — both surface amber — but the run is <strong>PASS</strong> because every critical check holds.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora eval</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora eval flags-verify --archive-dir runs</span>
+eval flags-verify  ·  executor=claude  ·  topology=multi-backend-feature-flags
+  <span class="ok">✓ run_ok</span>: manifest.ok=True
+  <span class="ok">✓ all_nodes_ok</span>: all nodes ok
+  <span class="ok">✓ gates_passed</span>: no failing gates
+  <span class="ok">✓ integrity_clean</span>: no integrity findings
+  <span class="amber">✓ cost_attributed: all nodes have cost (3 estimated from price table)  (warn)</span>
+  <span class="amber">✗ aidlc_artifacts: no aidlc-docs artifacts found  (warn)</span>
+  <span class="verdict">  score 5/6 (83%)  →  PASS</span></div>
+      </div>
+    </div>
+    <p class="note">The two amber rows are the non-critical layer: <span class="mn">cost_attributed</span> and <span class="mn">aidlc_artifacts</span> carry <span class="mn">(warn)</span> and never turn the verdict red. Only the four CRITICAL checks — <span class="mn">run_ok</span>, <span class="mn">all_nodes_ok</span>, <span class="mn">gates_passed</span>, <span class="mn">integrity_clean</span> — decide PASS or FAIL. If any one of those had failed, the bottom line would read <span class="mn">→ FAIL</span> and the command would exit non-zero.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">05</span><h2><span class="mn">eval --json</span> — the same verdict, for CI</h2></div>
+    <p>The same score as structured data: a <span class="mn">checks</span> array of <span class="mn">name / passed / detail</span>, then <span class="mn">passed</span>, <span class="mn">total</span>, <span class="mn">score</span>, and the <span class="mn">verdict</span>. The four <strong>green names</strong> below are the CRITICAL set — the only ones that gate <span class="mn">verdict</span> — while <span class="mn">cost_attributed</span> and <span class="mn">aidlc_artifacts</span> ride along as <span class="mn">passed:false</span>-tolerant warnings. In CI you gate on the process exit code: <span class="mn">0</span> when <span class="mn">verdict</span> is <span class="mn">pass</span>, <span class="mn">1</span> otherwise.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora eval --json</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora eval flags-verify --archive-dir runs --json</span>
+{
+  "run_id": "flags-verify",
+  "executor": "claude",
+  "topology": "multi-backend-feature-flags",
+  "checks": [
+    { "name": "<span class="ok">run_ok</span>",          "passed": true,  "detail": "manifest.ok=True" },
+    { "name": "<span class="ok">all_nodes_ok</span>",    "passed": true,  "detail": "all nodes ok" },
+    { "name": "<span class="ok">gates_passed</span>",    "passed": true,  "detail": "no failing gates" },
+    { "name": "<span class="ok">integrity_clean</span>", "passed": true,  "detail": "no integrity findings" },
+    { "name": "<span class="amber">cost_attributed</span>", "passed": true,  "detail": "all nodes have cost (3 estimated from price table)" },
+    { "name": "<span class="amber">aidlc_artifacts</span>", "passed": <span class="amber">false</span>, "detail": "no aidlc-docs artifacts found" }
+  ],
+  "passed": 5,
+  "total": 6,
+  "score": 0.833,
+  "verdict": <span class="verdict">"pass"</span>
+}</div>
+      </div>
+    </div>
+    <p class="note">Rendered here with the objects on one line each for reading; the real <span class="mn">--json</span> is standard <span class="mn">indent=2</span>. There is no <span class="mn">critical</span> field — the CRITICAL set (<span class="mn">run_ok</span>, <span class="mn">all_nodes_ok</span>, <span class="mn">gates_passed</span>, <span class="mn">integrity_clean</span>) is defined by name in the tool and is what <span class="mn">verdict</span> gates on.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">06</span><h2>Why the result is trustworthy: it's just arithmetic</h2></div>
+    <p>Neither tool asks a model anything. Both read the archived manifests and compute — a diff, a checklist — and nothing else. So a comparison or a score is <strong>reproducible</strong> (run it a hundred times, get the same bytes), <strong>offline</strong> (no network), and <strong>free</strong> (no tokens). That's what makes the number admissible: whoever doubts it can recompute it themselves and land on the same answer.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — deterministic by construction</span></div>
+      <div class="body">
+        <div class="term"><span class="cmt"># run it twice — byte-for-byte identical, offline, no model call</span>
+<span class="p">$</span> <span class="cmd">diff &lt;(cadora eval flags-verify) &lt;(cadora eval flags-verify) &amp;&amp; echo reproducible</span>
+<span class="ok">reproducible</span></div>
+        <div class="callout">
+          <div class="rhead"><span class="flag">the guarantee</span><span style="color:var(--scr-text);font-size:13px">Pure functions over the manifests — no LLM, no network.</span></div>
+          <div class="gtrip">
+            <div><b>Reproducible</b><span>same inputs → same diff / score, every time</span></div>
+            <div><b>Offline</b><span>reads archived manifests; nothing leaves the box</span></div>
+            <div><b>Free</b><span>no tokens, no model call — run it in CI on every push</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="arc"><span class="node on">read the manifests</span><span class="sep">→</span><span class="node on">compare · eval</span><span class="sep">→</span><span class="node on">reproducible verdict</span></div>
+  </div>
+
+  <div class="foot">
+    <p>The terminal frames above reproduce real <span class="mn">cadora compare / eval</span> output — the cross-backend diff and the eval checklist are captured verbatim; the over-time regression uses the same output shape on illustrative run ids. Lift them into Figma or iterate directly. This is the post-run half of Cadora's audit story: once the run is archived, weighing two of them or scoring one against the invariants costs nothing and comes out the same for everyone.</p>
+  </div>
+</div>
+</body>
+</html>

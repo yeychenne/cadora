@@ -50,11 +50,16 @@ def build_app(executor_factory=None, *, host="127.0.0.1", port=8000):
         archive_dir: str = "runs",
         gate_cmd: str = "ruff check . && pytest -q",
         gate_setup: str = "auto",
+        review_timeout: float = 3600.0,
     ) -> dict:
         """Start an AI-DLC run with HITL review gates; returns the run id.
 
         Every gate the topology references is registered with ``gate_cmd`` (mirroring ``cadora run``),
         so gated topologies run over MCP rather than failing as "unregistered gate(s)".
+
+        ``review_timeout`` bounds how long each gate waits for ``submit_review`` before failing
+        closed to an abort (default 1 h) — a client that starts a run and walks away cannot pin the
+        run thread forever. Pass ``0`` to wait indefinitely.
         """
         from cadora.gates import ShellGate
 
@@ -70,6 +75,7 @@ def build_app(executor_factory=None, *, host="127.0.0.1", port=8000):
             cwd=cwd,
             archive_root=archive_dir,
             gates=gates,
+            review_timeout=review_timeout,
         ).start()
         sessions[run_id] = session
         return {"run_id": run_id, "status": "started"}
@@ -92,11 +98,24 @@ def build_app(executor_factory=None, *, host="127.0.0.1", port=8000):
 
     @app.tool()
     def submit_review(run_id: str, decision: str, comments: str = "") -> dict:
-        """Submit the pending review decision: ``approve`` | ``request_changes`` | ``abort``."""
+        """Submit the pending review decision: ``approve`` | ``request_changes`` | ``abort``.
+
+        Fails soft: an invalid decision, a ``request_changes`` with no comments, or a submit when no
+        gate is pending (already resolved, or a double-submit) returns ``{"error": ...}`` rather than
+        raising through the tool call. The file and stdin surfaces already degrade to a safe abort on
+        bad input; the MCP tool must not be the one review path that surfaces a raw traceback.
+        """
         session = sessions.get(run_id)
         if session is None:
             return {"error": f"unknown run {run_id!r}"}
-        session.submit_review(ReviewResult(decision, comments))
+        try:
+            result = ReviewResult(decision, comments)
+        except ValueError as exc:
+            return {"error": str(exc)}
+        try:
+            session.submit_review(result)
+        except RuntimeError as exc:
+            return {"error": str(exc)}
         return {"submitted": decision}
 
     @app.tool()

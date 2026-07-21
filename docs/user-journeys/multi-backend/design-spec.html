@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multi-backend executors, by their surfaces · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;
+    --card:#fffefb;--amber:#b3760f;
+    --scr-bg:#0f172a;--scr-canvas:#111c2f;--scr-panel:#1e2937;--scr-panel2:#162237;--scr-line:#334158;
+    --scr-text:#f5f7fb;--scr-muted:#9aa8bc;--scr-blue:#6ba5f0;--scr-green:#16c784;--scr-greensoft:#75f0a8;
+    --scr-red:#fb7185;--scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;
+    --ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}}
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;--card:#fffefb;--amber:#b3760f}
+  *{box-sizing:border-box}
+  .wrap{max-width:840px;margin:0 auto;padding:2.6rem 1.5rem 4rem;color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0 0 .5rem}
+  h1{font-size:2.1rem;letter-spacing:-.02em;margin:.1rem 0 .4rem;font-weight:640}
+  .lede{color:var(--ink-soft);margin:0;max-width:64ch}
+  h2{font-size:1.15rem;margin:2.8rem 0 .3rem;font-weight:600;letter-spacing:-.01em}
+  .sub{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 1rem}
+  .rule{height:1px;background:var(--rule);border:0;margin:.4rem 0 0}
+  /* swatches */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:.6rem}
+  .sw{border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--card)}
+  .sw .chip{height:44px}
+  .sw .lab{padding:7px 9px}
+  .sw .lab b{font-size:12px;display:block}
+  .sw .lab code{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .sw .lab span{font-size:11px;color:var(--ink-soft);display:block;margin-top:1px}
+  /* type scale */
+  table{width:100%;border-collapse:collapse;margin-top:.5rem;font-size:13px}
+  th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ink-faint);font-weight:500;padding:6px 10px;border-bottom:1px solid var(--rule)}
+  td{padding:8px 10px;border-bottom:1px solid var(--rule);color:var(--ink-soft);vertical-align:top}
+  td b{color:var(--ink)}
+  td code,.mn{font-family:var(--mono);font-size:12px;color:var(--amber)}
+  /* dashboard component render */
+  .stage{background:var(--scr-bg);border:1px solid var(--rule);border-radius:12px;padding:16px;margin-top:.8rem}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px;position:relative}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .rhead span:last-child{color:var(--scr-text);font-size:13px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .msg.err{color:var(--scr-red)}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0;color:var(--scr-muted);font-size:12px}
+  .empty{color:var(--scr-muted);font-size:12px;font-style:italic;padding:4px 2px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:130px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted)}
+  /* anatomy pins */
+  .pin{position:absolute;font-family:var(--mono);font-size:10px;font-weight:600;width:18px;height:18px;
+    border-radius:50%;background:var(--scr-amber);color:#1a1205;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 3px var(--scr-panel2)}
+  .legend{margin-top:1rem;display:grid;gap:6px}
+  .legend div{display:flex;gap:9px;font-size:13px;color:var(--ink-soft)}
+  .legend .k{font-family:var(--mono);font-size:11px;font-weight:600;width:18px;height:18px;flex:none;
+    border-radius:50%;background:var(--amber);color:var(--paper);display:flex;align-items:center;justify-content:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:.8rem}
+  .state{background:var(--scr-bg);border:1px solid var(--rule);border-radius:10px;padding:12px}
+  .state .cap{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+  .foot{margin-top:3rem;padding-top:1.1rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+</style>
+
+<style>
+  /* evidence pack — appended after the verbatim base, reusing the same --scr-* tokens */
+  /* the verify verdict, rendered as a card — semantic left accent */
+  .verdict{background:var(--scr-bg);border:1px solid var(--scr-line);border-left:4px solid var(--scr-green);
+    border-radius:10px;padding:14px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.85;
+    color:var(--scr-muted);white-space:pre-wrap;word-break:break-word;position:relative}
+  .verdict.bad{border-left-color:var(--scr-red)}
+  .verdict .id{color:var(--scr-text)}
+  .verdict .ok{color:var(--scr-greensoft)}
+  .verdict .no{color:var(--scr-red)}
+  .verdict .amber{color:var(--scr-amber)}
+  .verdict .final{font-weight:700}
+  .verdict .final.y{color:var(--scr-greensoft)}
+  .verdict .final.n{color:var(--scr-red)}
+  /* pack contents — a labeled tree */
+  .tree{background:var(--scr-bg);border:1px solid var(--scr-line);border-radius:10px;padding:14px 16px;
+    font-family:var(--mono);font-size:12.5px;line-height:1.85;color:var(--scr-muted);white-space:pre;overflow-x:auto}
+  .tree .dir{color:var(--scr-blue)}
+  .tree .f{color:var(--scr-text)}
+  .tree .sig{color:var(--scr-amber)}
+  .tree .c{color:var(--scr-muted)}
+  /* checksums.txt line anatomy */
+  .chkline{background:var(--scr-bg);border:1px solid var(--scr-line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+  .chkline code{font-family:var(--mono);font-size:12.5px;white-space:pre;display:block}
+  .chkline .hash{color:var(--scr-green)}
+  .chkline .path{color:var(--scr-text)}
+  .chkline .gap{background:var(--scr-panel);border-radius:3px}
+  /* state verdict mini-cards */
+  .vstate{background:var(--scr-canvas);border:1px solid var(--rule);border-left:4px solid var(--scr-green);
+    border-radius:10px;padding:11px 13px;font-family:var(--mono);font-size:11.5px;line-height:1.7;
+    color:var(--scr-muted);white-space:pre-wrap;word-break:break-word;margin-top:8px}
+  .vstate.no{border-left-color:var(--scr-red)}
+  .vstate.warn{border-left-color:var(--scr-amber)}
+  .vstate .ok{color:var(--scr-greensoft)}
+  .vstate .bad{color:var(--scr-red)}
+  .vstate .amber{color:var(--scr-amber)}
+  .vstate .id{color:var(--scr-text)}
+  .vstate .final{font-weight:700}
+  .vstate .final.y{color:var(--scr-greensoft)}
+  .vstate .final.n{color:var(--scr-red)}
+</style>
+
+<style>
+  /* multi-backend — appended after the verbatim base, reusing the same --scr-* tokens */
+  /* terminal recreation — the shell used to render doctor/run/compare samples */
+  .term{font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--scr-muted);
+    white-space:pre-wrap;word-break:break-word}
+  .term .p{color:var(--scr-greensoft)}
+  .term .cmd{color:var(--scr-text)}
+  .term .ok{color:var(--scr-greensoft)}
+  .term .amber{color:var(--scr-amber)}
+  .term .bad{color:var(--scr-red)}
+  .mn2{font-family:var(--mono);font-size:12px;color:var(--amber)}
+  /* a dark mono card that pins can anchor to (position:relative) */
+  .termbox{background:var(--scr-bg);border:1px solid var(--scr-line);border-radius:10px;
+    padding:14px 16px;position:relative}
+  /* backend chip — one token per engine; every color below is already in the base CSS */
+  .bk{font-size:10px;font-weight:600;letter-spacing:.03em;border-radius:999px;padding:2px 8px;white-space:nowrap}
+  .bk.claude{background:#12314e;color:#7db8ff}
+  .bk.codex{background:#2a2410;color:var(--scr-amber)}
+  .bk.kiro{background:#0f3d2c;color:var(--scr-greensoft)}
+  .bk.neu{background:var(--scr-canvas);color:var(--scr-muted);border:1px solid var(--scr-line)}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:.4rem}
+  /* phase lane cards for the routing diagram */
+  .lane2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:.8rem}
+  .lanecard{background:var(--scr-bg);border:1px solid var(--rule);border-radius:10px;padding:12px}
+  .lanecard .cap{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+  .lanecard .row{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--scr-muted);padding:3px 0}
+  @media(max-width:640px){.lane2{grid-template-columns:1fr}}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Design specification for Cadora&#39;s multi-backend executors: the color and type tokens, the backend chips, the doctor row&#39;s anatomy, the phase-routing diagram, the backend registry, the compare diff line, the four backend-check states (ok, missing, unparsable, untested), and the voice.</h2>
+  <p class="eyebrow">Cadora · design spec</p>
+  <h1>Multi-backend executors, by their surfaces</h1>
+  <p class="lede">Everything needed to render or extend the swappable-engine surfaces — the exact tokens, the backend chips, the <span class="mn">cadora doctor</span> row&#39;s anatomy, the phase-routing diagram, the registry, and every backend-check state. The rendered components are live HTML; edit them here or lift the specs into Figma.</p>
+
+  <h2>Palette</h2>
+  <p class="sub">Semantic first · green passes, red blocks, amber asks for a second look</p>
+  <hr class="rule">
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#16c784"></div><div class="lab"><b>Green</b><code>--scr-green · #16c784</code><span>ok · verified · pass</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fb7185"></div><div class="lab"><b>Red</b><code>--scr-red · #fb7185</code><span>missing · unparsable · block</span></div></div>
+    <div class="sw"><div class="chip" style="background:#ffd08a"></div><div class="lab"><b>Amber</b><code>--scr-amber · #ffd08a</code><span>experimental · untested range</span></div></div>
+    <div class="sw"><div class="chip" style="background:#6ba5f0"></div><div class="lab"><b>Blue</b><code>--scr-blue · #6ba5f0</code><span>paths · info</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0f172a"></div><div class="lab"><b>Ink</b><code>--scr-bg · #0f172a</code><span>Card ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#111c2f"></div><div class="lab"><b>Canvas</b><code>--scr-canvas · #111c2f</code><span>Inset · state cards</span></div></div>
+    <div class="sw"><div class="chip" style="background:#162237"></div><div class="lab"><b>Panel</b><code>--scr-panel2 · #162237</code><span>Raised surface</span></div></div>
+    <div class="sw"><div class="chip" style="background:#334158"></div><div class="lab"><b>Line</b><code>--scr-line · #334158</code><span>Borders</span></div></div>
+    <div class="sw"><div class="chip" style="background:#f5f7fb"></div><div class="lab"><b>Text</b><code>--scr-text · #f5f7fb</code><span>Primary · versions</span></div></div>
+    <div class="sw"><div class="chip" style="background:#9aa8bc"></div><div class="lab"><b>Muted</b><code>--scr-muted · #9aa8bc</code><span>Labels · captions</span></div></div>
+  </div>
+
+  <h2>Backend chips</h2>
+  <p class="sub">One token per engine — and no engine gets its own hue</p>
+  <hr class="rule">
+  <div class="chips">
+    <span class="bk claude">claude</span>
+    <span class="bk codex">codex</span>
+    <span class="bk kiro">kiro</span>
+    <span class="bk neu">glm</span>
+    <span class="bk neu">antigravity</span>
+    <span class="bk neu">fixture</span>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">Each chip reuses a color already in the palette: <b style="color:var(--ink)">claude</b> the info blue (<span class="mn">#12314e / #7db8ff</span>), <b style="color:var(--ink)">codex</b> the amber accent, <b style="color:var(--ink)">kiro</b> the pass green. Experimental and test-only engines (glm, antigravity, fixture) take the neutral chip — maturity is carried by the tier tag, not by a bespoke color.</p>
+
+  <h2>Type &amp; metrics</h2>
+  <p class="sub">Monospace is the instrument voice — these surfaces are read at the shell</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Role</th><th>Family</th><th>Size / weight</th><th>Notes</th></tr>
+    <tr><td><b>Doctor row</b></td><td class="mn2">mono</td><td>12px / 400</td><td><code>status:&lt;10&gt; · label:&lt;26&gt; · version · detail</code></td></tr>
+    <tr><td><b>Status word</b></td><td class="mn2">mono</td><td>green / red / amber</td><td><code>ok</code> green · <code>missing</code>/<code>unparsable</code> red · <code>untested</code> amber</td></tr>
+    <tr><td><b>Backend chip</b></td><td class="mn2">mono</td><td>10px / 600</td><td>Pill, radius <code>999px</code>, one per engine</td></tr>
+    <tr><td><b>Node line</b></td><td class="mn2">mono</td><td>12px</td><td><code>✓ &lt;node&gt; $cost gate:&lt;name&gt; ok integrity:ok</code>, bits joined by three spaces</td></tr>
+    <tr><td><b>Compare line</b></td><td class="mn2">mono</td><td>12px</td><td><code>· &lt;node&gt;: A[✓ &lt;model&gt; $cost] B[✓ &lt;model&gt; $cost]</code></td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Metric</th><th>Value</th><th>Metric</th><th>Value</th></tr>
+    <tr><td>Status field width</td><td class="mn2">10 chars</td><td>Label field width</td><td class="mn2">26 chars</td></tr>
+    <tr><td>Card radius</td><td class="mn2">10px</td><td>Chip radius</td><td class="mn2">999px</td></tr>
+    <tr><td>Money format</td><td class="mn2">$%.4f</td><td>Cost delta sign</td><td class="mn2">+ / (none)</td></tr>
+    <tr><td>Default executor</td><td class="mn2">claude</td><td>Default funding</td><td class="mn2">subscription</td></tr>
+  </table>
+
+  <h2>Anatomy — the doctor row</h2>
+  <p class="sub">The one line an operator reads to trust an engine</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="termbox"><span class="pin" style="top:34px;left:-9px">1</span><span class="pin" style="top:34px;left:64px">2</span><span class="pin" style="top:34px;right:64px">3</span><span class="pin" style="bottom:6px;right:-9px">4</span><div class="term">cadora doctor — backend CLI contract checks
+  <span class="ok">ok</span>         claude (verified)          2.1.128
+  <span class="bad">missing</span>    antigravity (experimental)  ('agy' not on PATH)</div></div>
+  </div>
+  <div class="legend">
+    <div><span class="k">1</span><span><b style="color:var(--ink)">Status</b> — <span class="mn">ok</span> | <span class="mn">missing</span> | <span class="mn">unparsable</span> | <span class="mn">untested</span>. Green passes; red is the hard signal; amber is out-of-range-but-probably-fine. Left-justified to 10 columns.</span></div>
+    <div><span class="k">2</span><span><b style="color:var(--ink)">Backend (tier)</b> — the engine name plus its support tier, <span class="mn">verified</span> or <span class="mn">experimental</span>. Non-backend checks (python, bun) carry no tier.</span></div>
+    <div><span class="k">3</span><span><b style="color:var(--ink)">Version</b> — the detected CLI version, checked against the range the adapter contract was last verified against. Blank when the binary is missing.</span></div>
+    <div><span class="k">4</span><span><b style="color:var(--ink)">Detail</b> — the reason, when not <span class="mn">ok</span>: <span class="mn">&#39;agy&#39; not on PATH</span>, <span class="mn">below tested minimum 2.10.0</span>, or a truncated <span class="mn">--version</span> failure.</span></div>
+  </div>
+
+  <h2>Phase routing</h2>
+  <p class="sub"><span class="mn">--construction-executor</span> splits a run by phase</p>
+  <hr class="rule">
+  <div class="lane2">
+    <div class="lanecard"><p class="cap">inception + operations · --executor</p>
+      <div class="row">requirements <span class="bk claude">claude</span></div>
+      <div class="row">architecture <span class="bk claude">claude</span></div>
+      <div class="row">interface-design <span class="bk claude">claude</span></div>
+    </div>
+    <div class="lanecard"><p class="cap">construction · --construction-executor</p>
+      <div class="row">implement-engine <span class="bk codex">codex</span></div>
+      <div class="row">implement-api <span class="bk codex">codex</span></div>
+      <div class="row">integration-tests <span class="bk codex">codex</span></div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">A node&#39;s <span class="mn">phase</span> (<span class="mn">inception</span> | <span class="mn">construction</span> | <span class="mn">operations</span>) decides its engine. Set <span class="mn">--construction-executor codex --construction-model gpt-5.5</span> and only construction nodes move; everything else stays on <span class="mn">--executor</span>. The runner stamps each result with the engine that ran it (<span class="mn">result.executor</span>) so cost attributes correctly.</p>
+
+  <h2>States</h2>
+  <p class="sub">Every verdict a backend check can produce</p>
+  <hr class="rule">
+  <div class="grid2">
+    <div class="state"><p class="cap">ok · present, in range</p>
+      <div class="term">  <span class="ok">ok</span>         codex (verified)           0.142.3</div>
+    </div>
+    <div class="state"><p class="cap">missing · binary not found</p>
+      <div class="term">  <span class="bad">missing</span>    antigravity (experimental)  ('agy' not on PATH)</div>
+    </div>
+    <div class="state"><p class="cap">unparsable · --version failed</p>
+      <div class="term">  <span class="bad">unparsable</span> codex (verified)            (--version exited 1: 'Traceback (most recent call last):')</div>
+    </div>
+    <div class="state"><p class="cap">untested · outside tested range</p>
+      <div class="term">  <span class="amber">untested</span>   kiro (verified)            2.9.0  (below tested minimum 2.10.0)</div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.8rem"><b style="color:var(--ink)">untested still runs.</b> Outside the tested version range is a warning, not a block — the adapter usually still works, so the engine stays usable and the row is amber. <span class="mn">missing</span> and <span class="mn">unparsable</span> are the hard signals (red). The command exits <span class="mn">0</span> as long as at least one live backend is usable.</p>
+
+  <h2>What each flag produces</h2>
+  <p class="sub">One conductor · one topology · the engine is a flag</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Flag / command</th><th>Effect</th><th>Default</th></tr>
+    <tr><td><b><span class="mn">run --executor &lt;name&gt;</span></b></td><td>Drives every node on <span class="mn">&lt;name&gt;</span>; attributes cost per node to it</td><td class="mn2">claude</td></tr>
+    <tr><td><b><span class="mn">--construction-executor &lt;name&gt;</span></b></td><td>Routes construction-phase nodes to a second engine; inception/operations stay on <span class="mn">--executor</span></td><td class="mn2">(off)</td></tr>
+    <tr><td><b><span class="mn">--construction-model &lt;m&gt;</span></b></td><td>Model for the construction engine (e.g. <span class="mn">gpt-5.5</span>)</td><td class="mn2">(backend default)</td></tr>
+    <tr><td><b><span class="mn">--model &lt;m&gt;</span></b></td><td>Backend model override for <span class="mn">--executor</span></td><td class="mn2">(backend default)</td></tr>
+    <tr><td><b><span class="mn">--funding subscription|api</span></b></td><td>Claude funding source — the subscription token, not a metered API call</td><td class="mn2">subscription</td></tr>
+    <tr><td><b><span class="mn">doctor [--json]</span></b></td><td>Validates each backend CLI against its tested contract range, offline</td><td class="mn2">exit 0 if ≥1 usable</td></tr>
+    <tr><td><b><span class="mn">compare A B</span></b></td><td>Diffs outcome + cost per node across engines or across time</td><td class="mn2">(own capability)</td></tr>
+  </table>
+
+  <h2>Voice</h2>
+  <p class="sub">Name the engine; attribute the cost; keep the status words</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Do</th><th>Not</th></tr>
+    <tr><td>Name the engine — <span class="mn">executor=codex</span></td><td>&ldquo;the AI&rdquo; / &ldquo;the model&rdquo;</td></tr>
+    <tr><td>Show the tier — <span class="mn">(experimental)</span></td><td>Hide how mature an adapter is</td></tr>
+    <tr><td>Keep the status words — <span class="mn">ok · missing · untested</span></td><td>&ldquo;error&rdquo; / &ldquo;warning&rdquo; / a colored dot alone</td></tr>
+    <tr><td>Attribute cost to the engine — <span class="mn">B[✓ gpt-5.5 $0.32]</span></td><td>One blended number across backends</td></tr>
+  </table>
+
+  <div class="foot">Tokens and behavior are taken verbatim from <span class="mn">cadora/executors/</span> and <span class="mn">cadora/doctor.py</span>. Edit the rendered components in place, or hand the palette and metrics tables to a Figma library.</div>
+</div>
+</body>
+</html>

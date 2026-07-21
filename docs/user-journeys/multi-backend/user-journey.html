@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One topology, swappable engines · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec; --ink:#1b2130; --ink-soft:#4a5265; --ink-faint:#7b8496;
+    --rule:#e0dccf; --card:#fffefb; --amber:#b3760f; --amber-bg:#f6ecd6;
+    --green:#0f7a54; --red:#b23a4b; --blue:#245bb5;
+    --scr-bg:#0f172a; --scr-canvas:#111c2f; --scr-panel:#1e2937; --scr-panel2:#162237;
+    --scr-line:#334158; --scr-text:#f5f7fb; --scr-muted:#9aa8bc; --scr-blue:#6ba5f0;
+    --scr-green:#16c784; --scr-greensoft:#75f0a8; --scr-red:#fb7185; --scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+      --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;
+      --green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  }
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+    --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;--green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;
+    --rule:#e0dccf;--card:#fffefb;--amber:#b3760f;--amber-bg:#f6ecd6;--green:#0f7a54;--red:#b23a4b;--blue:#245bb5;}
+  *{box-sizing:border-box}
+  .wrap{max-width:760px;margin:0 auto;padding:3rem 1.5rem 4rem;color:var(--ink);
+    font-family:var(--sans);line-height:1.65;font-size:16px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--amber);margin:0 0 .6rem}
+  h1{font-size:2.5rem;line-height:1.05;letter-spacing:-.02em;margin:.2rem 0 .5rem;text-wrap:balance;font-weight:640}
+  .lede{font-size:1.15rem;color:var(--ink-soft);margin:0;max-width:60ch}
+  .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:1.4rem;
+    padding-top:1rem;border-top:1px solid var(--rule);display:flex;gap:1.5rem;flex-wrap:wrap}
+  .step{margin-top:3.4rem}
+  .step-head{display:flex;align-items:baseline;gap:.9rem;margin-bottom:.5rem}
+  .num{font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:600;
+    border:1px solid var(--rule);border-radius:6px;padding:2px 8px;flex:none}
+  h2{font-size:1.5rem;letter-spacing:-.01em;margin:0;font-weight:600;text-wrap:balance}
+  .step p{color:var(--ink-soft);margin:.5rem 0 0}
+  .step p strong{color:var(--ink);font-weight:600}
+  .note{font-size:.95rem;color:var(--ink-faint);border-left:2px solid var(--amber);
+    padding:.1rem 0 .1rem .9rem;margin:1.1rem 0 0}
+  /* faux browser frame holding a faithful dark-dashboard screen */
+  .screen{margin:1.4rem 0 .3rem;border-radius:12px;overflow:hidden;border:1px solid var(--rule);
+    background:var(--scr-bg);box-shadow:0 1px 0 var(--rule)}
+  .chrome{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#0b1220;border-bottom:1px solid #1e2a3d}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .url{margin-left:8px;font-family:var(--mono);font-size:11px;color:#5f6d84;background:#0f1a2c;
+    border-radius:6px;padding:3px 10px;flex:1}
+  .body{padding:14px;color:var(--scr-text);font-size:13px}
+  .hero{display:flex;justify-content:space-between;align-items:center;background:var(--scr-panel);
+    border-radius:10px;padding:11px 14px;margin-bottom:12px}
+  .hero b{font-size:15px}.hero small{color:var(--scr-muted);display:block;font-size:11px;margin-top:2px}
+  .pill{font-size:11px;padding:3px 9px;border-radius:999px}
+  .pill.run{background:#12314e;color:#7db8ff}.pill.done{background:#0f3d2c;color:var(--scr-greensoft)}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);
+    padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:150px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted);line-height:1.55}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0}
+  .prev h4{margin:2px 0 4px;font-size:13px;color:var(--scr-text)}
+  .prev p,.prev li{color:var(--scr-muted);font-size:12px;margin:2px 0}
+  .dag{display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:6px}
+  .node{width:180px;text-align:center;border-radius:8px;padding:7px;font-size:12px;
+    background:var(--scr-panel);border:1px solid var(--scr-line);color:var(--scr-muted)}
+  .node.on{background:#123024;border-color:#1f6a49;color:var(--scr-greensoft)}
+  .node .badge{font-size:9px;background:#0f3d2c;color:var(--scr-greensoft);border-radius:4px;padding:1px 6px;margin:0 2px}
+  .node.wait{background:#2a2410;border-color:#7a6320;color:var(--scr-amber)}
+  .arrow{color:var(--scr-line);font-size:12px}
+  .foot{margin-top:3.5rem;padding-top:1.2rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  a{color:var(--blue)}
+</style>
+
+<style>
+  /* evidence pack — appended after the verbatim base, reusing the same --scr-* tokens */
+  .mn{font-family:var(--mono);font-size:.9em}
+  /* terminal recreation — same dark palette, monospace, one pre-wrap region per screen */
+  .term{font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--scr-muted);
+    white-space:pre-wrap;word-break:break-word}
+  .term .p{color:var(--scr-greensoft)}          /* the $ prompt */
+  .term .cmd{color:var(--scr-text)}             /* the command you type */
+  .term .cmt{color:var(--scr-muted)}            /* # inline comment */
+  .term .path{color:var(--scr-blue)}
+  .term .ok{color:var(--scr-greensoft)}
+  .term .amber{color:var(--scr-amber)}
+  .term .bad{color:var(--scr-red)}
+  .term .verdict{color:var(--scr-greensoft);font-weight:700}
+  .term .verdict.no{color:var(--scr-red)}
+  /* mini archived-file list — a checksums.txt preview */
+  .chk{margin-top:11px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:9px 11px}
+  .chk .cap{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted);margin-bottom:6px}
+  .chk .row{display:flex;gap:12px;font-family:var(--mono);font-size:11px;padding:2px 0;line-height:1.5}
+  .chk .h{color:var(--scr-green);flex:none}
+  .chk .f{color:var(--scr-text);word-break:break-all}
+  .chk .more{color:var(--scr-muted);font-size:11px;margin-top:5px}
+  /* the sealed pack, ready to hand off */
+  .packrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .packrow .fn{font-family:var(--mono);font-size:12px;color:var(--scr-text);flex:none;min-width:150px}
+  .packrow .d{font-size:11px;color:var(--scr-muted);flex:1}
+  .packrow .tag{font-size:10px;letter-spacing:.05em;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 8px;white-space:nowrap}
+  .packrow .tag.sig{color:var(--scr-amber);border-color:var(--scr-amber)}
+  /* the arc: tamper-evident -> attributable -> verified */
+  .arc{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:1.6rem;font-family:var(--mono);font-size:12px}
+  .arc span.node{border:1px solid var(--rule);border-radius:999px;padding:4px 13px;color:var(--ink-soft)}
+  .arc span.node.on{border-color:var(--amber);color:var(--amber)}
+  .arc span.sep{color:var(--ink-faint)}
+</style>
+
+<style>
+  /* multi-backend — appended after the verbatim base, reusing the same --scr-* tokens */
+  /* backend chip — one token per engine; every color below is already in the base CSS */
+  .bk{font-size:10px;font-weight:600;letter-spacing:.03em;border-radius:999px;padding:2px 8px;white-space:nowrap}
+  .bk.claude{background:#12314e;color:#7db8ff}                 /* == .pill.run (info blue) */
+  .bk.codex{background:#2a2410;color:var(--scr-amber)}         /* == .node.wait (amber accent) */
+  .bk.kiro{background:#0f3d2c;color:var(--scr-greensoft)}      /* == .pill.done (green) */
+  .bk.neu{background:var(--scr-canvas);color:var(--scr-muted);border:1px solid var(--scr-line)}
+  /* phase lane label inside the routing DAG */
+  .lane{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--scr-muted);margin:12px 0 4px}
+  .fan{display:flex;gap:8px;justify-content:center}
+  .fan .node{width:150px}
+  /* registry tier tags — reuse the pack-list .tag with two semantic borders (both in base) */
+  .packrow .fn{min-width:104px}
+  .packrow .d code{font-family:var(--mono);color:var(--scr-blue);font-size:11px}
+  .packrow .tag.ok{color:var(--scr-greensoft);border-color:#1f6a49}
+  .packrow .tag.exp{color:var(--scr-amber);border-color:#7a6320}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Cadora drives one topology through swappable backends: cadora doctor validates each backend CLI against the version range its adapter contract was last verified against; cadora run --executor codex drives the whole run on Codex with cost attributed to codex; --construction-executor codex --construction-model gpt-5.5 splits a single run so inception nodes run on Claude Code and construction nodes on Codex; the backend registry resolves claude, codex, kiro, glm, antigravity, and fixture; cadora compare diffs outcome and cost per node across backends; and the gates, integrity checks, evidence pack, and cost attribution are identical no matter which engine ran.</h2>
+
+  <p class="eyebrow">Cadora · multi-backend</p>
+  <h1>One topology, swappable engines</h1>
+  <p class="lede">Cadora is the conductor, not the agent. The same topology drives <strong>Claude Code, Codex, Kiro, GLM, or Antigravity</strong> — and the gates, integrity checks, evidence pack, and cost attribution are backend-agnostic, so every engine produces the same audit-grade proof. You can even split one run across two backends and still get one verdict.</p>
+  <div class="meta"><span>Surface · CLI + backend registry</span><span>Role · operator / platform owner</span><span>Engines · claude · codex · kiro · glm · antigravity</span></div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">01</span><h2>Know your engines before you run</h2></div>
+    <p>Backend CLIs ship weekly and change their machine output without notice. <span class="mn">cadora doctor</span> checks each backend binary is present and its version falls inside the range the adapter contract was last verified against — <strong>offline, no model calls</strong>. Verified engines (claude, codex, kiro) carry a tested range; experimental ones (glm, antigravity) run, but aren&#39;t in the release smoke yet.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora doctor</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora doctor</span>
+cadora doctor — backend CLI contract checks
+  <span class="ok">ok</span>         python                     3.12.7
+  <span class="ok">ok</span>         claude (verified)          2.1.128
+  <span class="ok">ok</span>         codex (verified)           0.142.3
+  <span class="ok">ok</span>         kiro (verified)            2.10.4
+  <span class="ok">ok</span>         glm (experimental)        
+  <span class="bad">missing</span>    antigravity (experimental)  ('agy' not on PATH)
+  <span class="ok">ok</span>         bun                        1.1.34  (runtime for the aidlc-v2 method pack's hooks (optional otherwise))
+  support: 3 verified (claude, codex, kiro) · 2 experimental (antigravity, glm)
+  (fixture needs no check — offline, no external contract)</div>
+      </div>
+    </div>
+    <p class="note">Outside-range is a warning (<span class="mn">untested</span> — it usually still works); <span class="mn">missing</span> or <span class="mn">unparsable</span> is the hard signal. Exit stays <span class="mn">0</span> while at least one live backend is usable, so <span class="mn">cadora doctor</span> drops straight into CI. Add <span class="mn">--json</span> for the structured report.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">02</span><h2>Drive the whole run on Codex</h2></div>
+    <p>Point <span class="mn">--executor</span> at any engine and the entire run executes there. Every node runs on Codex, the build gate re-runs for real, and per-node cost is <strong>attributed to codex</strong> in the archive — the same manifest shape you&#39;d get from Claude Code.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora run --executor codex</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora run api.topology.yaml --executor codex --model gpt-5.5</span>
+cadora · executor=codex · run=api-codex-0717
+<span class="amber">▶</span> requirements · gpt-5.5 · running… (generating documents; this can take a few minutes)
+  <span class="ok">✓</span> requirements   $0.1180   integrity:<span class="ok">ok</span>
+<span class="amber">▶</span> design · gpt-5.5 · running…
+  <span class="ok">✓</span> design   $0.1640   integrity:<span class="ok">ok</span>
+<span class="amber">▶</span> construction · gpt-5.5 · running…
+  <span class="ok">✓</span> construction   $0.3210   gate:build-test <span class="ok">ok</span>   integrity:<span class="ok">ok</span>
+<span class="ok">✓ run complete -&gt; runs/api-codex-0717</span></div>
+      </div>
+    </div>
+    <p class="note">The run header reads <span class="mn">executor=codex</span>; <span class="mn">funding=</span> appears only for Claude Code (its subscription-vs-api token). Cost is attributed per node to the engine that ran it — dollar figures here are illustrative (est.).</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">03</span><h2>Split one run across two backends</h2></div>
+    <p>Design on one engine, build on another — in a single run. <span class="mn">--construction-executor</span> routes construction-phase nodes to a second backend while inception and operations nodes stay on <span class="mn">--executor</span>. Here the three design nodes run on Claude Code and the three code nodes on Codex, each node stamped with the engine that ran it. One conductor, one archive, one verdict.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8768/runs/flags-hetero-0717</span></div>
+      <div class="body">
+        <div class="hero"><div><b>flags-hetero-0717</b><small>multi-backend-feature-flags · 6 nodes · claude + codex</small></div><span class="pill done">completed</span></div>
+        <div class="ta"><span class="mn">cadora run multi-backend.topology.yaml --executor claude --construction-executor codex --construction-model gpt-5.5</span></div>
+        <div class="lane">inception · runs on --executor</div>
+        <div class="dag">
+          <div class="node on">requirements <span class="bk claude">claude</span></div>
+          <div class="arrow">↓</div>
+          <div class="node on">architecture <span class="bk claude">claude</span></div>
+          <div class="arrow">↓</div>
+          <div class="node on">interface-design <span class="bk claude">claude</span></div>
+        </div>
+        <div class="lane">construction · routed to --construction-executor</div>
+        <div class="dag">
+          <div class="fan">
+            <div class="node on">implement-engine <span class="bk codex">codex</span></div>
+            <div class="node on">implement-api <span class="bk codex">codex</span></div>
+          </div>
+          <div class="arrow">↓</div>
+          <div class="node on">integration-tests <span class="bk codex">codex</span><div style="margin-top:3px"><span class="badge">gate:build-test</span></div></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Routing is by phase — inception and operations stay on <span class="mn">--executor</span>; only construction moves to <span class="mn">--construction-executor</span>. The split is invisible downstream: gates, integrity, and cost attribution treat a two-engine run exactly like a one-engine run.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">04</span><h2>The backend registry</h2></div>
+    <p><span class="mn">--executor &lt;name&gt;</span> resolves through a small registry — one class per engine, each implementing the same <span class="mn">NodeExecutor</span> contract: <span class="mn">run(node, prompt, cwd) → ExecutionResult</span>. Adding an engine is a one-class change; nothing else in Cadora knows which backend ran. <span class="mn">get_executor(name)</span> forwards only the kwargs a backend accepts, so <span class="mn">--funding</span> reaches Claude Code and is quietly ignored elsewhere.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">cadora/executors/ — the backend registry</span></div>
+      <div class="body">
+        <div class="packrow"><span class="fn"><span class="bk claude">claude</span></span><span class="d"><code>claude_code.py</code> — default; structured stream-json</span><span class="tag ok">verified</span></div>
+        <div class="packrow"><span class="fn"><span class="bk codex">codex</span></span><span class="d"><code>codex.py</code> — OpenAI; structured JSONL</span><span class="tag ok">verified</span></div>
+        <div class="packrow"><span class="fn"><span class="bk kiro">kiro</span></span><span class="d"><code>kiro.py</code> — AWS; credit-based (kiro-cli)</span><span class="tag ok">verified</span></div>
+        <div class="packrow"><span class="fn"><span class="bk neu">glm</span></span><span class="d"><code>glm.py</code> — Z.ai, driven behind the claude CLI</span><span class="tag exp">experimental</span></div>
+        <div class="packrow"><span class="fn"><span class="bk neu">antigravity</span></span><span class="d"><code>antigravity.py</code> — Google (agy)</span><span class="tag exp">experimental</span></div>
+        <div class="packrow"><span class="fn"><span class="bk neu">fixture</span></span><span class="d"><code>fixture.py</code> — local deterministic backend for demos and tests</span><span class="tag">test-only</span></div>
+      </div>
+    </div>
+    <p class="note">Ask for an engine that isn&#39;t there and the registry is the allow-list: <span class="mn">unknown executor &#39;x&#39;; choose from [&#39;antigravity&#39;, &#39;claude&#39;, &#39;codex&#39;, &#39;fixture&#39;, &#39;glm&#39;, &#39;kiro&#39;]</span>.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">05</span><h2>Prove the swap didn&#39;t change the answer</h2></div>
+    <p>The differentiator no single vendor ships: run the <strong>same topology through two backends</strong> and diff outcome and cost per node. <span class="mn">cadora compare</span> reads two archived manifests and lines them up — pass/fail, model, and cost, node by node — so &ldquo;we switched engines&rdquo; becomes a measured claim, not a guess.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora compare (claude vs codex)</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora compare api-claude-0716 api-codex-0717</span>
+compare  A=api-claude-0716  B=api-codex-0717
+  A: executor=claude topology=api.topology.yaml ok=True pass=3/3 cost=$0.9120 out_tok=47210
+  B: executor=codex topology=api.topology.yaml ok=True pass=3/3 cost=$0.6030 out_tok=51840
+  Δcost (B−A): $-0.3090
+  nodes:
+    · requirements: A[<span class="ok">✓</span> claude-opus-4-8 $0.2040] B[<span class="ok">✓</span> gpt-5.5 $0.1180]
+    · design: A[<span class="ok">✓</span> claude-opus-4-8 $0.2790] B[<span class="ok">✓</span> gpt-5.5 $0.1640]
+    · construction: A[<span class="ok">✓</span> claude-opus-4-8 $0.4290] B[<span class="ok">✓</span> gpt-5.5 $0.3210]</div>
+      </div>
+    </div>
+    <p class="note">Same topology, same gates, both green — the diff is purely engine economics (figures illustrative, est.). <span class="mn">cadora compare</span> is its own capability; this is just where multi-backend pays off.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">06</span><h2>Same proof, every engine</h2></div>
+    <p>This is the whole point of a vendor-neutral conductor. Whichever engine ran — or a mix — the audit surface is identical: the same deterministic gates re-run the real build, the same toolchain-integrity checks, the same tamper-evident evidence pack, the same per-node cost attribution. Swapping engines changes the bill and maybe the speed. It never changes the shape of the proof.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">the backend-agnostic audit surface</span></div>
+      <div class="body">
+        <div class="callout">
+          <div class="rhead"><span class="flag">SAME PROOF</span><span>the audit surface doesn&#39;t know which engine ran</span></div>
+          <div class="docrow"><span class="mini">gates</span><a>deterministic — the real build / tests / scan re-run per node</a><span class="kind">identical</span></div>
+          <div class="docrow"><span class="mini">integrity</span><a>toolchain-integrity checks over the produced workspace</a><span class="kind">identical</span></div>
+          <div class="docrow"><span class="mini">evidence</span><a>tamper-evident pack — report, checksums, signature</a><span class="kind">identical</span></div>
+          <div class="docrow"><span class="mini">cost</span><a>per-node attribution, priced to the engine that ran it</a><span class="kind">identical</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="arc"><span class="node on">gates</span><span class="sep">·</span><span class="node on">integrity</span><span class="sep">·</span><span class="node on">evidence pack</span><span class="sep">·</span><span class="node on">cost</span></div>
+  </div>
+
+  <div class="foot">
+    <p>The terminal frames above reproduce real <span class="mn">cadora doctor / run / compare</span> output, rendered as editable HTML rather than raster captures — lift them into Figma or iterate directly. Cadora&#39;s bet: the conductor, the gates, and the proof stay put while the engine underneath is yours to choose — Claude Code today, Codex or Kiro tomorrow, or two at once, with the same audit-grade evidence every time.</p>
+  </div>
+</div>
+</body>
+</html>

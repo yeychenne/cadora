@@ -20,6 +20,12 @@ class FixtureExecutor(NodeExecutor):
     name = "fixture"
 
     def run(self, node: Node, prompt: str, *, cwd: str, env=None) -> ExecutionResult:
+        # Conversational review: answer a question / return a revised draft in the response text,
+        # deterministically, so the HITL review dialog can be exercised without a real model.
+        if "[[cadora-review-question]]" in prompt:
+            return self._reply(node, _answer_for(prompt))
+        if "[[cadora-review-revision]]" in prompt:
+            return self._reply(node, _revise_for(prompt))
         workspace = Path(cwd)
         docs = workspace / "aidlc-docs" / node.phase
         revised = "Human review of your previous attempt" in prompt
@@ -34,6 +40,12 @@ class FixtureExecutor(NodeExecutor):
             ),
             model="local-fixture",
             meta={"external_model": False, "private": True, "artifacts": artifacts},
+        )
+
+    def _reply(self, node: Node, text: str) -> ExecutionResult:
+        return ExecutionResult(
+            node_id=node.id, ok=True, exit_code=0, text=text,
+            model="local-fixture", meta={"external_model": False, "private": True},
         )
 
 
@@ -131,6 +143,32 @@ Revision applied: {'yes' if revised else 'no'}
         encoding="utf-8",
     )
     return str(path.relative_to(docs.parents[1]))
+
+
+def _section(prompt: str, label: str, until: str) -> str:
+    start = prompt.find(label)
+    if start < 0:
+        return ""
+    body = prompt[start + len(label):]
+    end = body.find(until)
+    return (body if end < 0 else body[:end]).strip()
+
+
+def _answer_for(prompt: str) -> str:
+    question = _section(prompt, "Question:", "\n\nDocument:") or "(no question)"
+    doc = _section(prompt, "Document:", "\n\nAnswer concisely")
+    first = next((ln.strip() for ln in doc.splitlines() if ln.strip() and not ln.startswith("#")), "")
+    basis = f" Based on the document: {first}" if first else ""
+    return (
+        f"Fixture answer to “{question}”.{basis} "
+        "A real executor would reason over the full document and reply here."
+    )
+
+
+def _revise_for(prompt: str) -> str:
+    instruction = _section(prompt, "Instruction:", "\n\nCurrent document:") or "(no instruction)"
+    doc = _section(prompt, "Current document:", "\n\nReturn the COMPLETE")
+    return f"{doc}\n\n## Revision (fixture)\nApplied per reviewer instruction: {instruction}\n"
 
 
 def _excerpt(prompt: str, limit: int = 700) -> str:

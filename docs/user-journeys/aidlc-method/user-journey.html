@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The method the conductor drives and gates · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec; --ink:#1b2130; --ink-soft:#4a5265; --ink-faint:#7b8496;
+    --rule:#e0dccf; --card:#fffefb; --amber:#b3760f; --amber-bg:#f6ecd6;
+    --green:#0f7a54; --red:#b23a4b; --blue:#245bb5;
+    --scr-bg:#0f172a; --scr-canvas:#111c2f; --scr-panel:#1e2937; --scr-panel2:#162237;
+    --scr-line:#334158; --scr-text:#f5f7fb; --scr-muted:#9aa8bc; --scr-blue:#6ba5f0;
+    --scr-green:#16c784; --scr-greensoft:#75f0a8; --scr-red:#fb7185; --scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+      --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;
+      --green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  }
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+    --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;--green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;
+    --rule:#e0dccf;--card:#fffefb;--amber:#b3760f;--amber-bg:#f6ecd6;--green:#0f7a54;--red:#b23a4b;--blue:#245bb5;}
+  *{box-sizing:border-box}
+  .wrap{max-width:760px;margin:0 auto;padding:3rem 1.5rem 4rem;color:var(--ink);
+    font-family:var(--sans);line-height:1.65;font-size:16px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--amber);margin:0 0 .6rem}
+  h1{font-size:2.5rem;line-height:1.05;letter-spacing:-.02em;margin:.2rem 0 .5rem;text-wrap:balance;font-weight:640}
+  .lede{font-size:1.15rem;color:var(--ink-soft);margin:0;max-width:60ch}
+  .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:1.4rem;
+    padding-top:1rem;border-top:1px solid var(--rule);display:flex;gap:1.5rem;flex-wrap:wrap}
+  .step{margin-top:3.4rem}
+  .step-head{display:flex;align-items:baseline;gap:.9rem;margin-bottom:.5rem}
+  .num{font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:600;
+    border:1px solid var(--rule);border-radius:6px;padding:2px 8px;flex:none}
+  h2{font-size:1.5rem;letter-spacing:-.01em;margin:0;font-weight:600;text-wrap:balance}
+  .step p{color:var(--ink-soft);margin:.5rem 0 0}
+  .step p strong{color:var(--ink);font-weight:600}
+  .note{font-size:.95rem;color:var(--ink-faint);border-left:2px solid var(--amber);
+    padding:.1rem 0 .1rem .9rem;margin:1.1rem 0 0}
+  /* faux browser frame holding a faithful dark-dashboard screen */
+  .screen{margin:1.4rem 0 .3rem;border-radius:12px;overflow:hidden;border:1px solid var(--rule);
+    background:var(--scr-bg);box-shadow:0 1px 0 var(--rule)}
+  .chrome{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#0b1220;border-bottom:1px solid #1e2a3d}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .url{margin-left:8px;font-family:var(--mono);font-size:11px;color:#5f6d84;background:#0f1a2c;
+    border-radius:6px;padding:3px 10px;flex:1}
+  .body{padding:14px;color:var(--scr-text);font-size:13px}
+  .hero{display:flex;justify-content:space-between;align-items:center;background:var(--scr-panel);
+    border-radius:10px;padding:11px 14px;margin-bottom:12px}
+  .hero b{font-size:15px}.hero small{color:var(--scr-muted);display:block;font-size:11px;margin-top:2px}
+  .pill{font-size:11px;padding:3px 9px;border-radius:999px}
+  .pill.run{background:#12314e;color:#7db8ff}.pill.done{background:#0f3d2c;color:var(--scr-greensoft)}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);
+    padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:150px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted);line-height:1.55}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0}
+  .prev h4{margin:2px 0 4px;font-size:13px;color:var(--scr-text)}
+  .prev p,.prev li{color:var(--scr-muted);font-size:12px;margin:2px 0}
+  .dag{display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:6px}
+  .node{width:180px;text-align:center;border-radius:8px;padding:7px;font-size:12px;
+    background:var(--scr-panel);border:1px solid var(--scr-line);color:var(--scr-muted)}
+  .node.on{background:#123024;border-color:#1f6a49;color:var(--scr-greensoft)}
+  .node .badge{font-size:9px;background:#0f3d2c;color:var(--scr-greensoft);border-radius:4px;padding:1px 6px;margin:0 2px}
+  .node.wait{background:#2a2410;border-color:#7a6320;color:var(--scr-amber)}
+  .arrow{color:var(--scr-line);font-size:12px}
+  .foot{margin-top:3.5rem;padding-top:1.2rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  a{color:var(--blue)}
+</style>
+
+<style>
+  /* evidence pack — appended after the verbatim base, reusing the same --scr-* tokens */
+  .mn{font-family:var(--mono);font-size:.9em}
+  /* terminal recreation — same dark palette, monospace, one pre-wrap region per screen */
+  .term{font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--scr-muted);
+    white-space:pre-wrap;word-break:break-word}
+  .term .p{color:var(--scr-greensoft)}          /* the $ prompt */
+  .term .cmd{color:var(--scr-text)}             /* the command you type */
+  .term .cmt{color:var(--scr-muted)}            /* # inline comment */
+  .term .path{color:var(--scr-blue)}
+  .term .ok{color:var(--scr-greensoft)}
+  .term .amber{color:var(--scr-amber)}
+  .term .bad{color:var(--scr-red)}
+  .term .verdict{color:var(--scr-greensoft);font-weight:700}
+  .term .verdict.no{color:var(--scr-red)}
+  /* mini archived-file list — a checksums.txt preview */
+  .chk{margin-top:11px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:9px 11px}
+  .chk .cap{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted);margin-bottom:6px}
+  .chk .row{display:flex;gap:12px;font-family:var(--mono);font-size:11px;padding:2px 0;line-height:1.5}
+  .chk .h{color:var(--scr-green);flex:none}
+  .chk .f{color:var(--scr-text);word-break:break-all}
+  .chk .more{color:var(--scr-muted);font-size:11px;margin-top:5px}
+  /* the sealed pack, ready to hand off */
+  .packrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .packrow .fn{font-family:var(--mono);font-size:12px;color:var(--scr-text);flex:none;min-width:150px}
+  .packrow .d{font-size:11px;color:var(--scr-muted);flex:1}
+  .packrow .tag{font-size:10px;letter-spacing:.05em;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 8px;white-space:nowrap}
+  .packrow .tag.sig{color:var(--scr-amber);border-color:var(--scr-amber)}
+  /* the arc: tamper-evident -> attributable -> verified */
+  .arc{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:1.6rem;font-family:var(--mono);font-size:12px}
+  .arc span.node{border:1px solid var(--rule);border-radius:999px;padding:4px 13px;color:var(--ink-soft)}
+  .arc span.node.on{border-color:var(--amber);color:var(--amber)}
+  .arc span.sep{color:var(--ink-faint)}
+</style>
+
+<style>
+  /* aidlc method pack — appended after the two verbatim bases; NO new colors, only --scr-* tokens
+     and the exact literals already present in the base .node / .badge rules */
+  /* phase swim-lanes: the three-phase model rendered as a DAG */
+  .lanes{display:flex;flex-direction:column;gap:9px;margin-top:2px}
+  .lane{border:1px solid var(--scr-line);border-radius:10px;background:var(--scr-panel2);padding:10px 12px}
+  .plabel{font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;
+    color:var(--scr-muted);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .pdot{width:8px;height:8px;border-radius:50%;flex:none}
+  .prow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .hnode{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;
+    padding:7px 11px;font-size:12px;color:var(--scr-text);line-height:1.3}
+  .hnode small{display:block;color:var(--scr-muted);font-size:10px;margin-top:2px;font-family:var(--mono)}
+  .hnode.done{border-color:#1f6a49;background:#123024}
+  .hnode.done b{color:var(--scr-greensoft)}
+  .hnode.wait{border-color:#7a6320;background:#2a2410}
+  .hnode.wait b{color:var(--scr-amber)}
+  .gchip{font-size:9px;font-family:var(--mono);border-radius:4px;padding:1px 6px;white-space:nowrap;margin-left:2px}
+  .gchip.rev{background:#2a2410;color:var(--scr-amber);border:1px solid #7a6320}
+  .gchip.gate{background:#0f3d2c;color:var(--scr-greensoft);border:1px solid #1f6a49}
+  .harrow{color:var(--scr-line);font-size:12px}
+  .lane .empty{color:var(--scr-muted);font-size:11px;font-style:italic}
+  /* yaml code frame — reuses the .term spans (.path key, .amber, .ok, .cmt) */
+  .yaml{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--scr-text);
+    white-space:pre;overflow-x:auto}
+  .yaml .k{color:var(--scr-blue)}
+  .yaml .rev{color:var(--scr-amber)}
+  .yaml .gate{color:var(--scr-greensoft)}
+  .yaml .cmt{color:var(--scr-muted)}
+  .yaml .ph{color:var(--scr-amber)}
+  /* two-pack comparison columns */
+  .cmp{display:flex;gap:12px;margin:1.4rem 0 .3rem;flex-wrap:wrap}
+  .col{flex:1;min-width:220px;border:1px solid var(--scr-line);border-radius:11px;background:var(--scr-bg);padding:14px}
+  .col h4{margin:0 0 3px;font-size:14px;color:var(--scr-text);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .col .tag{font-size:9px;font-family:var(--mono);letter-spacing:.05em;padding:2px 8px;border-radius:999px}
+  .col .tag.stable{background:#0f3d2c;color:var(--scr-greensoft)}
+  .col .tag.exp{background:#2a2410;color:var(--scr-amber)}
+  .col ul{margin:9px 0 0;padding:0;list-style:none}
+  .col li{font-size:12px;color:var(--scr-muted);padding:6px 0 6px 15px;position:relative;line-height:1.5;border-top:1px solid var(--scr-line)}
+  .col li:first-child{border-top:0}
+  .col li::before{content:"›";position:absolute;left:1px;color:var(--scr-blue)}
+  .col li b{color:var(--scr-text);font-weight:600}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Cadora's AI-DLC method pack, step by step: cadora aidlc-init lays the rules and inputs into a workspace, the method structures work into three phases (inception, construction, operations) with deterministic gates and human-review gates between them, a phased topology declares phase/gate/review on each node, cadora run --hitl drives the phases and pauses at review gates, cadora aidlc-audit reads back the six-state checklist and the 68-event audit trail, and the stable aidlc pack sits beside the EXPERIMENTAL pinned aidlc-v2 pack whose installer strips upstream's provider and cost pins by default.</h2>
+
+  <p class="eyebrow">Cadora · AI-DLC method pack</p>
+  <h1>The method the conductor drives and gates</h1>
+  <p class="lede">AI-DLC is not a mode inside Cadora — it is an installable <strong>method</strong>: rules plus inputs that structure work into three phases. Cadora lays that method into a workspace, drives a phased topology through it, puts <strong>deterministic gates</strong> and <strong>human-review gates</strong> between the phases, and reads back a phase-by-phase audit trail. This is that method's journey, from an empty directory to an audited run.</p>
+  <div class="meta"><span>Surface · CLI + phased topology</span><span>Role · operator / reviewer</span><span>Packs · aidlc (v1.0.0) · aidlc-v2 (experimental)</span></div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">01</span><h2>Lay the method into a workspace</h2></div>
+    <p>One command turns an empty directory into an AI-DLC workspace. Cadora installs the <strong>rules</strong> — the v1 pack vendored in <span class="mn">cadora/aidlc_rules/</span> — as backend-native project memory: <span class="mn">core-workflow.md</span> becomes the executor's instruction file (<span class="mn">CLAUDE.md</span> for Claude Code, <span class="mn">AGENTS.md</span> for Codex), and the detailed per-stage rules land in <span class="mn">.aidlc-rule-details/</span>. Your <strong>inputs</strong> — <span class="mn">vision.md</span> and the optional <span class="mn">tech-env.md</span> — sit beside them.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora aidlc-init</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora aidlc-init myapp --vision vision.md --tech-env tech-env.md</span>
+AI-DLC workspace ready at <span class="path">myapp</span> (rules 1.0.0)
+  installed: CLAUDE.md, .aidlc-rule-details/, vision.md, tech-env.md
+  next: cadora run examples/aidlc.topology.yaml --executor claude --cwd myapp</div>
+        <div class="chk">
+          <div class="cap">myapp/ — what aidlc-init laid down</div>
+          <div class="row"><span class="h">rules</span><span class="f">CLAUDE.md &nbsp;— AI-DLC core workflow, in a managed &lt;!-- cadora:aidlc --&gt; block</span></div>
+          <div class="row"><span class="h">rules</span><span class="f">.aidlc-rule-details/{inception,construction,operations,common}/</span></div>
+          <div class="row"><span class="h">input</span><span class="f">vision.md &nbsp;— your product vision (required)</span></div>
+          <div class="row"><span class="h">input</span><span class="f">tech-env.md &nbsp;— technical environment (optional)</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Pick the backend with <span class="mn">--executor claude|codex|kiro</span> — it only changes which instruction file the rules are written into. The method itself is identical across backends.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">02</span><h2>Three phases, gates between them</h2></div>
+    <p>The method organizes work into <strong>inception → construction → operations</strong> — the three directories under <span class="mn">.aidlc-rule-details/</span>. Cadora's job is to sit between the phases: a <span style="color:var(--amber)">review gate</span> (a node marked <span class="mn">review: true</span>) pauses for a human before downstream work starts, and a <span style="color:var(--green)">build-test gate</span> re-runs the real build and tests before a phase is allowed to count as done. The node ids below are the real ones from <span class="mn">examples/aidlc-phased.topology.yaml</span>.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8768/topology/aidlc-phased</span></div>
+      <div class="body">
+        <div class="lanes">
+          <div class="lane">
+            <div class="plabel"><span class="pdot" style="background:var(--scr-blue)"></span>phase · inception</div>
+            <div class="prow">
+              <div class="hnode"><b>requirements</b><span class="gchip rev">review</span><small>role · requirements-analysis</small></div>
+              <span class="harrow">→</span>
+              <div class="hnode"><b>design</b><span class="gchip rev">review</span><small>role · application-design</small></div>
+            </div>
+          </div>
+          <div class="lane">
+            <div class="plabel"><span class="pdot" style="background:var(--scr-green)"></span>phase · construction</div>
+            <div class="prow">
+              <div class="hnode"><b>code-generation</b><span class="gchip gate">gate: build-test</span><small>role · code-generation</small></div>
+              <span class="harrow">→</span>
+              <div class="hnode"><b>build-test</b><span class="gchip gate">gate: build-test</span><small>role · build-and-test</small></div>
+            </div>
+          </div>
+          <div class="lane">
+            <div class="plabel"><span class="pdot" style="background:var(--scr-muted)"></span>phase · operations</div>
+            <div class="prow">
+              <span class="empty">deploy / operate — the method's third phase (.aidlc-rule-details/operations/); nodes stay on --executor even when construction is routed elsewhere</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note">A node's <span class="mn">phase</span> is more than a label: <span class="mn">--construction-executor codex</span> routes only the construction-phase nodes to a second backend, leaving inception and operations on <span class="mn">--executor</span>.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">03</span><h2>The topology declares the phases</h2></div>
+    <p>The three-phase model is not hidden in Cadora — it is written in the topology you hand to <span class="mn">cadora run</span>. Each node carries a <span style="color:var(--amber)">phase</span>, a dependency edge, and — where the method wants a checkpoint — a <span class="mn">gate</span> or a <span class="mn">review: true</span> flag. Here is <span class="mn">examples/aidlc-phased.topology.yaml</span>, prompts elided.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">examples/aidlc-phased.topology.yaml</span></div>
+      <div class="body">
+        <div class="yaml"><span class="k">name</span>: aidlc-phased
+
+<span class="k">nodes</span>:
+  - <span class="k">id</span>: requirements
+    <span class="k">phase</span>: <span class="ph">inception</span>
+    <span class="k">role</span>: requirements-analysis
+    <span class="k">prompt</span>: | <span class="cmt"># Read vision.md → requirements.md …</span>
+    <span class="k">review</span>: <span class="rev">true</span>
+
+  - <span class="k">id</span>: design
+    <span class="k">phase</span>: <span class="ph">inception</span>
+    <span class="k">role</span>: application-design
+    <span class="k">depends_on</span>: [requirements]
+    <span class="k">review</span>: <span class="rev">true</span>
+
+  - <span class="k">id</span>: code-generation
+    <span class="k">phase</span>: <span class="ph">construction</span>
+    <span class="k">role</span>: code-generation
+    <span class="k">depends_on</span>: [design]
+    <span class="k">gate</span>: <span class="gate">build-test</span>
+
+  - <span class="k">id</span>: build-test
+    <span class="k">phase</span>: <span class="ph">construction</span>
+    <span class="k">role</span>: build-and-test
+    <span class="k">depends_on</span>: [code-generation]
+    <span class="k">gate</span>: <span class="gate">build-test</span></div>
+      </div>
+    </div>
+    <p class="note">The full per-stage lifecycle — seven inception stages, six construction stages, conditional self-skips — lives in <span class="mn">examples/aidlc-stages.topology.yaml</span>. The single-session shape is <span class="mn">examples/aidlc.topology.yaml</span> (one node, <span class="mn">gate: build-test</span>).</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">04</span><h2>Drive it — and pause for review</h2></div>
+    <p>One command installs the workspace <em>and</em> drives the phased topology through it. With <span class="mn">--hitl</span>, Cadora pauses at every <span class="mn">review: true</span> node — here <span class="mn">requirements</span> and <span class="mn">design</span>, both inception — and waits. <span class="mn">requirements</span> has finished and its documents are written; <span class="mn">design</span> is held at the gate; <span class="mn">construction</span> hasn't started. The operator approves, requests a same-stage revision, or aborts <strong>before</strong> any downstream work begins.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8768/runs/pr7-aidlc</span></div>
+      <div class="body">
+        <div class="hero"><div><b>pr7-aidlc</b><small>aidlc-hitl · executor claude · 3 nodes</small></div><span class="pill run">review · design</span></div>
+        <div class="dag">
+          <div class="node on">requirements<div style="margin-top:3px"><span class="badge">inception</span><span class="badge">approved</span></div></div>
+          <div class="arrow">↓</div>
+          <div class="node wait">design<div style="margin-top:3px"><span class="badge" style="background:#2a2410;color:var(--scr-amber)">inception</span><span class="badge" style="background:#2a2410;color:var(--scr-amber)">awaiting review</span></div></div>
+          <div class="arrow">↓</div>
+          <div class="node">construction<div style="margin-top:3px"><span class="mini">gate: build-test</span></div></div>
+        </div>
+        <div class="callout" style="margin-top:12px">
+          <div class="rhead"><span class="flag">review gate</span><span style="color:var(--scr-text);font-size:13px">design · inception — approve before construction starts</span></div>
+          <div class="ta">Application design written to <span style="color:var(--scr-blue)">aidlc-docs/inception/application-design/</span>. Read it, then decide. A revision re-runs <span class="mn" style="color:var(--scr-muted)">design</span> only.</div>
+          <div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span><span class="btn no">Abort</span><span class="msg">decision recorded in design/human-review.md</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Without <span class="mn">--hitl</span> the same topology runs autonomously end to end. Headless? <span class="mn">--review-file</span> writes <span class="mn">cadora-review-request.json</span> and polls for a decision file — any tool or human can drop it — and fails closed on <span class="mn">--review-timeout</span>.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">05</span><h2>Two packs: stable, and experimental</h2></div>
+    <p>There are two method packs. <strong>aidlc</strong> is the default — the v1 rules, vendored and stable, with no network fetch. <strong>aidlc-v2</strong> is a <em>pinned upstream distribution</em> and is honestly labelled <strong>EXPERIMENTAL</strong>: the default ref is a tag whose commit hash Cadora verifies after fetching, so a moved tag fails the install rather than silently shipping different code.</p>
+    <div class="cmp">
+      <div class="col">
+        <h4>aidlc <span class="tag stable">stable · default</span></h4>
+        <ul>
+          <li><b>v1 rules</b>, vendored in <span class="mn" style="color:var(--scr-muted)">cadora/aidlc_rules/</span> — <span class="mn" style="color:var(--scr-muted)">core-workflow.md</span> + <span class="mn" style="color:var(--scr-muted)">rule-details/</span> + <span class="mn" style="color:var(--scr-muted)">RULES_VERSION</span></li>
+          <li>Laid as <b>CLAUDE.md / AGENTS.md</b> + <span class="mn" style="color:var(--scr-muted)">.aidlc-rule-details/</span></li>
+          <li>No network fetch; runs on the <b>funding source you chose</b></li>
+          <li>Backends: <b>claude · codex · kiro</b></li>
+        </ul>
+      </div>
+      <div class="col">
+        <h4>aidlc-v2 <span class="tag exp">experimental</span></h4>
+        <ul>
+          <li><b>Pinned upstream dist</b> — default ref <span class="mn" style="color:var(--scr-muted)">v2.1.7</span>, commit verified after fetch</li>
+          <li><b>Strips provider/cost pins by default</b> and records exactly what it stripped</li>
+          <li>Five remote MCP servers <b>off</b> unless <span class="mn" style="color:var(--scr-muted)">--keep-mcp</span></li>
+          <li>GA preview with <b>weekly churn</b>; <span class="mn" style="color:var(--scr-muted)">--executor claude</span> only</li>
+        </ul>
+      </div>
+    </div>
+    <p>Why strip the pins? Upstream's shipped <span class="mn">.claude/settings.json</span> silently re-points every session at metered <strong>AWS Bedrock</strong> on <span class="mn">opus[1m]</span> at <span class="mn">effortLevel: xhigh</span> — the most expensive configuration. Cadora's guarded installer removes those pins so your run stays on the funding source you picked, and prints exactly what it took out. <span class="mn">--keep-provider-pins</span> opts back in.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora aidlc-init --method aidlc-v2</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora aidlc-init myapp-v2 --method aidlc-v2 --vision vision.md</span>
+aidlc-v2 pack (<span class="amber">EXPERIMENTAL</span>) installed at <span class="path">myapp-v2</span>
+  upstream: https://github.com/awslabs/aidlc-workflows@v2.1.7 (fde1e1af7aae)
+  <span class="amber">provider/cost pins stripped (recorded): model, effortLevel, CLAUDE_CODE_USE_BEDROCK, AWS_REGION</span>
+    (upstream default silently switches sessions to Bedrock at opus[1m]/xhigh;
+     funding stays yours — restore with --keep-provider-pins)
+  remote MCP servers NOT installed (opt in with --keep-mcp): 5 upstream servers
+  install record: <span class="path">myapp-v2/.cadora-aidlc-v2.json</span>
+  next: cd myapp-v2 &amp;&amp; claude   then run /aidlc — inspect any time with:
+        cadora aidlc-audit myapp-v2</div>
+      </div>
+    </div>
+    <p class="note">Every strip is written to <span class="mn">.cadora-aidlc-v2.json</span> — the install record is itself part of the evidence, so "what did Cadora change about upstream?" has a file-level answer.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">06</span><h2>Read the phases back — an audit trail</h2></div>
+    <p>Because the method writes its own state, Cadora can read it back. <span class="mn">cadora aidlc-audit</span> is <strong>read-only</strong>: it parses the v2 per-intent state file (<span class="mn">aidlc-state.md</span>, six-state checkboxes) and the append-only audit trail (<span class="mn">audit/&lt;host&gt;-&lt;clone&gt;.md</span> shards, a 68-event taxonomy with ISO timestamps) into one summary — the phase you're in, the stage roll-up, and the count of everything that happened.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora aidlc-audit</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora aidlc-audit myapp-v2</span>
+aidlc-v2 intent: <span class="path">2026-07-16-checkout-service</span>  (space: payments)
+  phase=<span class="amber">construction</span>  current=code-generation  next=build-and-test  status=in-progress
+  stages: <span class="ok">done=6</span>  skipped=2  revising=0  awaiting-approval=1  in-progress=1  not-started=2
+  audit: <span class="cmd">68 events</span>  ·  human_turns=7  ·  sensors fired/passed/failed=19/18/<span class="bad">1</span>
+    2026-07-16T14:22:07Z   stage.approved   requirements-analysis
+    2026-07-16T15:03:44Z   gate.passed      application-design
+    2026-07-16T16:41:12Z   stage.started    code-generation</div>
+        <div class="chk">
+          <div class="cap">aidlc-state.md — the six-state checklist the roll-up counts</div>
+          <div class="row"><span class="h">[x]</span><span class="f">requirements-analysis &nbsp;·&nbsp; done</span></div>
+          <div class="row"><span class="h">[?]</span><span class="f">nfr-requirements &nbsp;·&nbsp; awaiting-approval</span></div>
+          <div class="row"><span class="h">[-]</span><span class="f">code-generation &nbsp;·&nbsp; in-progress</span></div>
+          <div class="row"><span class="h">[ ]</span><span class="f">build-and-test &nbsp;·&nbsp; not-started</span></div>
+          <div class="more">states: [x] done · [-] in-progress · [?] awaiting-approval · [R] revising · [S] skipped · [ ] not-started · pass --json for the full report</div>
+        </div>
+      </div>
+    </div>
+    <p class="note"><span class="mn">aidlc-audit</span> reads the <em>aidlc-v2</em> workspace's own state files — it is the read-back for the experimental pack. For a v1 run, the same evidence (nodes, gates, per-node cost, review decisions) is in the run archive that <span class="mn">cadora report</span> packs.</p>
+  </div>
+
+  <div class="foot">
+    <p>The frames above reproduce real <span class="mn">cadora aidlc-init / run --hitl / aidlc-audit</span> output and the actual node ids from <span class="mn">examples/aidlc-phased.topology.yaml</span>, rendered as editable HTML rather than raster captures — lift them into Figma or iterate directly. This is the method layer of Cadora: AI-DLC is installed as rules-plus-inputs, driven as a phased DAG, checkpointed by deterministic and human gates, and — for the experimental v2 pack — read back phase by phase from its own audit trail.</p>
+  </div>
+</div>
+</body>
+</html>

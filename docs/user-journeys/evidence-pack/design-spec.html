@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The evidence pack, by its surfaces · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;
+    --card:#fffefb;--amber:#b3760f;
+    --scr-bg:#0f172a;--scr-canvas:#111c2f;--scr-panel:#1e2937;--scr-panel2:#162237;--scr-line:#334158;
+    --scr-text:#f5f7fb;--scr-muted:#9aa8bc;--scr-blue:#6ba5f0;--scr-green:#16c784;--scr-greensoft:#75f0a8;
+    --scr-red:#fb7185;--scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;
+    --ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}}
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;--card:#fffefb;--amber:#b3760f}
+  *{box-sizing:border-box}
+  .wrap{max-width:840px;margin:0 auto;padding:2.6rem 1.5rem 4rem;color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0 0 .5rem}
+  h1{font-size:2.1rem;letter-spacing:-.02em;margin:.1rem 0 .4rem;font-weight:640}
+  .lede{color:var(--ink-soft);margin:0;max-width:64ch}
+  h2{font-size:1.15rem;margin:2.8rem 0 .3rem;font-weight:600;letter-spacing:-.01em}
+  .sub{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 1rem}
+  .rule{height:1px;background:var(--rule);border:0;margin:.4rem 0 0}
+  /* swatches */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:.6rem}
+  .sw{border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--card)}
+  .sw .chip{height:44px}
+  .sw .lab{padding:7px 9px}
+  .sw .lab b{font-size:12px;display:block}
+  .sw .lab code{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .sw .lab span{font-size:11px;color:var(--ink-soft);display:block;margin-top:1px}
+  /* type scale */
+  table{width:100%;border-collapse:collapse;margin-top:.5rem;font-size:13px}
+  th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ink-faint);font-weight:500;padding:6px 10px;border-bottom:1px solid var(--rule)}
+  td{padding:8px 10px;border-bottom:1px solid var(--rule);color:var(--ink-soft);vertical-align:top}
+  td b{color:var(--ink)}
+  td code,.mn{font-family:var(--mono);font-size:12px;color:var(--amber)}
+  /* dashboard component render */
+  .stage{background:var(--scr-bg);border:1px solid var(--rule);border-radius:12px;padding:16px;margin-top:.8rem}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px;position:relative}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .rhead span:last-child{color:var(--scr-text);font-size:13px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .msg.err{color:var(--scr-red)}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0;color:var(--scr-muted);font-size:12px}
+  .empty{color:var(--scr-muted);font-size:12px;font-style:italic;padding:4px 2px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:130px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted)}
+  /* anatomy pins */
+  .pin{position:absolute;font-family:var(--mono);font-size:10px;font-weight:600;width:18px;height:18px;
+    border-radius:50%;background:var(--scr-amber);color:#1a1205;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 3px var(--scr-panel2)}
+  .legend{margin-top:1rem;display:grid;gap:6px}
+  .legend div{display:flex;gap:9px;font-size:13px;color:var(--ink-soft)}
+  .legend .k{font-family:var(--mono);font-size:11px;font-weight:600;width:18px;height:18px;flex:none;
+    border-radius:50%;background:var(--amber);color:var(--paper);display:flex;align-items:center;justify-content:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:.8rem}
+  .state{background:var(--scr-bg);border:1px solid var(--rule);border-radius:10px;padding:12px}
+  .state .cap{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+  .foot{margin-top:3rem;padding-top:1.1rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+</style>
+
+<style>
+  /* evidence pack — appended after the verbatim base, reusing the same --scr-* tokens */
+  /* the verify verdict, rendered as a card — semantic left accent */
+  .verdict{background:var(--scr-bg);border:1px solid var(--scr-line);border-left:4px solid var(--scr-green);
+    border-radius:10px;padding:14px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.85;
+    color:var(--scr-muted);white-space:pre-wrap;word-break:break-word;position:relative}
+  .verdict.bad{border-left-color:var(--scr-red)}
+  .verdict .id{color:var(--scr-text)}
+  .verdict .ok{color:var(--scr-greensoft)}
+  .verdict .no{color:var(--scr-red)}
+  .verdict .amber{color:var(--scr-amber)}
+  .verdict .final{font-weight:700}
+  .verdict .final.y{color:var(--scr-greensoft)}
+  .verdict .final.n{color:var(--scr-red)}
+  /* pack contents — a labeled tree */
+  .tree{background:var(--scr-bg);border:1px solid var(--scr-line);border-radius:10px;padding:14px 16px;
+    font-family:var(--mono);font-size:12.5px;line-height:1.85;color:var(--scr-muted);white-space:pre;overflow-x:auto}
+  .tree .dir{color:var(--scr-blue)}
+  .tree .f{color:var(--scr-text)}
+  .tree .sig{color:var(--scr-amber)}
+  .tree .c{color:var(--scr-muted)}
+  /* checksums.txt line anatomy */
+  .chkline{background:var(--scr-bg);border:1px solid var(--scr-line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+  .chkline code{font-family:var(--mono);font-size:12.5px;white-space:pre;display:block}
+  .chkline .hash{color:var(--scr-green)}
+  .chkline .path{color:var(--scr-text)}
+  .chkline .gap{background:var(--scr-panel);border-radius:3px}
+  /* state verdict mini-cards */
+  .vstate{background:var(--scr-canvas);border:1px solid var(--rule);border-left:4px solid var(--scr-green);
+    border-radius:10px;padding:11px 13px;font-family:var(--mono);font-size:11.5px;line-height:1.7;
+    color:var(--scr-muted);white-space:pre-wrap;word-break:break-word;margin-top:8px}
+  .vstate.no{border-left-color:var(--scr-red)}
+  .vstate.warn{border-left-color:var(--scr-amber)}
+  .vstate .ok{color:var(--scr-greensoft)}
+  .vstate .bad{color:var(--scr-red)}
+  .vstate .amber{color:var(--scr-amber)}
+  .vstate .id{color:var(--scr-text)}
+  .vstate .final{font-weight:700}
+  .vstate .final.y{color:var(--scr-greensoft)}
+  .vstate .final.n{color:var(--scr-red)}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Design specification for Cadora's evidence pack: the color and type tokens, the anatomy of the verify verdict, the pack contents tree, the checksums.txt line format, the four verdict states (verified, hash-mismatch, unsigned, signature-invalid), and the voice.</h2>
+  <p class="eyebrow">Cadora · design spec</p>
+  <h1>The evidence pack, by its surfaces</h1>
+  <p class="lede">Everything needed to render or extend the proof pack — the exact tokens, the verify verdict's anatomy, what the pack contains, the checksums line format, and every verdict state. The rendered components are live HTML; edit them here or lift the specs into Figma.</p>
+
+  <h2>Palette</h2>
+  <p class="sub">Semantic first · green proves, red warns, amber asks for a second look</p>
+  <hr class="rule">
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#16c784"></div><div class="lab"><b>Green</b><code>--scr-green · #16c784</code><span>Verified · hashes OK · VALID</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fb7185"></div><div class="lab"><b>Red</b><code>--scr-red · #fb7185</code><span>Tampered · mismatch · INVALID</span></div></div>
+    <div class="sw"><div class="chip" style="background:#ffd08a"></div><div class="lab"><b>Amber</b><code>--scr-amber · #ffd08a</code><span>Unsigned · confirm fingerprint</span></div></div>
+    <div class="sw"><div class="chip" style="background:#6ba5f0"></div><div class="lab"><b>Blue</b><code>--scr-blue · #6ba5f0</code><span>Paths · directories</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0f172a"></div><div class="lab"><b>Ink</b><code>--scr-bg · #0f172a</code><span>Card ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#111c2f"></div><div class="lab"><b>Canvas</b><code>--scr-canvas · #111c2f</code><span>Inset · state cards</span></div></div>
+    <div class="sw"><div class="chip" style="background:#162237"></div><div class="lab"><b>Panel</b><code>--scr-panel2 · #162237</code><span>Raised surface</span></div></div>
+    <div class="sw"><div class="chip" style="background:#334158"></div><div class="lab"><b>Line</b><code>--scr-line · #334158</code><span>Borders</span></div></div>
+    <div class="sw"><div class="chip" style="background:#f5f7fb"></div><div class="lab"><b>Text</b><code>--scr-text · #f5f7fb</code><span>Primary · run id · path</span></div></div>
+    <div class="sw"><div class="chip" style="background:#9aa8bc"></div><div class="lab"><b>Muted</b><code>--scr-muted · #9aa8bc</code><span>Labels · captions</span></div></div>
+  </div>
+
+  <h2>Type &amp; metrics</h2>
+  <p class="sub">Monospace is the instrument voice — the pack is read at the shell</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Role</th><th>Family</th><th>Size / weight</th><th>Notes</th></tr>
+    <tr><td><b>Verdict line</b></td><td class="mn">mono</td><td>12.5px / 400</td><td>The three lines of <code>cadora verify</code></td></tr>
+    <tr><td><b>Bottom line</b></td><td class="mn">mono</td><td>12.5px / 700</td><td><code>=&gt; VERIFIED</code> green · <code>=&gt; NOT VERIFIED</code> red</td></tr>
+    <tr><td><b>Hash</b></td><td class="mn">mono</td><td>green</td><td>64 hex chars; truncate with <code>…</code> only in dense views</td></tr>
+    <tr><td><b>Path</b></td><td class="mn">mono</td><td>text</td><td>Relative to the run dir — the cwd for <code>shasum -c</code></td></tr>
+    <tr><td><b>Fingerprint</b></td><td class="mn">mono</td><td>amber</td><td><code>SHA256:</code> + base64; amber until confirmed out of band</td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Metric</th><th>Value</th><th>Metric</th><th>Value</th></tr>
+    <tr><td>Card radius</td><td class="mn">10px</td><td>Semantic accent</td><td class="mn">4px left border</td></tr>
+    <tr><td>Verdict line-height</td><td class="mn">1.85</td><td>Tree line-height</td><td class="mn">1.85</td></tr>
+    <tr><td>Card padding</td><td class="mn">14px 16px</td><td>State padding</td><td class="mn">11px 13px</td></tr>
+    <tr><td>Checksums separator</td><td class="mn">two spaces</td><td>Signature namespace</td><td class="mn">cadora-evidence</td></tr>
+  </table>
+
+  <h2>Anatomy — the verify verdict</h2>
+  <p class="sub">The one component a recipient reads to trust the pack</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="verdict"><span class="pin" style="top:-9px;left:-9px">1</span><span class="pin" style="top:34px;right:-9px">2</span><span class="pin" style="top:64px;left:-9px">3</span><span class="pin" style="bottom:8px;right:-9px">4</span>evidence pack <span class="id">pr1-verify</span>:
+  <span class="ok">✓ hashes    23 file(s) OK</span>
+  <span class="ok">✓ signature VALID</span> — yves@cadora.dev · <span class="amber">self-attested</span>
+              confirm signer key <span class="amber">SHA256:u4yCok…HJJx8</span> out of band
+  <span class="final y">=&gt; VERIFIED</span></div>
+  </div>
+  <div class="legend">
+    <div><span class="k">1</span><span><b style="color:var(--ink)">Pack identity</b> — the run id being verified. One pack, one run.</span></div>
+    <div><span class="k">2</span><span><b style="color:var(--ink)">Hash floor</b> — every archived file plus report.json, recomputed. <span class="mn">N file(s) OK</span> in green, or <span class="mn">MISMATCH: &lt;paths&gt;</span> in red. Always runs, signed or not.</span></div>
+    <div><span class="k">3</span><span><b style="color:var(--ink)">Signature line</b> — <span class="mn">VALID</span> / <span class="mn">INVALID</span> / <span class="mn">none</span>, the signer identity, and the trust basis (self-attested, or an allowed-signers file). Amber flags the fingerprint to confirm out of band.</span></div>
+    <div><span class="k">4</span><span><b style="color:var(--ink)">Bottom line</b> — <span class="mn">=&gt; VERIFIED</span> (green, exit 0) only when the hashes hold and any signature checks out; otherwise <span class="mn">=&gt; NOT VERIFIED</span> (red, exit 1).</span></div>
+  </div>
+
+  <div class="grid2" style="margin-top:1.2rem">
+    <div class="state"><p class="cap">Verified · hashes hold, signature checks out</p>
+      <div class="verdict">evidence pack <span class="id">pr1-verify</span>:
+  <span class="ok">✓ hashes    23 file(s) OK</span>
+  <span class="ok">✓ signature VALID</span> — yves@cadora.dev
+  <span class="final y">=&gt; VERIFIED</span></div>
+    </div>
+    <div class="state"><p class="cap">Tampered · one hash no longer matches</p>
+      <div class="verdict bad">evidence pack <span class="id">pr1-verify</span>:
+  <span class="no">✗ hashes    MISMATCH: design/aidlc-docs/audit.md</span>
+  signature none (checksummed, not signed)
+  <span class="final n">=&gt; NOT VERIFIED</span></div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">Green and red are the same component with one token swapped — the left accent and the marks (<span class="mn">✓</span> / <span class="mn">✗</span>). A single mismatch turns the whole verdict red; there is no partial pass.</p>
+
+  <h2>Pack contents</h2>
+  <p class="sub">What <span class="mn">cadora report</span> writes, and what <span class="mn">cadora sign</span> adds</p>
+  <hr class="rule">
+  <div class="tree"><span class="dir">runs/pr1-verify/</span>
+├── manifest.json              <span class="c"># the run's spine — nodes, gates, usage</span>
+├── requirements/              <span class="c"># per-node dir</span>
+│   ├── output.txt
+│   ├── integrity.json
+│   ├── human-review.md
+│   └── aidlc-docs/ …
+├── design/                    <span class="c"># per-node dir</span>
+│   └── …
+└── <span class="dir">report/</span>                    <span class="c"># the pack — excluded from its own checksums</span>
+    ├── <span class="f">report.html</span>             <span class="c"># human view, self-contained</span>
+    ├── <span class="f">report.json</span>             <span class="c"># the same evidence, structured</span>
+    ├── <span class="f">checksums.txt</span>           <span class="c"># sha-256 of every file above + report.json</span>
+    ├── <span class="sig">checksums.txt.sig</span>       <span class="c"># detached SSH signature  (cadora sign)</span>
+    └── <span class="sig">signature.json</span>          <span class="c"># signer identity + public key + fingerprint</span></div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">The <span class="mn">report/</span> directory is skipped when its own checksums are computed, so the pack never tries to hash itself. The two <span style="color:var(--amber)">amber</span> files appear only after signing — an unsigned pack is the same tree without them.</p>
+
+  <h2>The <span class="mn" style="font-size:.8em">checksums.txt</span> line</h2>
+  <p class="sub">One line per file — the format <span class="mn">shasum -c</span> reads</p>
+  <hr class="rule">
+  <div class="chkline"><code><span class="hash">5172112d9749df7211e5b70711830af7d0f4d63d6ea698c73cd5903142d3b410</span><span class="gap">  </span><span class="path">design/aidlc-docs/aidlc-state.md</span></code></div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem"><span class="mn">&lt;64-hex sha-256&gt;</span> · <b style="color:var(--ink)">two spaces</b> (highlighted) · <span class="mn">&lt;path relative to the run dir&gt;</span>. The two-space separator is exactly what <span class="mn">shasum -a 256 -c</span> and <span class="mn">sha256sum -c</span> expect, so the same file verifies by hand with no Cadora installed. The last line always hashes <span class="mn">report.json</span>.</p>
+
+  <h2>States</h2>
+  <p class="sub">Every verdict the pack can produce</p>
+  <hr class="rule">
+  <div class="grid2">
+    <div class="state"><p class="cap">Verified</p>
+      <div class="vstate">evidence pack <span class="id">pr1-verify</span>:
+  <span class="ok">✓ hashes    23 file(s) OK</span>
+  <span class="ok">✓ signature VALID</span> — yves@cadora.dev
+  <span class="final y">=&gt; VERIFIED</span></div>
+    </div>
+    <div class="state"><p class="cap">Hash mismatch · tampered</p>
+      <div class="vstate no">evidence pack <span class="id">pr1-verify</span>:
+  <span class="bad">✗ hashes    MISMATCH: design/aidlc-docs/audit.md</span>
+  <span class="final n">=&gt; NOT VERIFIED</span></div>
+    </div>
+    <div class="state"><p class="cap">Unsigned · checksummed only</p>
+      <div class="vstate warn">evidence pack <span class="id">pr1-verify</span>:
+  <span class="ok">✓ hashes    23 file(s) OK</span>
+  <span class="amber">signature none (checksummed, not signed)</span>
+  <span class="final y">=&gt; VERIFIED</span></div>
+    </div>
+    <div class="state"><p class="cap">Signature invalid</p>
+      <div class="vstate no">evidence pack <span class="id">pr1-verify</span>:
+  <span class="ok">✓ hashes    23 file(s) OK</span>
+  <span class="bad">✗ signature INVALID</span> — signature did not verify
+  <span class="final n">=&gt; NOT VERIFIED</span></div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.8rem"><b style="color:var(--ink)">Unsigned still verifies.</b> The hash floor is always-on and independent of the signature: a pack that was never signed is tamper-evident (green verdict) but not attributable — the amber signature line says so. Signing only ever adds a claim; it never weakens the hash check.</p>
+
+  <h2>What each command produces</h2>
+  <p class="sub">Three verbs · report seals, sign attributes, verify judges</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Command</th><th>Writes</th><th>Effect</th></tr>
+    <tr><td><b><span class="mn">cadora report &lt;run&gt;</span></b></td><td class="mn">report.html · report.json · checksums.txt</td><td>Seals the pack. Tamper-evident, not yet signed.</td></tr>
+    <tr><td><b><span class="mn">cadora sign &lt;run&gt; --key</span></b></td><td class="mn">checksums.txt.sig · signature.json</td><td>Adds a detached SSH signature. Now attributable. Builds the pack first if it isn't there.</td></tr>
+    <tr><td><b><span class="mn">cadora verify &lt;run&gt;</span></b></td><td>— (reads only)</td><td>Recomputes every hash, then checks any signature. Prints the verdict; exit 0 verified, 1 not.</td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Line</th><th>Verified (green)</th><th>Failed / warned</th></tr>
+    <tr><td><b>hashes</b></td><td class="mn">N file(s) OK</td><td class="mn">MISMATCH: &lt;paths&gt; · &lt;path&gt; (missing)</td></tr>
+    <tr><td><b>signature</b></td><td class="mn">VALID — &lt;signer&gt; · &lt;trust&gt;</td><td class="mn">INVALID — &lt;reason&gt; · none (checksummed, not signed)</td></tr>
+    <tr><td><b>bottom line</b></td><td class="mn">=&gt; VERIFIED</td><td class="mn">=&gt; NOT VERIFIED</td></tr>
+  </table>
+
+  <h2>Voice</h2>
+  <p class="sub">The verdict is evidence, not applause</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Do</th><th>Not</th></tr>
+    <tr><td>State the count — <span class="mn">23 file(s) OK</span></td><td>“All good”</td></tr>
+    <tr><td>Name the trust basis — <span class="mn">self-attested — confirm … out of band</span></td><td>“Trusted ✓”</td></tr>
+    <tr><td>Show the fingerprint — <span class="mn">SHA256:u4yCok…</span></td><td>Hide who signed it</td></tr>
+    <tr><td>Keep the exact glyphs — <span class="mn">=&gt; VERIFIED</span> / <span class="mn">=&gt; NOT VERIFIED</span></td><td>“Success!” / “Failed”</td></tr>
+  </table>
+
+  <div class="foot">Tokens and behavior are taken verbatim from <span class="mn">cadora/report.py</span> and <span class="mn">cadora/signing.py</span>. Edit the rendered components in place, or hand the palette and metrics tables to a Figma library.</div>
+</div>
+</body>
+</html>

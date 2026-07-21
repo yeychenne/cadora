@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ship agent-built software you can prove · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec; --ink:#1b2130; --ink-soft:#4a5265; --ink-faint:#7b8496;
+    --rule:#e0dccf; --card:#fffefb; --amber:#b3760f; --amber-bg:#f6ecd6;
+    --green:#0f7a54; --red:#b23a4b; --blue:#245bb5;
+    --scr-bg:#0f172a; --scr-canvas:#111c2f; --scr-panel:#1e2937; --scr-panel2:#162237;
+    --scr-line:#334158; --scr-text:#f5f7fb; --scr-muted:#9aa8bc; --scr-blue:#6ba5f0;
+    --scr-green:#16c784; --scr-greensoft:#75f0a8; --scr-red:#fb7185; --scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+      --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;
+      --green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  }
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+    --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;--green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;
+    --rule:#e0dccf;--card:#fffefb;--amber:#b3760f;--amber-bg:#f6ecd6;--green:#0f7a54;--red:#b23a4b;--blue:#245bb5;}
+  *{box-sizing:border-box}
+  .wrap{max-width:760px;margin:0 auto;padding:3rem 1.5rem 4rem;color:var(--ink);
+    font-family:var(--sans);line-height:1.65;font-size:16px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--amber);margin:0 0 .6rem}
+  h1{font-size:2.5rem;line-height:1.05;letter-spacing:-.02em;margin:.2rem 0 .5rem;text-wrap:balance;font-weight:640}
+  .lede{font-size:1.15rem;color:var(--ink-soft);margin:0;max-width:60ch}
+  .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:1.4rem;
+    padding-top:1rem;border-top:1px solid var(--rule);display:flex;gap:1.5rem;flex-wrap:wrap}
+  .step{margin-top:3.4rem}
+  .step-head{display:flex;align-items:baseline;gap:.9rem;margin-bottom:.5rem}
+  .num{font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:600;
+    border:1px solid var(--rule);border-radius:6px;padding:2px 8px;flex:none}
+  h2{font-size:1.5rem;letter-spacing:-.01em;margin:0;font-weight:600;text-wrap:balance}
+  .step p{color:var(--ink-soft);margin:.5rem 0 0}
+  .step p strong{color:var(--ink);font-weight:600}
+  .note{font-size:.95rem;color:var(--ink-faint);border-left:2px solid var(--amber);
+    padding:.1rem 0 .1rem .9rem;margin:1.1rem 0 0}
+  /* faux browser frame holding a faithful dark-dashboard screen */
+  .screen{margin:1.4rem 0 .3rem;border-radius:12px;overflow:hidden;border:1px solid var(--rule);
+    background:var(--scr-bg);box-shadow:0 1px 0 var(--rule)}
+  .chrome{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#0b1220;border-bottom:1px solid #1e2a3d}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .url{margin-left:8px;font-family:var(--mono);font-size:11px;color:#5f6d84;background:#0f1a2c;
+    border-radius:6px;padding:3px 10px;flex:1}
+  .body{padding:14px;color:var(--scr-text);font-size:13px}
+  .hero{display:flex;justify-content:space-between;align-items:center;background:var(--scr-panel);
+    border-radius:10px;padding:11px 14px;margin-bottom:12px}
+  .hero b{font-size:15px}.hero small{color:var(--scr-muted);display:block;font-size:11px;margin-top:2px}
+  .pill{font-size:11px;padding:3px 9px;border-radius:999px}
+  .pill.run{background:#12314e;color:#7db8ff}.pill.done{background:#0f3d2c;color:var(--scr-greensoft)}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);
+    padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:150px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted);line-height:1.55}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0}
+  .prev h4{margin:2px 0 4px;font-size:13px;color:var(--scr-text)}
+  .prev p,.prev li{color:var(--scr-muted);font-size:12px;margin:2px 0}
+  .dag{display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:6px}
+  .node{width:180px;text-align:center;border-radius:8px;padding:7px;font-size:12px;
+    background:var(--scr-panel);border:1px solid var(--scr-line);color:var(--scr-muted)}
+  .node.on{background:#123024;border-color:#1f6a49;color:var(--scr-greensoft)}
+  .node .badge{font-size:9px;background:#0f3d2c;color:var(--scr-greensoft);border-radius:4px;padding:1px 6px;margin:0 2px}
+  .node.wait{background:#2a2410;border-color:#7a6320;color:var(--scr-amber)}
+  .arrow{color:var(--scr-line);font-size:12px}
+  .foot{margin-top:3.5rem;padding-top:1.2rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  a{color:var(--blue)}
+  /* --- run-a-gated-workflow additions · same palette, faithful CLI + dashboard-DAG surfaces --- */
+  /* dark terminal screen — monospace CLI output inside the same browser frame */
+  .term{font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--scr-text);padding:12px 14px}
+  .term .row{display:block;white-space:pre-wrap;word-break:break-word}
+  .term .dim{color:var(--scr-muted)}
+  .term .run{color:var(--scr-blue)}
+  .term .ok{color:var(--scr-greensoft)}
+  .term .bad{color:var(--scr-red)}
+  .term .amb{color:var(--scr-amber)}
+  .term .pr{color:var(--scr-green)}
+  .term b{font-weight:600;color:var(--scr-text)}
+  /* editor screen — same monospace, plain YAML */
+  .code{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--scr-text);padding:12px 14px}
+  .code .row{display:block;white-space:pre-wrap;word-break:break-word}
+  .code .c{color:var(--scr-muted)}
+  .code .w{color:var(--scr-amber)}
+  /* preflight blast-radius banner */
+  .banner{font-family:var(--mono);font-size:11.5px;line-height:1.65;color:var(--scr-text);
+    border:1px solid var(--scr-amber);border-radius:10px;background:var(--scr-panel2);padding:11px 14px;margin-top:2px}
+  .banner .cap{color:var(--scr-amber);font-weight:600;letter-spacing:.05em;text-transform:uppercase;display:block;margin-bottom:7px;font-size:11px}
+  .banner .k{color:var(--scr-muted)}
+  .banner .w{color:var(--scr-text);display:block;margin-top:2px}
+  .banner .ask{color:var(--scr-amber);display:block;margin-top:9px}
+  /* faithful dashboard DAG node — light chip on dark canvas (mirrors cadora/dashboard/static/style.css) */
+  .canvas{background:var(--scr-bg);border-radius:10px;padding:14px 8px}
+  .dnode{width:214px;border-radius:6px;padding:8px 10px;display:grid;gap:4px;text-align:left;
+    background:var(--scr-greensoft);color:#063b21;border:2px solid transparent}
+  .dnode.run,.dnode.wait{background:#93c5fd}
+  .dnode.fail{background:#fda4af}
+  .dnode.idle{background:#d5dbe7}
+  .dnode .t{font-size:13px;font-weight:800;color:#0a2a19}
+  .dnode.run .t,.dnode.wait .t{color:#0b2649}.dnode.fail .t{color:#3a0f18}.dnode.idle .t{color:#2b3446}
+  .dnode .s{font-size:11px;font-weight:600;opacity:.72}
+  .dnode .st{justify-self:start;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px}
+  .st.done{background:#c9ffd8;color:#08783d}.st.run{background:#173765;color:#8fbaff}
+  .st.wait{background:#3b2f15;color:var(--scr-amber)}.st.fail{background:#4b1520;color:var(--scr-red)}
+  .st.idle{background:#c2cad8;color:#3a4658}
+  .bd{display:flex;flex-wrap:wrap;gap:3px}
+  .bd .b{font-size:9px;font-weight:700;border-radius:4px;padding:1px 6px;background:#26324a;color:#e7edf5}
+  .bd .b.ok{background:#0f5132;color:var(--scr-greensoft)}
+  .bd .b.warn{background:#5a4a15;color:var(--scr-amber)}
+  .bd .b.bad{background:#5a1622;color:var(--scr-red)}
+  .dfoot{display:flex;justify-content:space-between;font-size:10px;font-weight:700;opacity:.85}
+  .darrow{color:#5f6d84;font-size:13px;line-height:1}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">The getting-started journey in Cadora: write a topology of nodes wired by dependencies and gates, launch it past the preflight trust banner, watch the run execute in dependency-order waves, see a deterministic gate hold a node honest, and finish with a sealed evidence pack you can prove.</h2>
+
+  <p class="eyebrow">Cadora · run a gated workflow</p>
+  <h1>Ship agent-built software you can prove</h1>
+  <p class="lede">Cadora drives a coding agent through a topology — a graph of nodes, each with a role and a prompt, wired by dependencies. After every node a deterministic gate re-runs the real build and tests, and the whole run is archived as evidence. This is the journey from a YAML file to a sealed pack.</p>
+  <div class="meta"><span>Surface · terminal + local dashboard</span><span>Role · operator / author</span><span>Path · topology → gates → evidence</span></div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">01</span><h2>Write a topology</h2></div>
+    <p>A topology is a <strong>DAG of nodes</strong>. Each node names a <strong>role</strong> and a <strong>prompt</strong>; <span style="font-family:var(--mono);font-size:.9em">depends_on</span> wires the order; and a <span style="font-family:var(--mono);font-size:.9em">gate</span> names the deterministic check that must pass before the run moves on. Cadora topo-sorts the graph into dependency waves.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">build-a-service.topology.yaml</span></div>
+      <div class="code">
+        <span class="row"><span class="c">name:</span> build-a-service</span>
+        <span class="row"> </span>
+        <span class="row"><span class="c">gates:</span></span>
+        <span class="row">  spec-check: { cmd: <span class="w">"test -f aidlc-docs/requirements.md"</span>, setup: off }</span>
+        <span class="row">  build-test: { cmd: <span class="w">"ruff check . &amp;&amp; pytest -q"</span>, setup: auto }</span>
+        <span class="row"> </span>
+        <span class="row"><span class="c">nodes:</span></span>
+        <span class="row">  - id: requirements       <span class="c"># wave 1</span></span>
+        <span class="row">    role: analyst</span>
+        <span class="row">    prompt: "Read vision.md, write the requirements."</span>
+        <span class="row">    <span class="w">gate: spec-check</span></span>
+        <span class="row">  - id: design             <span class="c"># wave 2</span></span>
+        <span class="row">    role: architect</span>
+        <span class="row">    <span class="w">depends_on: [requirements]</span></span>
+        <span class="row">    prompt: "Turn the requirements into a component design."</span>
+        <span class="row">    <span class="w">gate: spec-check</span></span>
+        <span class="row">  - id: construction       <span class="c"># wave 3</span></span>
+        <span class="row">    role: engineer</span>
+        <span class="row">    <span class="w">depends_on: [design]</span></span>
+        <span class="row">    prompt: "Generate the code and tests; run the suite until green."</span>
+        <span class="row">    <span class="w">gate: build-test</span></span>
+      </div>
+    </div>
+    <p class="note">A node can also carry <span style="font-family:var(--mono);font-size:.9em">review: true</span> to pause for a human — that is the human-in-the-loop journey. Here every gate is deterministic: a shell command Cadora re-runs itself.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">02</span><h2>Launch — past the trust gate</h2></div>
+    <p>You point Cadora at the topology, an <strong>executor</strong> (the agent CLI), and a <strong>vision</strong>. Because the agent runs autonomously with <span style="font-family:var(--mono);font-size:.9em">--dangerously-skip-permissions</span> inside your <span style="font-family:var(--mono);font-size:.9em">--cwd</span>, Cadora prints a blast-radius banner first and asks once before it starts.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora run</span></div>
+      <div class="term">
+        <span class="row"><span class="dim">$</span> cadora run build-a-service.topology.yaml \</span>
+        <span class="row">    --executor claude --model claude-opus-4-8 \</span>
+        <span class="row">    --vision vision.md --cwd ./demo</span>
+        <span class="row"> </span>
+        <div class="banner">
+          <span class="cap">┌─ cadora · autonomous run</span>
+          <span class="row"><span class="k">backend    :</span> claude (--dangerously-skip-permissions)</span>
+          <span class="row"><span class="k">workspace  :</span> /Users/you/demo</span>
+          <span class="w">Cadora audits the agent's OUTPUT (gates · integrity · evidence),</span>
+          <span class="w">it does NOT sandbox EXECUTION. The agent can read/write/run there</span>
+          <span class="w">with your permissions. Point it only at a trusted or throwaway</span>
+          <span class="w">workspace (a fresh dir, worktree, or container).</span>
+          <span class="ask">Proceed with an autonomous run in /Users/you/demo? [y/N]</span>
+        </div>
+      </div>
+    </div>
+    <p class="note">In automation there is no one to answer, so <span style="font-family:var(--mono);font-size:.9em">--yes</span> (or <span style="font-family:var(--mono);font-size:.9em">CADORA_ASSUME_YES=1</span>) prints the banner for the record and proceeds. A piped, TTY-less run does the same — the banner is the audit trail, and CI is never blocked.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">03</span><h2>The run executes, wave by wave</h2></div>
+    <p>Each node runs in dependency order. Cadora announces the node, streams a heartbeat while the agent works, then — the moment the agent claims done — <strong>runs the gate and the toolchain-integrity check itself</strong> and prints the verdict. The agent's own "ok" never decides the line.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora run</span></div>
+      <div class="term">
+        <span class="row"><span class="dim">cadora · executor=claude · funding=subscription · run=build-a-service-20260717-0904</span></span>
+        <span class="row"><span class="run">▶</span> requirements · claude-opus-4-8 · running… <span class="dim">(generating documents; this can take a few minutes)</span></span>
+        <span class="row">  <span class="ok">✓</span> requirements   <span class="dim">$0.3100</span>   gate:spec-check <span class="ok">ok</span>   integrity:<span class="ok">ok</span></span>
+        <span class="row"><span class="run">▶</span> design · claude-opus-4-8 · running…</span>
+        <span class="row">  <span class="ok">✓</span> design   <span class="dim">$0.4600</span>   gate:spec-check <span class="ok">ok</span>   integrity:<span class="ok">ok</span></span>
+        <span class="row"><span class="run">▶</span> construction · claude-opus-4-8 · running…</span>
+        <span class="row">  <span class="ok">✓</span> construction   <span class="dim">$1.2700</span>   gate:build-test <span class="ok">ok</span>   integrity:<span class="ok">ok</span></span>
+        <span class="row"><span class="ok">✓</span> run complete -&gt; runs/build-a-service-20260717-0904</span>
+      </div>
+    </div>
+    <p class="note">Independent nodes in the same wave can run concurrently with <span style="font-family:var(--mono);font-size:.9em">--max-parallel N</span> — only the agent sessions overlap; gates, integrity, and archiving stay sequential and deterministic.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">04</span><h2>Watch it live</h2></div>
+    <p>In another terminal, <span style="font-family:var(--mono);font-size:.9em">cadora dashboard</span> serves the same archive. The run detail page is a DAG canvas: each node is a cost-and-quality map carrying its <strong>cost</strong>, <strong>context tokens</strong>, and <strong>badges</strong> for its gate, integrity, and review outcomes — so a bad gate shows up right on the node.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">127.0.0.1:8765/runs/build-a-service-20260717-0904</span></div>
+      <div class="body">
+        <div class="hero"><div><b>build-a-service</b><small>claude · 3 nodes · $0.7700 so far</small></div><span class="pill run">running</span></div>
+        <div class="canvas"><div class="dag">
+          <div class="dnode"><span class="st done">completed</span><div class="t">requirements</div><div class="s">analyst</div><div class="bd"><span class="b ok">gate ok</span><span class="b ok">integrity ok</span></div><div class="dfoot"><span>$0.3100</span><span>ctx 22.4k</span></div></div>
+          <div class="darrow">↓</div>
+          <div class="dnode run"><span class="st run">running</span><div class="t">design</div><div class="s">architect</div><div class="dfoot"><span>$0.4600</span><span>ctx 31.8k</span></div></div>
+          <div class="darrow">↓</div>
+          <div class="dnode idle"><span class="st idle">idle</span><div class="t">construction</div><div class="s">engineer</div><div class="dfoot"><span>—</span><span>ctx —</span></div></div>
+        </div></div>
+      </div>
+    </div>
+    <p class="note">The dashboard is a read-only cockpit over the run archive — no login, no database, loopback by default. A FinOps panel breaks the same cost down by model, executor, and funding.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">05</span><h2>A gate holds it honest</h2></div>
+    <p>Green means <strong>proven, not claimed</strong>. When a node's gate does not truly pass, the run <strong>stops there</strong> — fail-closed. Here <span style="font-family:var(--mono);font-size:.9em">construction</span> exited zero, but the suite ran <strong>no tests</strong>: the gate reports <span style="font-family:var(--mono);font-size:.9em">VACUOUS</span> and refuses to certify it.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora run</span></div>
+      <div class="term">
+        <span class="row"><span class="run">▶</span> construction · claude-opus-4-8 · running…</span>
+        <span class="row">  <span class="bad">✗</span> construction   <span class="dim">$1.0200</span>   gate:build-test <span class="bad">VACUOUS</span>   integrity:<span class="ok">ok</span></span>
+        <span class="row">    <span class="dim">collected 0 items — a suite that runs zero tests verified nothing</span></span>
+        <span class="row"><span class="bad">✗</span> stopped at node 'construction': gate 'build-test' blocked  -&gt;  runs/build-a-service-20260717-0912</span>
+      </div>
+    </div>
+    <p class="note">The status vocabulary is precise: <span style="font-family:var(--mono);font-size:.9em">failed</span> (a real defect), <span style="font-family:var(--mono);font-size:.9em">vacuous</span> (ran nothing), <span style="font-family:var(--mono);font-size:.9em">packaging_failed</span> (declares a package that will not build), and <span style="font-family:var(--mono);font-size:.9em">blocked_prerequisite</span> (external tooling missing — not the agent's to fix). Add <span style="font-family:var(--mono);font-size:.9em">--remediate N</span> and a remediable status drives a fresh, constrained session, then the <em>same</em> gate re-runs to decide green.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">06</span><h2>The run is proven</h2></div>
+    <p>Every gate cleared, the run finishes and its evidence pack is <strong>sealed</strong>. The DAG reads at a glance — three green nodes, each stamped with its gate and integrity outcome — and the archive records exactly which command ran, what it printed, and what it cost, node by node.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">127.0.0.1:8765/runs/build-a-service-20260717-0904</span></div>
+      <div class="body">
+        <div class="hero"><div><b>build-a-service</b><small>claude · 3 nodes · $2.0400 · sealed</small></div><span class="pill done">completed</span></div>
+        <div class="canvas"><div class="dag">
+          <div class="dnode"><span class="st done">completed</span><div class="t">requirements</div><div class="s">analyst</div><div class="bd"><span class="b ok">gate ok</span><span class="b ok">integrity ok</span></div><div class="dfoot"><span>$0.3100</span><span>ctx 22.4k</span></div></div>
+          <div class="darrow">↓</div>
+          <div class="dnode"><span class="st done">completed</span><div class="t">design</div><div class="s">architect</div><div class="bd"><span class="b ok">gate ok</span><span class="b ok">integrity ok</span></div><div class="dfoot"><span>$0.4600</span><span>ctx 31.8k</span></div></div>
+          <div class="darrow">↓</div>
+          <div class="dnode"><span class="st done">completed</span><div class="t">construction</div><div class="s">engineer</div><div class="bd"><span class="b ok">gate ok</span><span class="b ok">integrity ok</span></div><div class="dfoot"><span>$1.2700</span><span>ctx 58.1k</span></div></div>
+        </div></div>
+        <div style="margin-top:12px">
+          <div class="docrow"><a href="#">report.html</a><span class="kind">SEALED</span><span class="mini">open</span></div>
+          <div class="docrow"><a href="#">report.json</a><span class="kind">SEALED</span><span class="mini">open</span></div>
+          <div class="docrow"><a href="#">checksums.txt</a><span class="kind">SHA-256</span><span class="mini">open</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Off the archive you can run <span style="font-family:var(--mono);font-size:.9em">cadora report</span> for a portable pack, <span style="font-family:var(--mono);font-size:.9em">cadora eval</span> for the deterministic checks, or <span style="font-family:var(--mono);font-size:.9em">cadora compare</span> to diff the same topology run on a second backend.</p>
+  </div>
+
+  <div class="foot">
+    <p>The screens above reproduce the live Cadora terminal and dashboard exactly — rendered as editable HTML rather than raster captures, so they can be lifted into Figma or iterated directly. Every gate is deterministic and fail-closed, every run is archived, and "green" is a fact Cadora observed and kept — not a sentence the model emitted.</p>
+  </div>
+</div>
+</body>
+</html>

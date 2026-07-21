@@ -1,5 +1,98 @@
 # Changelog
 
+## v0.11.0 — 2026-07-20
+
+The human-review release. HITL went through a full validation campaign — two complex applications
+(an insurance-claims adjudication engine and a DAG pipeline factory) rebuilt end-to-end through
+**active human gates**, with a real reviewer approving, requesting changes, and conversing with the
+run at every checkpoint — and the review experience was rebuilt around what that reviewer actually
+needed. Every fix below traces to a failure **observed live** during that campaign, not imagined.
+The run's evidence also gets two provenance upgrades: the workspace is fingerprint-verified on
+resume, and the pack now records **which conductor produced it**.
+
+### Added
+- **Review a gate in the browser.** The dashboard now surfaces a pending `--review-file` gate as a
+  first-class panel: the stage's changed documents one click away, a comment box, and
+  **Approve / Request changes / Abort** buttons that write the decision file for you. Auto-polling
+  pauses while a review is pending so a rerender can never wipe an in-progress comment. The
+  decision POST requires a JSON content-type (a cross-origin form can't reach the write path
+  without a blocked preflight), and the dashboard stays what it was: loopback, read-only except
+  this one deliberate bridge into the run's workspace.
+- **Conversational review — ask the run about a document, or have it revised on the spot.** While
+  a gate is parked, the reviewer can send a **question** ("why Decimal for money?") or a
+  **revision instruction** ("add the refund path") scoped to one document; the parked run answers
+  through its own executor, writing the reply back for the dashboard — a revision rewrites the
+  document in place and re-surfaces it for review. The conversation never consumes the gate: the
+  decision still has to be taken explicitly.
+- **Full-screen document review with annotations.** A gate document opens full screen (Esc
+  closes); selecting a passage offers a note input, notes collect as removable chips, and one
+  click appends them to the review comment box as `path: “quote” — note` lines — feeding the same
+  request-changes / revision loop as hand-written comments. Asked for by the reviewer mid-campaign:
+  the inline preview was too small to really read a design, and there was no way to say what's
+  wrong *where* it's wrong.
+- **One dashboard, several projects.** `cadora dashboard --archive-dir` is now repeatable: runs
+  from every archive merge onto one surface, usage aggregates across them, the header names
+  exactly what is served, and each run card carries its archive when more than one is on screen.
+  Motivated by a live incident: with two projects archiving to separate dirs, a reviewer
+  "approved" a gate on a dashboard that could never show it — the decision went into the void.
+- **The evidence pack records which conductor produced it.** Every run manifest and status now
+  carry a `conductor` stamp — cadora version + git SHA (and dirty flag) — so evidence is
+  attributable to the engine that made it. Motivated live: an editable install had its branch
+  switched mid-run, hot-swapping the conductor's own code under a running gate, and nothing in the
+  archive could show it.
+- **Resume verifies workspace provenance.** `--resume-from`/`--skip` now fingerprint the workspace
+  and verify it against the run being resumed — a drifted workspace (files edited, added, removed
+  since that run) is **refused**, with the drift itemized, rather than certifying gates over
+  source that never passed the earlier stages. `--allow-drift` proceeds deliberately, and the
+  drift is recorded in the evidence pack either way.
+- **A guided documentation library — twelve capabilities, three documents each.**
+  `docs/user-journeys/` pairs a narrated **user journey**, a **user manual**, and a **design
+  spec** for every capability — the audit-grade core (gated runs, gates & integrity, human
+  review, evidence pack, cost), backends/recovery/evaluation, and method/delivery/integration —
+  indexed and linked from a new README guided tour. The twelfth documents **journey-first
+  builds**: making a built app's own user journey a gated, human-reviewed artifact (born from the
+  campaign, where `MANUAL_REVIEW` shipped as a routed-tested-and-never-resolved dead end until a
+  gate reviewer asked *where is the user journey?*).
+
+### Fixed
+- **Human deliberation no longer inflates a node's signed duration.** A node's
+  `duration_seconds` — which flows into the manifest and the signed evidence pack — silently
+  included the entire time a human spent deciding at a review gate (one observed node: 381s of
+  agent work recorded as 7,581s). Review-wait intervals are now subtracted from every node span
+  they overlap, and surfaced honestly as their own `review_wait_seconds` field.
+- **The review request/message/reply/decision files are written atomically.** The parked gate and
+  the dashboard poll these files on tight intervals, and plain writes let a reader observe a file
+  that exists but hasn't finished landing. Worst case observed: a partially-read *message* was
+  deleted as corrupt — silently swallowing the reviewer's Ask; a partially-read *request* made
+  `write_review_message` reject with "no review is pending" the instant a gate opened. All four
+  files now write tmp-then-rename, readers retry instead of deleting, and the tests assert the
+  send — verified 40× under 8-way CPU contention after the first, incomplete fix passed clean
+  locally and still failed on CI.
+- **MCP review tools fail closed on time and soft on input.** `start_run`'s `review_timeout`
+  bounds how long each gate waits before aborting (a walk-away client can't pin the run thread
+  forever; `0` waits indefinitely for a genuinely interactive reviewer — the file surface honors
+  the same `0` semantics). `submit_review` returns `{"error": …}` on an invalid decision, empty
+  request-changes comments, or a double-submit, instead of raising a traceback through the tool
+  call.
+- **Integrity no longer mistakes a gate venv for hollow app code.** The stub-implementation scan
+  knew `.venv` by *name*; a gate command that built its env as `.gatevenv` had pytest's own
+  vendored internals reported as a BLOCKING finding on two otherwise-clean campaign runs. Venvs
+  are now detected **structurally** (PEP 405 `pyvenv.cfg`, recomputed per scan — the remediation
+  loop creates gate venvs between scans), with `site-packages` as the catch-all for markerless
+  layouts. Hollow code at the workspace root still blocks, covered by tests.
+- **The dashboard tells the truth about time, cost, and liveness.** Timestamps render as local
+  `HH:MM:SS` and durations as `Xm Ys` (the original fix was orphaned by a post-merge push and is
+  recovered here); long values clip instead of painting over their neighbors; static assets send
+  `Cache-Control: no-cache` so fixes actually reach reviewers; markdown **pipe tables** render as
+  tables in doc previews; an active run whose status file has been untouched for 45+ minutes is
+  labeled **stale?** (a SIGKILLed conductor never finalizes its status — review-parked runs are
+  exempt); and **token-only backends are priced in the UI** via the same read-time normalization
+  as `usage`/`compare`, flagged `est.` — no more $0.0000 Codex runs. The archive stays raw truth;
+  estimation remains a read-time concern.
+- **A bare `pytest` can no longer silently skip the MCP/HITL suite.** The `mcp` extra is part of
+  `dev`, and the suite fails loud when it's missing instead of reporting a falsely-reassuring
+  green with the entire MCP surface skipped.
+
 ## v0.10.1 — 2026-07-08
 
 ### Fixed

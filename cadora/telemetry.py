@@ -6,6 +6,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from cadora.provenance import conductor_fingerprint
 from cadora.topology import Topology
 
 
@@ -22,6 +23,9 @@ class RunTelemetry:
             "run_id": run_id,
             "topology": topology.name,
             "executor": executor,
+            # Which Cadora is driving this run — stamped at start so even an aborted or
+            # mid-flight-inspected run shows the conductor it launched under.
+            "conductor": conductor_fingerprint(),
             "status": "created",
             "started_at": None,
             "completed_at": None,
@@ -41,6 +45,7 @@ class RunTelemetry:
                     "cost_usd": None,
                     "credits": None,
                     "duration_seconds": None,
+                    "review_wait_seconds": 0.0,
                     "generation_tokens": 0,
                     "context_tokens": 0,
                     "gate": None,
@@ -51,6 +56,12 @@ class RunTelemetry:
                 for node in topology.nodes
             },
         }
+        # W5: human review is not agent work. Record each review-wait interval so a node's
+        # duration_seconds can exclude review time that overlapped its span — its own gates, and
+        # under --max-parallel a sibling's review it sat idle through. review_wait_seconds keeps the
+        # node's own deliberation as a separate honest field. Both flow into the signed evidence pack.
+        self._review_wait_start: dict[str, str] = {}
+        self._review_intervals: list[tuple[str, str]] = []
         self._write_status()
 
     def emit(self, event_type: str, *, node_id: str | None = None, **payload) -> None:
@@ -132,7 +143,13 @@ class RunTelemetry:
         node = self._node(node_id)
         node["status"] = "completed" if ok else "failed"
         node["completed_at"] = ts
-        node["duration_seconds"] = _duration(node.get("started_at"), ts)
+        # W5: exclude human-review time from the node's WORK duration. Subtract every review-wait
+        # interval that overlapped this node's span, so duration_seconds is agent work — not
+        # wall-clock that silently includes a human deliberating. This value feeds the signed pack.
+        raw = _duration(node.get("started_at"), ts)
+        review_overlap = _overlap_seconds(node.get("started_at"), ts, self._review_intervals)
+        node["duration_seconds"] = None if raw is None else round(max(0.0, raw - review_overlap), 3)
+        node["review_wait_seconds"] = round(node.get("review_wait_seconds") or 0.0, 3)
         node["model"] = model or node.get("model")
         node["cost_usd"] = cost_usd
         node["credits"] = (usage or {}).get("credits")
@@ -150,6 +167,7 @@ class RunTelemetry:
             cost_usd=cost_usd,
             credits=node["credits"],
             duration_seconds=node["duration_seconds"],
+            review_wait_seconds=node["review_wait_seconds"] or None,
             generation_tokens=generation,
             context_tokens=context,
             error=error,
@@ -159,18 +177,28 @@ class RunTelemetry:
     def review_waiting(self, node_id: str) -> None:
         node = self._node(node_id)
         node["status"] = "review_waiting"
+        self._review_wait_start[node_id] = _now()  # W5: start of a human-deliberation interval
         self.emit("review_waiting", node_id=node_id)
         self._write_status()
 
     def review_resolved(self, node_id: str, decision: str) -> None:
         node = self._node(node_id)
         node["review"] = decision
+        # W5: close the review-wait interval — record it globally (for the duration correction) and
+        # accumulate this node's own deliberation time (across request_changes reruns).
+        started = self._review_wait_start.pop(node_id, None)
+        waited = 0.0
+        if started is not None:
+            ended = _now()
+            self._review_intervals.append((started, ended))
+            waited = _duration(started, ended) or 0.0
+            node["review_wait_seconds"] = round((node.get("review_wait_seconds") or 0.0) + waited, 3)
         event_type = {
             "approve": "review_approved",
             "request_changes": "review_requested_changes",
             "abort": "review_aborted",
         }.get(decision, "review_resolved")
-        self.emit(event_type, node_id=node_id, decision=decision)
+        self.emit(event_type, node_id=node_id, decision=decision, waited_seconds=round(waited, 3) or None)
         self._write_status()
 
     def _node(self, node_id: str) -> dict:
@@ -229,3 +257,30 @@ def _duration(started_at: str | None, completed_at: str | None) -> float | None:
     except (ValueError, TypeError):
         return None
     return round(delta.total_seconds(), 3)
+
+
+def _overlap_seconds(span_start: str | None, span_end: str | None, intervals) -> float:
+    """Total seconds of ``intervals`` (each an ISO ``(start, end)`` pair) that fall inside the span.
+
+    Used to debit a node's work duration for human-review time: each interval counts only for the
+    part overlapping ``[span_start, span_end]``, so a node loses its own review waits and — under
+    ``--max-parallel`` — any sibling review it sat idle through, but nothing outside its own span.
+    """
+    if not span_start or not span_end:
+        return 0.0
+    try:
+        s = datetime.fromisoformat(span_start)
+        e = datetime.fromisoformat(span_end)
+    except (ValueError, TypeError):
+        return 0.0
+    total = 0.0
+    for istart, iend in intervals:
+        try:
+            a = datetime.fromisoformat(istart)
+            b = datetime.fromisoformat(iend)
+        except (ValueError, TypeError):
+            continue
+        lo, hi = max(s, a), min(e, b)
+        if hi > lo:
+            total += (hi - lo).total_seconds()
+    return round(total, 3)

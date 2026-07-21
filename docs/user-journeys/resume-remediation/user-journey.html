@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A broken run doesn't cost you the whole run · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec; --ink:#1b2130; --ink-soft:#4a5265; --ink-faint:#7b8496;
+    --rule:#e0dccf; --card:#fffefb; --amber:#b3760f; --amber-bg:#f6ecd6;
+    --green:#0f7a54; --red:#b23a4b; --blue:#245bb5;
+    --scr-bg:#0f172a; --scr-canvas:#111c2f; --scr-panel:#1e2937; --scr-panel2:#162237;
+    --scr-line:#334158; --scr-text:#f5f7fb; --scr-muted:#9aa8bc; --scr-blue:#6ba5f0;
+    --scr-green:#16c784; --scr-greensoft:#75f0a8; --scr-red:#fb7185; --scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+      --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;
+      --green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  }
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+    --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;--green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;
+    --rule:#e0dccf;--card:#fffefb;--amber:#b3760f;--amber-bg:#f6ecd6;--green:#0f7a54;--red:#b23a4b;--blue:#245bb5;}
+  *{box-sizing:border-box}
+  .wrap{max-width:760px;margin:0 auto;padding:3rem 1.5rem 4rem;color:var(--ink);
+    font-family:var(--sans);line-height:1.65;font-size:16px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--amber);margin:0 0 .6rem}
+  h1{font-size:2.5rem;line-height:1.05;letter-spacing:-.02em;margin:.2rem 0 .5rem;text-wrap:balance;font-weight:640}
+  .lede{font-size:1.15rem;color:var(--ink-soft);margin:0;max-width:60ch}
+  .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:1.4rem;
+    padding-top:1rem;border-top:1px solid var(--rule);display:flex;gap:1.5rem;flex-wrap:wrap}
+  .step{margin-top:3.4rem}
+  .step-head{display:flex;align-items:baseline;gap:.9rem;margin-bottom:.5rem}
+  .num{font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:600;
+    border:1px solid var(--rule);border-radius:6px;padding:2px 8px;flex:none}
+  h2{font-size:1.5rem;letter-spacing:-.01em;margin:0;font-weight:600;text-wrap:balance}
+  .step p{color:var(--ink-soft);margin:.5rem 0 0}
+  .step p strong{color:var(--ink);font-weight:600}
+  .note{font-size:.95rem;color:var(--ink-faint);border-left:2px solid var(--amber);
+    padding:.1rem 0 .1rem .9rem;margin:1.1rem 0 0}
+  /* faux browser frame holding a faithful dark-dashboard screen */
+  .screen{margin:1.4rem 0 .3rem;border-radius:12px;overflow:hidden;border:1px solid var(--rule);
+    background:var(--scr-bg);box-shadow:0 1px 0 var(--rule)}
+  .chrome{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#0b1220;border-bottom:1px solid #1e2a3d}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .url{margin-left:8px;font-family:var(--mono);font-size:11px;color:#5f6d84;background:#0f1a2c;
+    border-radius:6px;padding:3px 10px;flex:1}
+  .body{padding:14px;color:var(--scr-text);font-size:13px}
+  .hero{display:flex;justify-content:space-between;align-items:center;background:var(--scr-panel);
+    border-radius:10px;padding:11px 14px;margin-bottom:12px}
+  .hero b{font-size:15px}.hero small{color:var(--scr-muted);display:block;font-size:11px;margin-top:2px}
+  .pill{font-size:11px;padding:3px 9px;border-radius:999px}
+  .pill.run{background:#12314e;color:#7db8ff}.pill.done{background:#0f3d2c;color:var(--scr-greensoft)}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);
+    padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:150px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted);line-height:1.55}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0}
+  .prev h4{margin:2px 0 4px;font-size:13px;color:var(--scr-text)}
+  .prev p,.prev li{color:var(--scr-muted);font-size:12px;margin:2px 0}
+  .dag{display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:6px}
+  .node{width:180px;text-align:center;border-radius:8px;padding:7px;font-size:12px;
+    background:var(--scr-panel);border:1px solid var(--scr-line);color:var(--scr-muted)}
+  .node.on{background:#123024;border-color:#1f6a49;color:var(--scr-greensoft)}
+  .node .badge{font-size:9px;background:#0f3d2c;color:var(--scr-greensoft);border-radius:4px;padding:1px 6px;margin:0 2px}
+  .node.wait{background:#2a2410;border-color:#7a6320;color:var(--scr-amber)}
+  .arrow{color:var(--scr-line);font-size:12px}
+  .foot{margin-top:3.5rem;padding-top:1.2rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  a{color:var(--blue)}
+</style>
+
+<style>
+  /* resume & remediation — appended after the verbatim base, reusing the same --scr-* tokens */
+  .mn{font-family:var(--mono);font-size:.9em}
+  /* terminal recreation — same dark palette, monospace, one pre-wrap region per screen */
+  .term{font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--scr-muted);
+    white-space:pre-wrap;word-break:break-word}
+  .term .p{color:var(--scr-greensoft)}          /* the $ prompt */
+  .term .cmd{color:var(--scr-text)}             /* the command you type */
+  .term .cmt{color:var(--scr-muted)}            /* # inline comment */
+  .term .path{color:var(--scr-blue)}
+  .term .ok{color:var(--scr-greensoft)}
+  .term .amber{color:var(--scr-amber)}
+  .term .bad{color:var(--scr-red)}
+  .term .verdict{color:var(--scr-greensoft);font-weight:700}
+  .term .verdict.no{color:var(--scr-red)}
+  /* resumed DAG: trusted (skipped) nodes read muted + dashed; re-run nodes are green */
+  .node.trust{border-style:dashed;color:var(--scr-muted)}
+  .node .badge.t{background:#2a2410;color:var(--scr-amber)}
+  .pill.res{background:#2a2410;color:var(--scr-amber)}
+  /* the remediation attempt trail — one row per fresh constrained session */
+  .att{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .att .n{font-family:var(--mono);font-size:11px;color:var(--scr-muted);flex:none;min-width:80px}
+  .att .g{font-family:var(--mono);font-size:12px;color:var(--scr-muted);flex:1}
+  .att .v{font-family:var(--mono);font-weight:600;font-size:11px;padding:2px 10px;border-radius:999px;white-space:nowrap}
+  .att .v.no{color:var(--scr-red);border:1px solid var(--scr-red)}
+  .att .v.ok{color:var(--scr-greensoft);border:1px solid var(--scr-green)}
+  .marker{font-size:11px;font-family:var(--mono);color:var(--scr-amber);border:1px solid var(--scr-amber);
+    border-radius:999px;padding:3px 10px;display:inline-block}
+  .cap2{font-size:11px;color:var(--scr-muted);margin-top:9px;line-height:1.55}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Cadora's resume and remediation, step by step: a run stops at a red gate with its artifacts preserved in the workspace; cadora run --resume-from build skips the upstream nodes as trusted and re-runs from the break; provenance verification refuses to resume onto a workspace that drifted since the run being resumed unless --allow-drift is passed and the drift is recorded; --remediate runs a bounded, verified auto-repair loop where green means the same gate re-passing, never the agent's claim; a cost ceiling stops remediation honest-blocked before overspending; and the dashboard badges skipped nodes trusted and re-run nodes fresh.</h2>
+
+  <p class="eyebrow">Cadora · resume &amp; remediation</p>
+  <h1>A broken run doesn't cost you the whole run</h1>
+  <p class="lede">A timeout, a walk-away, a red gate four stages in — none of it should mean starting over. Cadora lets you <strong>resume from the break</strong>, trusting the upstream artifacts already on disk (and verifying that trust against the run's own provenance, so you never resume onto a drifted workspace unnoticed), or hand a failed gate to a <strong>bounded, verified auto-repair loop</strong>. In both, "green" is the real gate re-passing — never the agent's say-so.</p>
+  <div class="meta"><span>Surface · CLI + dashboard</span><span>Role · operator</span><span>Captured · fixture run, app.topology.yaml</span></div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">01</span><h2>The run stops at a red gate</h2></div>
+    <p><span class="mn">plan</span> and <span class="mn">design</span> cleared their gates; four minutes into <span class="mn">build</span>, the <span class="mn">tests</span> gate comes back red. Cadora stops the run <strong>right there</strong> — it never lets a failed gate flow downstream. What matters for recovery: the workspace and the partial archive are left intact under <span class="mn">runs/&lt;id&gt;</span>. The two green stages are done; only <span class="mn">build</span> and below are unfinished.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora run</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora run app.topology.yaml --cwd ./workspace</span>
+cadora · executor=claude · run=<span class="path">run-20260717-140205</span>
+▶ plan · claude-opus-4-8 · running… (generating documents; this can take a few minutes)
+  <span class="ok">✓ plan</span>   $0.4200 est.   gate:docs ok
+▶ design · claude-opus-4-8 · running…
+  <span class="ok">✓ design</span>   $0.6100 est.   gate:docs ok
+▶ build · claude-sonnet-5 · running…
+  <span class="bad">✗ build</span>   $1.9800 est.   gate:tests <span class="bad">FAILED</span>
+<span class="bad">✗ stopped at node 'build': gate 'tests' blocked</span>  ->  <span class="path">runs/run-20260717-140205</span></div>
+      </div>
+    </div>
+    <p class="note">Nothing is lost. The workspace still holds everything <span class="mn">plan</span> and <span class="mn">design</span> wrote, and the run's fingerprint is recorded. You resume from <span class="mn">build</span> — not from zero.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">02</span><h2>Resume from the break — <span class="mn">--resume-from</span></h2></div>
+    <p>Point Cadora at the node you want to restart at. <span class="mn">--resume-from build</span> skips <strong>every node upstream of</strong> <span class="mn">build</span> — trusting their artifacts already in <span class="mn">--cwd</span> — then re-runs <span class="mn">build</span> itself and everything downstream. First, though, it verifies that trust: the current workspace is checked against the fingerprint of the run being resumed, and only a clean match proceeds.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora run --resume-from build</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora run app.topology.yaml --resume-from build --cwd ./workspace</span>
+↩ resume: skipping plan, design · running from 'build'
+  ↳ workspace verified against <span class="path">run-20260717-140205</span> — no drift (37 files)
+cadora · executor=claude · run=<span class="path">run-20260717-163150</span>
+↩ skip 'plan' — artifacts trusted in the workspace
+↩ skip 'design' — artifacts trusted in the workspace
+▶ build · claude-sonnet-5 · running…
+  <span class="ok">✓ build</span>   $2.0700 est.   gate:tests ok
+▶ test · claude-sonnet-5 · running…
+  <span class="ok">✓ test</span>   $0.4400 est.   gate:tests ok
+<span class="verdict">✓ run complete</span> -> <span class="path">runs/run-20260717-163150</span></div>
+      </div>
+    </div>
+    <p class="note">Need finer control than a resume point? <span class="mn">--skip plan,design</span> names the trusted nodes directly — the same "trust their existing workspace artifacts" contract, one node at a time.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">03</span><h2>Trust, but verify — provenance refuses drift</h2></div>
+    <p>Resuming <em>trusts</em> the skipped nodes' artifacts. So Cadora makes that trust <strong>checked, not silent</strong>: if the workspace drifted since the run you're resuming — a file edited, something added or cleaned — it <strong>refuses</strong>, rather than certify gates over source that never passed the earlier stages. The refusal names exactly what moved.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — resume refused</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora run app.topology.yaml --resume-from build --cwd ./workspace</span>
+↩ resume: skipping plan, design · running from 'build'
+<span class="bad">✗ resume refused: workspace drifted since run-20260717-140205 (2 modified, 0 removed, 1 added).</span>
+    modified: aidlc-docs/inception/application-design/application-design.md
+    modified: src/orders/service.py
+       added: src/orders/scratch.py
+  The skipped nodes' artifacts no longer match the run you are resuming, so the gates
+  would certify source that never passed the earlier stages. Re-run from scratch, or pass
+  --allow-drift to resume anyway (the drift is recorded in the evidence pack).</div>
+      </div>
+    </div>
+    <p>You can override — deliberately. <span class="mn">--allow-drift</span> proceeds, and the drift is <strong>recorded in the evidence pack either way</strong>, so the resume stays honest about the ground it stood on.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — resume --allow-drift</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora run app.topology.yaml --resume-from build --cwd ./workspace --allow-drift</span>
+↩ resume: skipping plan, design · running from 'build'
+  <span class="amber">⚠ workspace DRIFTED since run-20260717-140205 (2 modified, 0 removed, 1 added) — proceeding under --allow-drift</span>
+      modified: aidlc-docs/inception/application-design/application-design.md
+      modified: src/orders/service.py
+         added: src/orders/scratch.py
+    this run's evidence will record that it resumed against a drifted workspace
+cadora · executor=claude · run=<span class="path">run-20260717-164410</span>
+↩ skip 'plan' — artifacts trusted in the workspace
+↩ skip 'design' — artifacts trusted in the workspace
+▶ build · claude-sonnet-5 · running…</div>
+      </div>
+    </div>
+    <p class="note">Default is refuse. The drifted-workspace path is opt-in and self-documenting — the evidence pack shows the resume ran against a workspace that no longer matched its baseline.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">04</span><h2>Let a bounded loop clear the gate — <span class="mn">--remediate</span></h2></div>
+    <p>Instead of stopping at the red gate, <span class="mn">--remediate 2</span> feeds the failing gate's own output into a <strong>fresh, constrained session</strong> and re-runs — up to two attempts. Attempt 1's fix doesn't hold; attempt 2 clears it. Crucially, "cleared" is decided by re-running <strong>the same</strong> <span class="mn">gate:tests</span> check — not by the agent reporting success. The node completes green, tagged with its attempt count.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora run --remediate 2</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora run app.topology.yaml --cwd ./workspace --remediate 2</span>
+▶ build · claude-sonnet-5 · running…
+  <span class="ok">✓ build</span>   $3.4100 est.   gate:tests ok   <span class="amber">remediate:completed-green x2</span></div>
+        <div class="marker" style="margin:12px 0 4px">attempt trail — archived under build/remediation/</div>
+        <div class="att"><span class="n">attempt 1</span><span class="g">fresh session · re-ran gate:tests</span><span class="v no">FAILED</span></div>
+        <div class="att"><span class="n">attempt 2</span><span class="g">fresh session · re-ran gate:tests</span><span class="v ok">PASSED</span></div>
+        <div class="cap2"><b style="color:var(--scr-amber)">Green = the same ShellGate.check re-passing.</b> A false claim of success from the agent never substitutes for the gate — the verdict comes from re-running the deterministic check, and integrity is re-scanned too when enforced.</div>
+      </div>
+    </div>
+    <p class="note">Each attempt runs in its own fresh, constrained session told not to weaken, skip, or bypass the gate. A gate that passes having run zero tests is a <span class="mn">vacuous</span> pass, not a fix — and it doesn't count as green.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">05</span><h2>The bounds hold honest</h2></div>
+    <p>Remediation is bounded, and a bound hit never becomes a fabricated pass. Exhaust the attempts and the run stops <strong>honest-blocked</strong> — the full attempt trail preserved, the gate still red. Add <span class="mn">--remediate-max-cost 5.00</span> and it stops <em>before</em> the next attempt would cross the ceiling, rather than over-spending toward a fix that may not come.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — attempts exhausted</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora run app.topology.yaml --cwd ./workspace --remediate 2</span>
+▶ build · claude-sonnet-5 · running…
+  <span class="bad">✗ build</span>   $5.8700 est.   gate:tests <span class="bad">FAILED</span>   <span class="amber">remediate:honest-blocked x2</span>
+<span class="bad">✗ stopped at node 'build': gate 'tests' blocked — remediation exhausted after 2 attempt(s) (max_attempts)</span>  ->  <span class="path">runs/run-20260717-171904</span></div>
+      </div>
+    </div>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cost ceiling reached</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora run app.topology.yaml --cwd ./workspace --remediate 3 --remediate-max-cost 5.00</span>
+▶ build · claude-sonnet-5 · running…
+  <span class="bad">✗ build</span>   $7.1000 est.   gate:tests <span class="bad">FAILED</span>   <span class="amber">remediate:honest-blocked x2</span>
+<span class="bad">✗ stopped at node 'build': gate 'tests' blocked — remediation exhausted after 2 attempt(s) (cost_ceiling)</span>  ->  <span class="path">runs/run-20260717-172530</span></div>
+        <div class="cap2">A third attempt was allowed by <span class="mn">--remediate 3</span>, but the attempts so far already summed past <span class="mn">$5.00</span> — so Cadora stopped <span style="color:var(--scr-amber)">honest-blocked</span> rather than spend more chasing a green that isn't guaranteed.</div>
+      </div>
+    </div>
+    <p class="note">Missing tooling is never handed to the loop: a <span class="mn">blocked_prerequisite</span> gate is not agent-repairable, so remediation doesn't engage — it stays truthfully blocked.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">06</span><h2>The resumed run, on the dashboard</h2></div>
+    <p>The run-detail view makes the two kinds of node unmistakable. Skipped nodes are badged <strong>trusted</strong> — dashed, muted, not re-run this run. The resume point and everything below are <strong>fresh</strong> — re-executed, gated green. A banner marks where the run picked up and what it verified against.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8768/runs/run-20260717-163150</span></div>
+      <div class="body">
+        <div class="hero"><div><b>run-20260717-163150</b><small>app.topology.yaml · resumed from 'build' · verified vs run-20260717-140205 · no drift</small></div><span class="pill res">resumed</span></div>
+        <div class="dag">
+          <div class="node trust">plan<div style="margin-top:3px"><span class="badge t">trusted</span><span class="kind">not re-run</span></div></div>
+          <div class="arrow">↓</div>
+          <div class="node trust">design<div style="margin-top:3px"><span class="badge t">trusted</span><span class="kind">not re-run</span></div></div>
+          <div class="arrow">↓</div>
+          <div class="node on">build<div style="margin-top:3px"><span class="badge">gate passed</span><span class="badge">re-run</span></div></div>
+          <div class="arrow">↓</div>
+          <div class="node on">test<div style="margin-top:3px"><span class="badge">gate passed</span><span class="badge">re-run</span></div></div>
+        </div>
+        <div class="cap2"><b style="color:var(--scr-amber)">trusted</b> nodes contributed no new agent cost — their artifacts came from the earlier run and were provenance-checked before the resume ran. Only <b style="color:var(--scr-greensoft)">build</b> and <b style="color:var(--scr-greensoft)">test</b> re-executed and re-gated.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <p>The terminal frames above reproduce real <span class="mn">cadora run --resume-from / --skip / --allow-drift / --remediate</span> output, rendered as editable HTML rather than raster captures — lift them into Figma or iterate directly. This is the recovery half of an audit-grade conductor: an interrupted run resumes on <em>verified</em> trust, and a red gate gets a <em>bounded</em> repair whose only definition of green is the real gate passing again — with the honest-blocked trail kept when it doesn't.</p>
+  </div>
+</div>
+</body>
+</html>

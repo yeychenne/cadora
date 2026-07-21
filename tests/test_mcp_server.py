@@ -238,3 +238,83 @@ def test_get_artifact_blocks_path_traversal(tmp_path):
     assert ok == "fine"
     assert "escapes the run workspace" in escaped
     assert "outside" not in escaped
+
+
+def test_mcp_request_changes_then_approve_reruns_the_node(tmp_path):
+    # T1.5/W7: the rejection path end-to-end over the MCP tools — request_changes re-executes the
+    # node and re-presents the gate, and a follow-up approve lands the run green. The existing HITL
+    # MCP test only covers approve.
+    async def _run():
+        topo = tmp_path / "one.yaml"
+        topo.write_text("name: one\nnodes:\n  - id: requirements\n    prompt: REQ\n    review: true\n")
+        async with connect(_fake_app()) as client:
+            await client.initialize()
+            _result(await client.call_tool("start_run", {
+                "topology": str(topo), "run_id": "rc1", "cwd": str(tmp_path),
+                "archive_dir": str(tmp_path / "runs")}))
+            decisions = []
+            for _ in range(500):
+                gate = _result(await client.call_tool("review_gate", {"run_id": "rc1"}))
+                if gate.get("pending"):
+                    if not decisions:
+                        _result(await client.call_tool("submit_review", {
+                            "run_id": "rc1", "decision": "request_changes", "comments": "add X"}))
+                        decisions.append("request_changes")
+                    else:
+                        _result(await client.call_tool("submit_review", {
+                            "run_id": "rc1", "decision": "approve", "comments": "better"}))
+                        decisions.append("approve")
+                        break
+                await asyncio.sleep(0.01)
+            for _ in range(500):
+                st = _result(await client.call_tool("run_status", {"run_id": "rc1"}))
+                if not st["running"]:
+                    return decisions, st
+                await asyncio.sleep(0.01)
+            return decisions, {"error": "timeout"}
+
+    decisions, status = asyncio.run(_run())
+    assert decisions == ["request_changes", "approve"]  # gate fired twice, second time approved
+    assert status["error"] is None
+    manifest = json.loads((tmp_path / "runs" / "rc1" / "manifest.json").read_text())
+    assert manifest["ok"] is True
+    reviews = manifest["nodes"][0]["human_reviews"]
+    assert [r["decision"] for r in reviews] == ["request_changes", "approve"]
+
+
+def test_mcp_abort_sets_run_status_error_and_stops_before_downstream(tmp_path):
+    # T1.5/W7: an abort over MCP surfaces the failure via run_status.error and stops before the
+    # downstream node — the whole rejection surface (not just approve) works over the tools.
+    async def _run():
+        topo = tmp_path / "two.yaml"
+        topo.write_text(
+            "name: two\nnodes:\n  - id: requirements\n    prompt: REQ\n    review: true\n"
+            "  - id: design\n    prompt: DES\n    depends_on: [requirements]\n    review: true\n"
+        )
+        async with connect(_fake_app()) as client:
+            await client.initialize()
+            _result(await client.call_tool("start_run", {
+                "topology": str(topo), "run_id": "ab1", "cwd": str(tmp_path),
+                "archive_dir": str(tmp_path / "runs")}))
+            aborted = False
+            for _ in range(500):
+                gate = _result(await client.call_tool("review_gate", {"run_id": "ab1"}))
+                if gate.get("pending"):
+                    _result(await client.call_tool("submit_review", {
+                        "run_id": "ab1", "decision": "abort", "comments": "wrong direction"}))
+                    aborted = True
+                    break
+                await asyncio.sleep(0.01)
+            for _ in range(500):
+                st = _result(await client.call_tool("run_status", {"run_id": "ab1"}))
+                if not st["running"]:
+                    return aborted, st
+                await asyncio.sleep(0.01)
+            return aborted, {"error": "timeout"}
+
+    aborted, status = asyncio.run(_run())
+    assert aborted
+    assert status["error"] is not None and "abort" in status["error"].lower()
+    manifest = json.loads((tmp_path / "runs" / "ab1" / "manifest.json").read_text())
+    assert manifest["ok"] is False
+    assert [n["node_id"] for n in manifest["nodes"]] == ["requirements"]  # design never ran

@@ -103,6 +103,31 @@ The artifact tab lists files captured under each node archive, including `aidlc-
 artifacts such as `.md`, `.txt`, `.json`, `.jsonl`, `.yaml`, and `.yml` can be previewed in the
 browser.
 
+## Reviewing a gate from the dashboard (HITL)
+
+When a run started with `cadora run … --hitl --review-file` pauses at a `review: true` node, the run
+detail page shows a **review panel** at the top: the node that is waiting, its changed documents as
+**clickable links** (open the rendered doc, or `preview` it inline), a comments box, and
+**Approve / Request changes / Abort**. Submitting a decision delivers it to the live run — the run
+continues to the next node on approve, re-runs the stage with your comments on request-changes, or
+stops on abort — and the panel advances to the next gate. The auto-refresh pauses while a review is
+open so it never wipes an in-progress comment.
+
+Before you decide, you can **talk to the work**. Pick a document and either **Ask** a question about
+it or **Revise** it: the parked run drives the executor scoped to that document and replies in the
+panel — a question is answered inline, a revision rewrites the document in place and shows you the new
+draft, which you can then approve (or revise again). Each ask or revision is a real executor call, so
+it costs a turn on a real backend; the fixture executor answers deterministically for demos.
+
+For a genuinely asynchronous reviewer (you step away, or review from the dashboard on your own time),
+start the run with **`--review-timeout 0`** so the gate waits indefinitely rather than failing closed.
+
+How it works: the run records its workspace path in `run-input.json`, and the dashboard bridges to it
+over the existing decision-file channel — it reads the pending `cadora-review-request.json` and writes
+`cadora-review-decision.json` back into the run's workspace. This needs the dashboard to share the
+run's filesystem (same host) and the run to use `--review-file`. The decision `POST` requires a JSON
+content-type; keep the dashboard on loopback (it is unauthenticated).
+
 ## Token usage CLI
 
 Use `cadora usage` when you want the same usage information in the terminal:

@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cost attribution, by the numbers · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;
+    --card:#fffefb;--amber:#b3760f;
+    --scr-bg:#0f172a;--scr-canvas:#111c2f;--scr-panel:#1e2937;--scr-panel2:#162237;--scr-line:#334158;
+    --scr-text:#f5f7fb;--scr-muted:#9aa8bc;--scr-blue:#6ba5f0;--scr-green:#16c784;--scr-greensoft:#75f0a8;
+    --scr-red:#fb7185;--scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;
+    --ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}}
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;--card:#fffefb;--amber:#b3760f}
+  *{box-sizing:border-box}
+  .wrap{max-width:840px;margin:0 auto;padding:2.6rem 1.5rem 4rem;color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0 0 .5rem}
+  h1{font-size:2.1rem;letter-spacing:-.02em;margin:.1rem 0 .4rem;font-weight:640}
+  .lede{color:var(--ink-soft);margin:0;max-width:64ch}
+  h2{font-size:1.15rem;margin:2.8rem 0 .3rem;font-weight:600;letter-spacing:-.01em}
+  .sub{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 1rem}
+  .rule{height:1px;background:var(--rule);border:0;margin:.4rem 0 0}
+  /* swatches */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:.6rem}
+  .sw{border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--card)}
+  .sw .chip{height:44px}
+  .sw .lab{padding:7px 9px}
+  .sw .lab b{font-size:12px;display:block}
+  .sw .lab code{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .sw .lab span{font-size:11px;color:var(--ink-soft);display:block;margin-top:1px}
+  /* type scale */
+  table{width:100%;border-collapse:collapse;margin-top:.5rem;font-size:13px}
+  th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ink-faint);font-weight:500;padding:6px 10px;border-bottom:1px solid var(--rule)}
+  td{padding:8px 10px;border-bottom:1px solid var(--rule);color:var(--ink-soft);vertical-align:top}
+  td b{color:var(--ink)}
+  td code,.mn{font-family:var(--mono);font-size:12px;color:var(--amber)}
+  /* dashboard component render */
+  .stage{background:var(--scr-bg);border:1px solid var(--rule);border-radius:12px;padding:16px;margin-top:.8rem}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px;position:relative}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .rhead span:last-child{color:var(--scr-text);font-size:13px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .msg.err{color:var(--scr-red)}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0;color:var(--scr-muted);font-size:12px}
+  .empty{color:var(--scr-muted);font-size:12px;font-style:italic;padding:4px 2px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:130px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted)}
+  /* anatomy pins */
+  .pin{position:absolute;font-family:var(--mono);font-size:10px;font-weight:600;width:18px;height:18px;
+    border-radius:50%;background:var(--scr-amber);color:#1a1205;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 3px var(--scr-panel2)}
+  .legend{margin-top:1rem;display:grid;gap:6px}
+  .legend div{display:flex;gap:9px;font-size:13px;color:var(--ink-soft)}
+  .legend .k{font-family:var(--mono);font-size:11px;font-weight:600;width:18px;height:18px;flex:none;
+    border-radius:50%;background:var(--amber);color:var(--paper);display:flex;align-items:center;justify-content:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:.8rem}
+  .state{background:var(--scr-bg);border:1px solid var(--rule);border-radius:10px;padding:12px}
+  .state .cap{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+  .foot{margin-top:3rem;padding-top:1.1rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+  /* --- FinOps components: tiles, breakdown rows, token split, daily, toggle --- */
+  .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+  .metric{background:var(--scr-panel);border:1px solid var(--scr-line);border-radius:8px;padding:12px 13px}
+  .metric .mlabel{color:var(--scr-muted);font-size:11px}
+  .metric strong{display:block;margin-top:6px;font-size:22px;line-height:1.1;color:var(--scr-text);font-weight:700}
+  .finhead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+  .finhead b{font-size:15px;color:var(--scr-text)}
+  .since-toggle{display:flex;gap:6px}
+  .since-toggle span{font-size:11px;padding:4px 10px;border:1px solid var(--scr-line);border-radius:6px;color:var(--scr-muted)}
+  .since-toggle span.active{border-color:var(--scr-blue);color:var(--scr-blue)}
+  .finops-top{display:grid;gap:12px;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}
+  .finops-block{background:var(--scr-panel2);border:1px solid var(--scr-line);border-radius:8px;padding:12px}
+  .flabel{color:var(--scr-muted);font-size:11px;display:block;margin-bottom:6px}
+  .split{display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;font-size:15px;font-weight:700;color:var(--scr-text)}
+  .split em{color:var(--scr-muted);font-style:normal;font-weight:500;margin-right:4px}
+  .finops-cols{display:grid;gap:16px;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .cost-row{align-items:center;border-top:1px solid var(--scr-line);display:grid;gap:8px;
+    grid-template-columns:minmax(50px,.7fr) minmax(44px,1fr) auto;font-size:13px;padding:7px 0}
+  .cost-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--scr-text);font-size:12px}
+  .cost-row .cmuted{color:var(--scr-muted);font-family:var(--mono);font-size:11px}
+  .bar{background:#0d1526;border-radius:999px;display:block;height:8px;overflow:hidden}
+  .bar>span{background:linear-gradient(90deg,var(--scr-blue),var(--scr-green));display:block;height:100%}
+  .daily{align-items:end;display:flex;gap:4px;height:70px;margin-top:8px}
+  .daily-col{align-items:center;display:flex;flex:1;flex-direction:column;gap:4px;height:100%;justify-content:flex-end;min-width:0}
+  .daily-fill{background:linear-gradient(180deg,var(--scr-greensoft),var(--scr-blue));border-radius:3px 3px 0 0;display:block;width:68%}
+  .daily-col small{color:var(--scr-muted);font-size:10px}
+  .estnote{color:var(--scr-amber);font-size:11px;margin-top:8px}
+  @media(max-width:760px){.finops-cols{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:520px){.metrics{grid-template-columns:1fr 1fr}.finops-top,.finops-cols{grid-template-columns:1fr}}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Design specification for Cadora's cost attribution and FinOps surfaces: the color and type tokens, the metric tile, the breakdown row, the token-split bar, the since toggle, the panel's anatomy, its states, and what every metric means.</h2>
+  <p class="eyebrow">Cadora · design spec</p>
+  <h1>Cost attribution, by the numbers</h1>
+  <p class="lede">Everything needed to rebuild or extend the FinOps surface — the exact tokens, the metric tile, the breakdown row, the token split, the since toggle, and every state they must render. The components below are live HTML; edit them here or lift the specs into Figma.</p>
+
+  <h2>Palette</h2>
+  <p class="sub">Dark instrument surface · blue-to-green for cost · amber reserved</p>
+  <hr class="rule">
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#3b82f6"></div><div class="lab"><b>Blue</b><code>--blue · #3b82f6</code><span>Cost bar start · active toggle</span></div></div>
+    <div class="sw"><div class="chip" style="background:#16c784"></div><div class="lab"><b>Green</b><code>--green · #16c784</code><span>Cost bar end</span></div></div>
+    <div class="sw"><div class="chip" style="background:#75f0a8"></div><div class="lab"><b>Green soft</b><code>--green-soft · #75f0a8</code><span>Daily bar top</span></div></div>
+    <div class="sw"><div class="chip" style="background:#ffd08a"></div><div class="lab"><b>Amber</b><code>--amber · #ffd08a</code><span>Attention only · sparingly</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0f172a"></div><div class="lab"><b>Ink</b><code>--bg · #0f172a</code><span>Page ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#1e2937"></div><div class="lab"><b>Panel</b><code>--panel · #1e2937</code><span>Metric tile</span></div></div>
+    <div class="sw"><div class="chip" style="background:#162237"></div><div class="lab"><b>Panel 2</b><code>--panel-2 · #162237</code><span>Split · daily block</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0d1526"></div><div class="lab"><b>Bar track</b><code>#0d1526</code><span>Cost bar ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#334158"></div><div class="lab"><b>Line</b><code>--line · #334158</code><span>Borders · row rules</span></div></div>
+    <div class="sw"><div class="chip" style="background:#f5f7fb"></div><div class="lab"><b>Text</b><code>--text · #f5f7fb</code><span>Numbers</span></div></div>
+    <div class="sw"><div class="chip" style="background:#9aa8bc"></div><div class="lab"><b>Muted</b><code>--muted · #9aa8bc</code><span>Labels · tokens/$cost</span></div></div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.7rem">Cost reads <b style="color:var(--ink)">blue&nbsp;→&nbsp;green</b>, never red: spend is information, not an error. Amber stays reserved for the review gate and integrity warnings — it does not appear in a healthy FinOps panel.</p>
+
+  <h2>Type &amp; metrics</h2>
+  <p class="sub">System sans for numbers · monospace for the tokens/$cost voice</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Role</th><th>Family</th><th>Size / weight</th><th>Notes</th></tr>
+    <tr><td><b>Metric number</b></td><td class="mn">system-ui</td><td>22–24px / 700</td><td>The tile's headline value</td></tr>
+    <tr><td><b>Metric label</b></td><td class="mn">system-ui</td><td>11–12px / 400</td><td>Muted, above the number</td></tr>
+    <tr><td><b>Breakdown label</b></td><td class="mn">system-ui</td><td>12–13px / 700</td><td>Model / executor / funding, ellipsis on overflow</td></tr>
+    <tr><td><b>tokens / $cost</b></td><td class="mn">mono</td><td>11–12px</td><td>Muted · <code>990.8k / $1.9895</code></td></tr>
+    <tr><td><b>Panel / section label</b></td><td class="mn">system-ui</td><td>12–15px</td><td><code>FinOps</code> · <code>By model</code></td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Metric</th><th>Value</th><th>Metric</th><th>Value</th></tr>
+    <tr><td>Tile radius</td><td class="mn">8px</td><td>Tile padding</td><td class="mn">14px</td></tr>
+    <tr><td>Bar height</td><td class="mn">8px</td><td>Bar radius</td><td class="mn">999px</td></tr>
+    <tr><td>Cost-row grid</td><td class="mn">.7fr 1fr auto</td><td>Row gap</td><td class="mn">8px</td></tr>
+    <tr><td>Daily height</td><td class="mn">92px</td><td>Daily-fill width</td><td class="mn">68%</td></tr>
+    <tr><td>Cost precision</td><td class="mn">$0.0000</td><td>Token format</td><td class="mn">1.0k · 1.00M</td></tr>
+  </table>
+
+  <h2>Anatomy — the metric tiles</h2>
+  <p class="sub">Four totals across the top of the home page</p>
+  <hr class="rule">
+  <div class="stage">
+    <div style="position:relative">
+      <span class="pin" style="top:-9px;left:-9px">1</span>
+      <span class="pin" style="top:-9px;right:-9px">2</span>
+      <div class="metrics">
+        <div class="metric"><span class="mlabel">Runs</span><strong>7</strong></div>
+        <div class="metric"><span class="mlabel">Generation Tokens</span><strong>26.0k</strong></div>
+        <div class="metric"><span class="mlabel">Context Tokens</span><strong>990.8k</strong></div>
+        <div class="metric"><span class="mlabel">Cost</span><strong>$1.9895</strong></div>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <div><span class="k">1</span><span><b style="color:var(--ink)">Muted label</b> — one word or two, 11–12px, in <span class="mn">--muted</span>. Names the metric; never competes with the number.</span></div>
+    <div><span class="k">2</span><span><b style="color:var(--ink)">Large number</b> — 22–24px, <span class="mn">--text</span>, weight 700. Tokens abbreviate (<span class="mn">26.0k</span>, <span class="mn">1.00M</span>); cost is always four decimals (<span class="mn">$1.9895</span>).</span></div>
+  </div>
+
+  <h2>Anatomy — the FinOps panel</h2>
+  <p class="sub">The panel every attribution question turns on</p>
+  <hr class="rule">
+  <div class="stage">
+    <div style="position:relative">
+      <span class="pin" style="top:-9px;left:-9px">1</span>
+      <span class="pin" style="top:-9px;right:-9px">2</span>
+      <div class="finhead"><b>FinOps</b><div class="since-toggle"><span class="active">all</span><span>30d</span><span>7d</span></div></div>
+      <span class="pin" style="top:56px;left:-9px">3</span>
+      <span class="pin" style="top:56px;right:-9px">4</span>
+      <div class="finops-top" style="margin-bottom:12px">
+        <div class="finops-block">
+          <span class="flabel">Token split</span>
+          <div class="split"><span><em>in</em> 6.4k</span><span><em>out</em> 19.6k</span><span><em>cache</em> 964.8k</span></div>
+        </div>
+        <div class="finops-block">
+          <span class="flabel">Cost by day</span>
+          <div class="daily">
+            <div class="daily-col"><span class="daily-fill" style="height:8%"></span><small>07-14</small></div>
+            <div class="daily-col"><span class="daily-fill" style="height:6%"></span><small>07-15</small></div>
+            <div class="daily-col"><span class="daily-fill" style="height:22%"></span><small>07-16</small></div>
+            <div class="daily-col"><span class="daily-fill" style="height:100%"></span><small>07-17</small></div>
+          </div>
+        </div>
+      </div>
+      <span class="pin" style="bottom:-9px;left:-9px">5</span>
+      <div class="finops-cols">
+        <div><span class="flabel">By model</span>
+          <div class="cost-row"><strong>claude-opus-4-7[1m]</strong><span class="bar"><span style="width:100%"></span></span><span class="cmuted">990.8k / $1.9895</span></div>
+        </div>
+        <div><span class="flabel">By executor</span>
+          <div class="cost-row"><strong>claude</strong><span class="bar"><span style="width:100%"></span></span><span class="cmuted">990.8k / $1.9895</span></div>
+        </div>
+        <div><span class="flabel">By funding</span>
+          <div class="cost-row"><strong>subscription</strong><span class="bar"><span style="width:100%"></span></span><span class="cmuted">990.8k / $1.9895</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <div><span class="k">1</span><span><b style="color:var(--ink)">Panel title</b> — <span class="mn">FinOps</span>, 15px. The one place the cost surface is named.</span></div>
+    <div><span class="k">2</span><span><b style="color:var(--ink)">Since toggle</b> — <span class="mn">all / 30d / 7d</span>. The active window carries a blue border and blue text; it filters every block below, server-side.</span></div>
+    <div><span class="k">3</span><span><b style="color:var(--ink)">Token split</b> — <span class="mn">in / out / cache</span>, each a bold number with a muted label. The cache number is usually the largest.</span></div>
+    <div><span class="k">4</span><span><b style="color:var(--ink)">Cost by day</b> — one bar per day in the window, height scaled to the costliest day. A zero-cost day still shows a 4% sliver.</span></div>
+    <div><span class="k">5</span><span><b style="color:var(--ink)">Breakdown columns</b> — the same spend by model, by executor, by funding. Each column is a stack of cost rows.</span></div>
+  </div>
+
+  <h2>The breakdown row</h2>
+  <p class="sub">Label · cost bar · tokens / $cost</p>
+  <hr class="rule">
+  <div class="stage">
+    <div style="position:relative">
+      <span class="pin" style="top:8px;left:-9px">1</span>
+      <span class="pin" style="top:8px;left:34%">2</span>
+      <span class="pin" style="top:8px;right:-9px">3</span>
+      <div class="finops-block" style="background:transparent;border:0;padding:0">
+        <div class="cost-row" style="border-top:0"><strong>claude-opus-4-7[1m]</strong><span class="bar"><span style="width:100%"></span></span><span class="cmuted">990.8k / $1.9895</span></div>
+        <div class="cost-row"><strong>gpt-5.5</strong><span class="bar"><span style="width:18%"></span></span><span class="cmuted">42.1k / $0.3765</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <div><span class="k">1</span><span><b style="color:var(--ink)">Label</b> — the group key (model id, executor, or funding). Truncates with an ellipsis; the full value is the row.</span></div>
+    <div><span class="k">2</span><span><b style="color:var(--ink)">Cost bar</b> — blue→green fill, width proportional to this row's cost against the column max (floored at 3% so a tiny non-zero row is still visible).</span></div>
+    <div><span class="k">3</span><span><b style="color:var(--ink)">tokens / $cost</b> — monospace, muted: context tokens then dollars to four places. Rows sort by context, heaviest first.</span></div>
+  </div>
+
+  <h2>States &amp; variants</h2>
+  <p class="sub">Every condition the surface must render</p>
+  <hr class="rule">
+  <div class="grid2">
+    <div class="state"><p class="cap">Funding · subscription (default)</p>
+      <span class="flabel">By funding</span>
+      <div class="cost-row" style="border-top:0"><strong>subscription</strong><span class="bar"><span style="width:100%"></span></span><span class="cmuted">990.8k / $1.9895</span></div>
+    </div>
+    <div class="state"><p class="cap">Funding · metered (billed API)</p>
+      <span class="flabel">By funding</span>
+      <div class="cost-row" style="border-top:0"><strong>subscription</strong><span class="bar"><span style="width:100%"></span></span><span class="cmuted">990.8k / $1.9895</span></div>
+      <div class="cost-row"><strong>metered</strong><span class="bar"><span style="width:18%"></span></span><span class="cmuted">42.1k / $0.3765</span></div>
+      <p class="estnote">gpt-5.5 · cost estimated from the public rate table</p>
+    </div>
+    <div class="state"><p class="cap">Zero-cost run (fixture / mock)</p>
+      <div class="metrics" style="grid-template-columns:1fr 1fr">
+        <div class="metric"><span class="mlabel">Runs</span><strong>1</strong></div>
+        <div class="metric"><span class="mlabel">Cost</span><strong>$0.0000</strong></div>
+      </div>
+      <p class="empty" style="margin-top:8px">No usage yet</p>
+    </div>
+    <div class="state"><p class="cap">Empty window</p>
+      <span class="flabel">Cost by day</span>
+      <p class="empty">No runs in window</p>
+    </div>
+    <div class="state"><p class="cap">Cache-heavy split (typical)</p>
+      <div class="split" style="font-size:14px"><span><em>in</em> 6.4k</span><span><em>out</em> 19.6k</span><span><em>cache</em> 964.8k</span></div>
+    </div>
+    <div class="state"><p class="cap">Undated run</p>
+      <span class="flabel">Cost by day</span>
+      <div class="daily" style="height:48px"><div class="daily-col"><span class="daily-fill" style="height:100%"></span><small>n/a</small></div></div>
+    </div>
+  </div>
+
+  <h2>What each metric means</h2>
+  <p class="sub">The number, and the arithmetic behind it</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Metric</th><th>Definition</th></tr>
+    <tr><td><b>Runs</b></td><td>Archived runs inside the active window.</td></tr>
+    <tr><td><b>Generation tokens</b></td><td><span class="mn">input + output</span> — the tokens the model read fresh and wrote.</td></tr>
+    <tr><td><b>Context tokens</b></td><td><span class="mn">input + output + cache creation + cache read</span> — the full volume moved, so cache stays visible.</td></tr>
+    <tr><td><b>Cost</b></td><td>Summed per-node dollars. Backend-reported when the backend gives dollars (Claude Code); otherwise priced from the public rate table and flagged <span class="mn">estimated</span> (Codex).</td></tr>
+    <tr><td><b>Token split</b></td><td>The three classes behind context: <span class="mn">in</span>, <span class="mn">out</span>, and <span class="mn">cache</span> (creation + read combined).</td></tr>
+    <tr><td><b>By model / executor / funding</b></td><td>The same spend grouped three ways. Executor is the backend that ran the node; funding is <span class="mn">subscription</span> or <span class="mn">metered</span>.</td></tr>
+    <tr><td><b>Cost by day</b></td><td>Per-day cost bars across the window, scaled to the costliest day.</td></tr>
+  </table>
+
+  <h2>The usage CLI</h2>
+  <p class="sub">The same aggregation, in the terminal — <span class="mn">cadora usage</span></p>
+  <hr class="rule">
+  <table>
+    <tr><th>Flag</th><th>Effect</th></tr>
+    <tr><td><code>--archive-dir &lt;dir&gt;</code></td><td>Which <span class="mn">runs/</span> archive to read. Default <span class="mn">runs</span>.</td></tr>
+    <tr><td><code>--since &lt;when&gt;</code></td><td>Window cutoff: an ISO timestamp, <span class="mn">Nd</span> (days), or <span class="mn">Nh</span> (hours). Same filter as the dashboard toggle.</td></tr>
+    <tr><td><code>--json</code></td><td>Emit the structured summary — every <span class="mn">by_model / by_executor / by_funding / by_day</span> group plus per-node rows — for another tool.</td></tr>
+  </table>
+
+  <h2>Voice</h2>
+  <p class="sub">Words are part of the design</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Do</th><th>Not</th></tr>
+    <tr><td>Attribute — "by executor: codex $0.38"</td><td>"Total spend: $2.36"</td></tr>
+    <tr><td>Mark the estimate — "estimated from the rate table"</td><td>Show an estimate as a billed figure</td></tr>
+    <tr><td><span class="mn">$1.9895</span> · four decimals, always</td><td><span class="mn">~$2</span> · <span class="mn">$1.99</span></td></tr>
+    <tr><td><span class="mn">990.8k</span> · <span class="mn">1.00M</span></td><td><span class="mn">990842 tokens</span></td></tr>
+  </table>
+
+  <div class="foot">Tokens and metrics are taken verbatim from <span class="mn">cadora/dashboard/static/style.css</span> and <span class="mn">cadora/usage.py</span>. Edit the rendered components in place, or hand the palette and metrics tables to a Figma library.</div>
+</div>
+</body>
+</html>

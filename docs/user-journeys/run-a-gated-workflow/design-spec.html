@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The surfaces of a run · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;
+    --card:#fffefb;--amber:#b3760f;
+    --scr-bg:#0f172a;--scr-canvas:#111c2f;--scr-panel:#1e2937;--scr-panel2:#162237;--scr-line:#334158;
+    --scr-text:#f5f7fb;--scr-muted:#9aa8bc;--scr-blue:#6ba5f0;--scr-green:#16c784;--scr-greensoft:#75f0a8;
+    --scr-red:#fb7185;--scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;
+    --ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}}
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;--card:#fffefb;--amber:#b3760f}
+  *{box-sizing:border-box}
+  .wrap{max-width:840px;margin:0 auto;padding:2.6rem 1.5rem 4rem;color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0 0 .5rem}
+  h1{font-size:2.1rem;letter-spacing:-.02em;margin:.1rem 0 .4rem;font-weight:640}
+  .lede{color:var(--ink-soft);margin:0;max-width:64ch}
+  h2{font-size:1.15rem;margin:2.8rem 0 .3rem;font-weight:600;letter-spacing:-.01em}
+  .sub{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 1rem}
+  .rule{height:1px;background:var(--rule);border:0;margin:.4rem 0 0}
+  /* swatches */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:.6rem}
+  .sw{border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--card)}
+  .sw .chip{height:44px}
+  .sw .lab{padding:7px 9px}
+  .sw .lab b{font-size:12px;display:block}
+  .sw .lab code{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .sw .lab span{font-size:11px;color:var(--ink-soft);display:block;margin-top:1px}
+  /* type scale */
+  table{width:100%;border-collapse:collapse;margin-top:.5rem;font-size:13px}
+  th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ink-faint);font-weight:500;padding:6px 10px;border-bottom:1px solid var(--rule)}
+  td{padding:8px 10px;border-bottom:1px solid var(--rule);color:var(--ink-soft);vertical-align:top}
+  td b{color:var(--ink)}
+  td code,.mn{font-family:var(--mono);font-size:12px;color:var(--amber)}
+  /* dashboard component render */
+  .stage{background:var(--scr-bg);border:1px solid var(--rule);border-radius:12px;padding:16px;margin-top:.8rem}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px;position:relative}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .rhead span:last-child{color:var(--scr-text);font-size:13px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .msg.err{color:var(--scr-red)}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0;color:var(--scr-muted);font-size:12px}
+  .empty{color:var(--scr-muted);font-size:12px;font-style:italic;padding:4px 2px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:130px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted)}
+  /* anatomy pins */
+  .pin{position:absolute;font-family:var(--mono);font-size:10px;font-weight:600;width:18px;height:18px;
+    border-radius:50%;background:var(--scr-amber);color:#1a1205;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 3px var(--scr-panel2)}
+  .legend{margin-top:1rem;display:grid;gap:6px}
+  .legend div{display:flex;gap:9px;font-size:13px;color:var(--ink-soft)}
+  .legend .k{font-family:var(--mono);font-size:11px;font-weight:600;width:18px;height:18px;flex:none;
+    border-radius:50%;background:var(--amber);color:var(--paper);display:flex;align-items:center;justify-content:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:.8rem}
+  .state{background:var(--scr-bg);border:1px solid var(--rule);border-radius:10px;padding:12px}
+  .state .cap{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+  .foot{margin-top:3rem;padding-top:1.1rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+  /* --- run-a-gated-workflow additions · faithful DAG node + states + run-line --- */
+  /* dashboard DAG node — light chip on dark canvas (mirrors cadora/dashboard/static/style.css) */
+  .dnode{width:230px;border-radius:6px;padding:9px 11px;display:grid;gap:5px;position:relative;
+    background:var(--scr-greensoft);color:#063b21;border:2px solid transparent}
+  .dnode.run,.dnode.wait{background:#93c5fd}
+  .dnode.fail{background:#fda4af}
+  .dnode.idle{background:#d5dbe7}
+  .dnode .t{font-size:13px;font-weight:800;color:#0a2a19}
+  .dnode.run .t,.dnode.wait .t{color:#0b2649}.dnode.fail .t{color:#3a0f18}.dnode.idle .t{color:#2b3446}
+  .dnode .s{font-size:11px;font-weight:600;opacity:.72}
+  .dnode .st{justify-self:start;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px}
+  .st.done{background:#c9ffd8;color:#08783d}.st.run{background:#173765;color:#8fbaff}
+  .st.wait{background:#3b2f15;color:var(--scr-amber)}.st.fail{background:#4b1520;color:var(--scr-red)}
+  .st.idle{background:#c2cad8;color:#3a4658}
+  .bd{display:flex;flex-wrap:wrap;gap:3px}
+  .bd .b{font-size:9px;font-weight:700;border-radius:4px;padding:1px 6px;background:#26324a;color:#e7edf5}
+  .bd .b.ok{background:#0f5132;color:var(--scr-greensoft)}
+  .bd .b.warn{background:#5a4a15;color:var(--scr-amber)}
+  .bd .b.bad{background:#5a1622;color:var(--scr-red)}
+  .dfoot{display:flex;justify-content:space-between;font-size:10px;font-weight:700;opacity:.85}
+  .center{display:flex;justify-content:center;padding:14px 0}
+  /* state grid */
+  .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-top:.8rem}
+  .sgrid .cell{background:var(--scr-bg);border:1px solid var(--rule);border-radius:10px;padding:12px;display:grid;gap:10px;justify-items:start}
+  .sgrid .cap{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0}
+  /* terminal run-line rendering */
+  .term{font-family:var(--mono);font-size:12px;line-height:1.9;color:var(--scr-text);
+    background:var(--scr-bg);border:1px solid var(--rule);border-radius:12px;padding:14px 16px;margin-top:.8rem}
+  .term .row{display:block;white-space:pre-wrap;word-break:break-word}
+  .term .dim{color:var(--scr-muted)}.term .run{color:var(--scr-blue)}.term .ok{color:var(--scr-greensoft)}
+  .term .bad{color:var(--scr-red)}.term .amb{color:var(--scr-amber)}
+  @media(max-width:640px){.sgrid{grid-template-columns:1fr}}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Design specification for Cadora's gated-run surfaces: the color and type tokens taken from the dashboard, the DAG node's anatomy, its five states, the terminal run-line grammar, and the run's controls and voice.</h2>
+  <p class="eyebrow">Cadora · design spec</p>
+  <h1>The surfaces of a run</h1>
+  <p class="lede">Everything needed to rebuild or extend the two surfaces a gated run is watched on — the dashboard DAG canvas and the terminal. The exact tokens, the node's anatomy, its states, the run-line grammar, and how each control behaves. The rendered components are live HTML; edit them here or lift the specs into Figma.</p>
+
+  <h2>Palette</h2>
+  <p class="sub">Dark instrument surface · light node chips carry status by hue</p>
+  <hr class="rule">
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#0f172a"></div><div class="lab"><b>Ink</b><code>--bg · #0f172a</code><span>Page &amp; canvas ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#16c784"></div><div class="lab"><b>Green</b><code>--green · #16c784</code><span>Gate pass · completed</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fb7185"></div><div class="lab"><b>Red</b><code>--red · #fb7185</code><span>Gate fail · stopped</span></div></div>
+    <div class="sw"><div class="chip" style="background:#ffd08a"></div><div class="lab"><b>Amber</b><code>--amber · #ffd08a</code><span>Human needed · warn</span></div></div>
+    <div class="sw"><div class="chip" style="background:#3b82f6"></div><div class="lab"><b>Blue</b><code>--blue · #3b82f6</code><span>Running · in review</span></div></div>
+    <div class="sw"><div class="chip" style="background:#9aa8bc"></div><div class="lab"><b>Muted</b><code>--muted · #9aa8bc</code><span>Secondary · captions</span></div></div>
+    <div class="sw"><div class="chip" style="background:#111c2f"></div><div class="lab"><b>Canvas</b><code>--canvas · #111c2f</code><span>Inset panels</span></div></div>
+    <div class="sw"><div class="chip" style="background:#334158"></div><div class="lab"><b>Line</b><code>--line · #334158</code><span>Borders</span></div></div>
+    <div class="sw"><div class="chip" style="background:#f5f7fb"></div><div class="lab"><b>Text</b><code>--text · #f5f7fb</code><span>Primary</span></div></div>
+    <div class="sw"><div class="chip" style="background:#75f0a8"></div><div class="lab"><b>Green-soft</b><code>--green-soft · #75f0a8</code><span>Completed node fill</span></div></div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.7rem">The DAG node is a <b style="color:var(--ink)">light chip on the dark canvas</b>: completed fills <span class="mn">#75f0a8</span>, running / in-review <span class="mn">#93c5fd</span>, failed <span class="mn">#fda4af</span>, idle <span class="mn">#d5dbe7</span> — status is legible from the fill alone, before you read a word.</p>
+
+  <h2>Type &amp; metrics</h2>
+  <p class="sub">System sans for reading · monospace for the instrument voice</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Role</th><th>Family</th><th>Size / weight</th><th>Notes</th></tr>
+    <tr><td><b>Node title</b></td><td class="mn">system-ui</td><td>13px / 800</td><td>The topology node id</td></tr>
+    <tr><td><b>Node role · sub</b></td><td class="mn">system-ui</td><td>11px / 600</td><td>analyst · architect · engineer, 0.72 opacity</td></tr>
+    <tr><td><b>Status pill · badge</b></td><td class="mn">system-ui</td><td>10px / 700</td><td>Sentence case; badge label is <span class="mn">&lt;kind&gt; &lt;value&gt;</span></td></tr>
+    <tr><td><b>Cost · tokens</b></td><td class="mn">system-ui</td><td>10px / 700</td><td><span class="mn">$0.0000</span> (4 dp) · <span class="mn">22.4k</span> / <span class="mn">1.20M</span></td></tr>
+    <tr><td><b>Terminal line</b></td><td class="mn">mono</td><td>12px</td><td>Glyph + node + fields, single line</td></tr>
+    <tr><td><b>Time · duration</b></td><td class="mn">system-ui</td><td>13px</td><td><span class="mn">2m 30s</span> · <span class="mn">1.4s</span> — never raw ISO</td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Metric</th><th>Value</th><th>Metric</th><th>Value</th></tr>
+    <tr><td>Node width</td><td class="mn">170px</td><td>Node radius</td><td class="mn">6px</td></tr>
+    <tr><td>Badge radius</td><td class="mn">4px</td><td>Pill radius</td><td class="mn">999px</td></tr>
+    <tr><td>Canvas ground</td><td class="mn">#0f172a</td><td>Edge stroke</td><td class="mn">2.5px #f8fafc</td></tr>
+    <tr><td>Dashboard bind</td><td class="mn">127.0.0.1:8765</td><td>Live poll</td><td class="mn">5s (pauses in review)</td></tr>
+  </table>
+
+  <h2>Anatomy — the DAG node</h2>
+  <p class="sub">The one component the whole run turns on</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="center">
+      <div class="dnode">
+        <span class="pin" style="top:-9px;left:-9px">1</span>
+        <span class="st done">completed</span>
+        <div class="t">construction</div>
+        <span class="pin" style="top:52px;left:-9px">2</span>
+        <div class="s">engineer</div>
+        <span class="pin" style="top:76px;right:-9px">3</span>
+        <div class="bd"><span class="b ok">gate ok</span><span class="b ok">integrity ok</span><span class="b">review approve</span></div>
+        <span class="pin" style="bottom:-9px;left:-9px">4</span>
+        <span class="pin" style="bottom:-9px;right:-9px">5</span>
+        <div class="dfoot"><span>$1.2700</span><span>ctx 58.1k</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <div><span class="k">1</span><span><b style="color:var(--ink)">Node name</b> — the topology node id, with a status pill that colors the whole chip (see States). The completed fill is the same green the gate signs off with.</span></div>
+    <div><span class="k">2</span><span><b style="color:var(--ink)">Role</b> — the hat the agent wears for this node: <span class="mn">analyst</span>, <span class="mn">architect</span>, <span class="mn">engineer</span>, and so on. Purely descriptive; it does not change verification.</span></div>
+    <div><span class="k">3</span><span><b style="color:var(--ink)">Badges</b> — one per deterministic check, labelled <span class="mn">&lt;kind&gt; &lt;value&gt;</span>: the <b style="color:var(--ink)">gate</b> outcome, the <b style="color:var(--ink)">toolchain-integrity</b> result, and — under <span class="mn">--hitl</span> — the <b style="color:var(--ink)">human-review</b> decision. Green ok, amber warn, red bad.</span></div>
+    <div><span class="k">4</span><span><b style="color:var(--ink)">Cost</b> — dollars attributed to this node, <span class="mn">$0.0000</span> to four places. Token-only backends (Codex) are computed from the rate table and flagged estimated.</span></div>
+    <div><span class="k">5</span><span><b style="color:var(--ink)">Context tokens</b> — input + output + cache read + cache create for the node, humanized (<span class="mn">22.4k</span>, <span class="mn">1.20M</span>). Arrows to dependent nodes are drawn as white DAG edges.</span></div>
+  </div>
+
+  <h2>Node states</h2>
+  <p class="sub">Every condition a node box must render — the fill carries the state</p>
+  <hr class="rule">
+  <div class="sgrid">
+    <div class="cell"><p class="cap">idle · not yet run</p>
+      <div class="dnode idle"><span class="st idle">idle</span><div class="t">construction</div><div class="s">engineer</div><div class="dfoot"><span>—</span><span>ctx —</span></div></div>
+    </div>
+    <div class="cell"><p class="cap">running</p>
+      <div class="dnode run"><span class="st run">running</span><div class="t">design</div><div class="s">architect</div><div class="dfoot"><span>$0.4600</span><span>ctx 31.8k</span></div></div>
+    </div>
+    <div class="cell"><p class="cap">review_waiting · --hitl</p>
+      <div class="dnode wait"><span class="st wait">review_waiting</span><div class="t">requirements</div><div class="s">analyst</div><div class="bd"><span class="b warn">review required</span></div><div class="dfoot"><span>$0.3100</span><span>ctx 22.4k</span></div></div>
+    </div>
+    <div class="cell"><p class="cap">completed · passed</p>
+      <div class="dnode"><span class="st done">completed</span><div class="t">requirements</div><div class="s">analyst</div><div class="bd"><span class="b ok">gate ok</span><span class="b ok">integrity ok</span></div><div class="dfoot"><span>$0.3100</span><span>ctx 22.4k</span></div></div>
+    </div>
+    <div class="cell"><p class="cap">failed · gate blocked</p>
+      <div class="dnode fail"><span class="st fail">failed</span><div class="t">construction</div><div class="s">engineer</div><div class="bd"><span class="b bad">gate vacuous</span><span class="b ok">integrity ok</span></div><div class="dfoot"><span>$1.0200</span><span>ctx 54.9k</span></div></div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.7rem">Idle and completed share no badge but differ in fill; <b style="color:var(--ink)">running</b> and <b style="color:var(--ink)">review_waiting</b> share the blue fill (both are "in flight") and separate on the pill and badge. A <span class="mn">gate</span> badge of <span class="mn">vacuous</span>, <span class="mn">packaging_failed</span>, or <span class="mn">blocked_prerequisite</span> surfaces a construction gate that did not truly pass — right on the node.</p>
+
+  <h2>The terminal run line</h2>
+  <p class="sub">One line per node — the glyph is the verdict</p>
+  <hr class="rule">
+  <div class="term">
+    <span class="row"><span class="dim">cadora · executor=claude · funding=subscription · run=build-a-service-20260717-0904</span></span>
+    <span class="row"><span class="run">▶</span> requirements · claude-opus-4-8 · running… <span class="dim">(generating documents; this can take a few minutes)</span></span>
+    <span class="row">  <span class="ok">✓</span> requirements   <span class="dim">$0.3100</span>   gate:spec-check <span class="ok">ok</span>   integrity:<span class="ok">ok</span></span>
+    <span class="row">  <span class="bad">✗</span> construction   <span class="dim">$1.0200</span>   gate:build-test <span class="bad">VACUOUS</span>   integrity:<span class="ok">ok</span></span>
+    <span class="row"><span class="bad">✗</span> stopped at node 'construction': gate 'build-test' blocked  -&gt;  runs/build-a-service-20260717-0904</span>
+  </div>
+  <table style="margin-top:1rem">
+    <tr><th>Line</th><th>Grammar</th><th>Means</th></tr>
+    <tr><td><b><span class="mn" style="color:var(--scr-blue)">▶</span> announce</b></td><td class="mn">▶ &lt;node&gt; · &lt;model&gt; · running…</td><td>Node started; a heartbeat spins on a TTY until the agent returns.</td></tr>
+    <tr><td><b><span class="mn" style="color:var(--green)">✓</span> passed</b></td><td class="mn">✓ &lt;node&gt;   $&lt;cost&gt;   gate:&lt;name&gt; ok   integrity:ok</td><td>Cadora re-ran the gate itself and it passed. Fields append only when present.</td></tr>
+    <tr><td><b><span class="mn" style="color:var(--red)">✗</span> did not pass</b></td><td class="mn">✗ &lt;node&gt;   …   gate:&lt;name&gt; VACUOUS</td><td>Gate status upper-cased: <span class="mn">FAILED</span> · <span class="mn">VACUOUS</span> · <span class="mn">PACKAGING_FAILED</span> · <span class="mn">BLOCKED_PREREQUISITE</span>.</td></tr>
+    <tr><td><b><span class="mn" style="color:var(--red)">✗</span> stopped</b></td><td class="mn">✗ stopped at node '&lt;node&gt;': &lt;reason&gt; -&gt; &lt;archive&gt;</td><td>Fail-closed: the run halts here and points at the archived evidence.</td></tr>
+    <tr><td><b>appended</b></td><td class="mn">funding=… · integrity:N BLOCKING · remediate:&lt;state&gt; xN</td><td>Extra fields render only when they apply to that node.</td></tr>
+  </table>
+
+  <h2>Controls &amp; behavior</h2>
+  <p class="sub">What each flag does, and the rules that keep green honest</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Control</th><th>Action</th><th>Result on the run</th></tr>
+    <tr><td><b><span class="mn">cadora run &lt;topology&gt;</span></b></td><td>Drive the DAG</td><td>Nodes execute in dependency-order waves; each is gated, integrity-scanned, and archived.</td></tr>
+    <tr><td><b><span class="mn">--executor</span></b></td><td>Pick the agent CLI</td><td><span class="mn">claude · codex · kiro · glm · antigravity</span> — every node runs on that backend.</td></tr>
+    <tr><td><b><span class="mn">--vision &lt;path&gt;</span></b></td><td>Supply the product spec</td><td>Installs the AI-DLC workspace into <span class="mn">--cwd</span>; nodes read it as context.</td></tr>
+    <tr><td><b><span class="mn">gate: &lt;name&gt;</span></b> (node)</td><td>Deterministic ShellGate</td><td>The gate command re-runs after the node; a non-zero exit or vacuous pass blocks.</td></tr>
+    <tr><td><b><span class="mn">--integrity-mode enforce</span></b></td><td>Scan the toolchain</td><td>A blocking finding — tool impersonation, hollow code — fails the node.</td></tr>
+    <tr><td><b><span class="mn">--max-parallel N</span></b></td><td>Concurrency</td><td>Independent wave nodes run at once; gates, integrity, and archiving stay sequential.</td></tr>
+    <tr><td><b><span class="mn">--remediate N</span></b></td><td>Bounded repair</td><td>A remediable gate feeds up to N fresh sessions; the <em>same</em> gate decides green.</td></tr>
+    <tr><td><b><span class="mn">review: true</span></b> + <span class="mn">--hitl</span></td><td>Human gate</td><td>Pauses for approve / request-changes / abort before downstream work (see HITL spec).</td></tr>
+    <tr><td><b><span class="mn">--yes</span></b> · <span class="mn">CADORA_ASSUME_YES=1</span></td><td>Trust gate</td><td>Prints the blast-radius banner for the record and skips the interactive confirm.</td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Rule</th><th>Why</th></tr>
+    <tr><td><b>Green means proven, not claimed</b></td><td>The agent's own "ok" never decides a line — Cadora re-runs the real gate and reads the real result.</td></tr>
+    <tr><td><b>Fail-closed</b></td><td>Ambiguity resolves against the agent; a suite that ran zero tests does not pass.</td></tr>
+    <tr><td><b>Deterministic ordering</b></td><td>Only agent sessions parallelize. Gates, integrity, review, and archiving are sequential, so the manifest is reproducible.</td></tr>
+    <tr><td><b>Every verdict archived</b></td><td>The gate command, its output, the status, and the cost are serialized whole — green is a record you can read.</td></tr>
+  </table>
+
+  <h2>Voice</h2>
+  <p class="sub">Words are part of the design</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Do</th><th>Not</th></tr>
+    <tr><td>Name the verdict — <span class="mn">gate:build-test ok</span></td><td>“Success!”</td></tr>
+    <tr><td>Sentence case — “Proceed with an autonomous run?”</td><td>Title Case — “Proceed With An Autonomous Run?”</td></tr>
+    <tr><td>Say why it stopped — “gate 'build-test' blocked”</td><td>“Error”</td></tr>
+    <tr><td><span class="mn">$1.2700</span> · <span class="mn">2m 30s</span> · <span class="mn">58.1k</span></td><td><span class="mn">2026-07-17T09:04:06.215+00:00</span></td></tr>
+  </table>
+
+  <div class="foot">Tokens and metrics are taken verbatim from <span class="mn">cadora/dashboard/static/style.css</span>; the terminal grammar from <span class="mn">cadora/runner.py</span>. Edit the rendered components in place, or hand the palette and metrics tables to a Figma library.</div>
+</div>
+</body>
+</html>

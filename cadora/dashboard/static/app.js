@@ -1,12 +1,34 @@
 let selectedNodeId = null;
 let selectedTab = "activity";
 let sinceWindow = "";
+// While a review is pending on the open run, pause the auto-poll: re-rendering the panel under the
+// reviewer would wipe an in-progress comment and race their click. The manual Refresh still works,
+// and polling resumes once the decision advances the run.
+let reviewPending = false;
+let servedArchives = [];
 
 const fmtTokens = (value) => {
   const n = Number(value || 0);
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return String(n);
+};
+
+// Timestamps: show a readable local HH:MM:SS, not the full ISO string with microseconds + tz.
+const fmtTime = (ts) => {
+  if (!ts) return "";
+  const d = new Date(ts);
+  return Number.isNaN(d.getTime())
+    ? String(ts).slice(11, 19)
+    : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+};
+
+// Durations: seconds under a minute, else "Xm Ys".
+const fmtDuration = (seconds) => {
+  if (seconds == null || Number.isNaN(Number(seconds))) return "—";
+  const n = Number(seconds);
+  if (n < 60) return `${n.toFixed(1)}s`;
+  return `${Math.floor(n / 60)}m ${Math.round(n % 60)}s`;
 };
 
 const escapeHtml = (value) =>
@@ -32,21 +54,51 @@ const mdInline = (s) =>
       '<a href="$2" target="_blank" rel="noopener">$1</a>',
     );
 
+// One pipe-table row -> its trimmed cells (drops the outer empty splits of "| a | b |").
+const tableCells = (line) => {
+  const t = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  return t.split("|").map((c) => c.trim());
+};
+const isTableRow = (line) => /^\s*\|.*\|\s*$/.test(line);
+const isTableSeparator = (line) => isTableRow(line) && /^[\s|:-]+$/.test(line.trim());
+
 const renderMarkdown = (raw) => {
   const out = [];
   let inCode = false;
   let inList = false;
+  let tableBuf = [];
   const closeList = () => {
     if (inList) {
       out.push("</ul>");
       inList = false;
     }
   };
+  // AI-DLC docs are full of pipe tables (traceability matrices, decision tables) — they used to
+  // fall through to <p> rows of raw "| … |" text. Buffer consecutive table rows; a separator as
+  // the second row promotes the first to a header.
+  const flushTable = () => {
+    if (!tableBuf.length) return;
+    const rows = [...tableBuf];
+    tableBuf = [];
+    if (rows.length === 1) {
+      out.push(`<p class="md-p">${mdInline(rows[0])}</p>`); // a lone pipe line isn't a table
+      return;
+    }
+    const hasHeader = isTableSeparator(rows[1]);
+    const cells = (line, tag) =>
+      `<tr>${tableCells(line).map((c) => `<${tag}>${mdInline(c)}</${tag}>`).join("")}</tr>`;
+    out.push('<div class="md-table-wrap"><table class="md-table">');
+    if (hasHeader) out.push(`<thead>${cells(rows[0], "th")}</thead>`);
+    const body = rows.slice(hasHeader ? 2 : 0).filter((r) => !isTableSeparator(r));
+    out.push(`<tbody>${body.map((r) => cells(r, "td")).join("")}</tbody>`);
+    out.push("</table></div>");
+  };
   for (const line of escapeHtml(raw).split("\n")) {
     if (line.trim().startsWith("```")) {
       if (inCode) out.push("</code></pre>");
       else {
         closeList();
+        flushTable();
         out.push('<pre class="md-code"><code>');
       }
       inCode = !inCode;
@@ -56,6 +108,12 @@ const renderMarkdown = (raw) => {
       out.push(line);
       continue;
     }
+    if (isTableRow(line)) {
+      closeList();
+      tableBuf.push(line);
+      continue;
+    }
+    flushTable();
     const heading = line.match(/^(#{1,6})\s+(.*)$/);
     if (heading) {
       closeList();
@@ -77,7 +135,144 @@ const renderMarkdown = (raw) => {
   }
   if (inCode) out.push("</code></pre>");
   closeList();
+  flushTable();
   return out.join("\n");
+};
+
+// ---- Full-screen document review with annotations -------------------------------------------
+// The reviewer opens a gate document full screen, selects passages, attaches notes, and sends
+// the collected annotations into the review comment box — where they drive a request_changes
+// (same-stage revision) or a conversational Revise. Mounted on <body>, outside the re-rendered
+// app container, so a rerender can never wipe an open review.
+let docModal = null;
+let docAnnotations = [];
+let docModalPath = "";
+
+const renderAnnotations = () => {
+  const list = docModal.querySelector("#ann-list");
+  list.innerHTML = docAnnotations.length
+    ? docAnnotations
+        .map(
+          (a, i) => `
+            <div class="ann-chip">
+              <span class="ann-quote">“${escapeHtml(a.quote)}”</span>
+              <span class="ann-note">${escapeHtml(a.note)}</span>
+              <button class="ann-del" data-ann="${i}" title="remove">×</button>
+            </div>`,
+        )
+        .join("")
+    : '<span class="ann-empty">Select a passage in the document to attach a note.</span>';
+  docModal.querySelector("#ann-apply").disabled = !docAnnotations.length;
+  list.querySelectorAll(".ann-del").forEach((b) =>
+    b.addEventListener("click", () => {
+      docAnnotations.splice(Number(b.dataset.ann), 1);
+      renderAnnotations();
+    }),
+  );
+};
+
+const ensureDocModal = () => {
+  if (docModal) return docModal;
+  docModal = document.createElement("div");
+  docModal.className = "doc-modal";
+  docModal.innerHTML = `
+    <div class="doc-modal-card" role="dialog" aria-modal="true" aria-label="Document review">
+      <div class="doc-modal-head">
+        <strong id="doc-modal-path"></strong>
+        <span class="doc-modal-hint">select text to annotate · Esc closes</span>
+        <button id="doc-modal-close" title="close">✕</button>
+      </div>
+      <div class="doc-modal-body md-view" id="doc-modal-body"></div>
+      <div class="ann-bar">
+        <div class="ann-input-row" id="ann-input-row" hidden>
+          <span class="ann-quote" id="ann-pending-quote"></span>
+          <input id="ann-note-input" type="text" placeholder="Your note on this passage…">
+          <button id="ann-save">Add note</button>
+          <button id="ann-cancel">Cancel</button>
+        </div>
+        <div class="ann-list" id="ann-list"></div>
+        <div class="ann-actions">
+          <button id="ann-apply" disabled>Add annotations to review comments</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(docModal);
+
+  const close = () => {
+    docModal.classList.remove("open");
+    document.removeEventListener("keydown", onKey);
+  };
+  const onKey = (e) => {
+    if (e.key === "Escape") close();
+  };
+  docModal.addEventListener("keydown", onKey);
+  docModal.querySelector("#doc-modal-close").addEventListener("click", close);
+  docModal.addEventListener("click", (e) => {
+    if (e.target === docModal) close(); // click on the backdrop
+  });
+
+  // Selection -> pending annotation: capture the selected text when the mouse settles.
+  docModal.querySelector("#doc-modal-body").addEventListener("mouseup", () => {
+    const sel = window.getSelection();
+    const text = sel ? String(sel).trim().replace(/\s+/g, " ") : "";
+    if (!text) return;
+    const quote = text.length > 140 ? `${text.slice(0, 140)}…` : text;
+    docModal.querySelector("#ann-pending-quote").textContent = `“${quote}”`;
+    docModal.querySelector("#ann-input-row").hidden = false;
+    docModal.querySelector("#ann-note-input").focus();
+  });
+  const savePending = () => {
+    const note = docModal.querySelector("#ann-note-input").value.trim();
+    const quoted = docModal.querySelector("#ann-pending-quote").textContent.replace(/^“|”$/g, "");
+    if (!note || !quoted) return;
+    docAnnotations.push({ quote: quoted, note });
+    docModal.querySelector("#ann-note-input").value = "";
+    docModal.querySelector("#ann-input-row").hidden = true;
+    renderAnnotations();
+  };
+  docModal.querySelector("#ann-save").addEventListener("click", savePending);
+  docModal.querySelector("#ann-note-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") savePending();
+  });
+  docModal.querySelector("#ann-cancel").addEventListener("click", () => {
+    docModal.querySelector("#ann-input-row").hidden = true;
+  });
+
+  // Annotations -> the review comment box: one line per note, prefixed with the document path,
+  // appended so the reviewer can still edit before deciding.
+  docModal.querySelector("#ann-apply").addEventListener("click", () => {
+    const comments = document.getElementById("review-comments");
+    if (!comments) return;
+    const lines = docAnnotations.map((a) => `${docModalPath}: “${a.quote}” — ${a.note}`);
+    comments.value = [comments.value.trim(), ...lines].filter(Boolean).join("\n");
+    docAnnotations = [];
+    renderAnnotations();
+    docModal.classList.remove("open");
+    comments.scrollIntoView({ block: "center" });
+    comments.focus();
+  });
+  return docModal;
+};
+
+const openDocModal = async (url, path) => {
+  const modal = ensureDocModal();
+  docModalPath = path;
+  docAnnotations = [];
+  modal.querySelector("#doc-modal-path").textContent = path;
+  modal.querySelector("#ann-input-row").hidden = true;
+  const body = modal.querySelector("#doc-modal-body");
+  body.innerHTML = '<p class="empty">Loading…</p>';
+  modal.classList.add("open");
+  renderAnnotations();
+  const response = await fetch(url);
+  const text = response.ok ? await response.text() : "Could not load document";
+  body.innerHTML =
+    response.ok && previewKindFor(path) === "markdown"
+      ? renderMarkdown(text)
+      : `<pre>${escapeHtml(text)}</pre>`;
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") modal.classList.remove("open");
+  });
 };
 
 const statusOf = (run) => {
@@ -114,9 +309,29 @@ const nodesOf = (run) => {
   }));
 };
 
+// Prefer the server's normalized per-node costs: backends that report tokens but no dollars
+// (Codex) are priced from the rate table at read time, flagged estimated — the same numbers
+// usage/compare show. Falls back to raw manifest costs for older payload shapes.
 const runCost = (run) => {
+  const normalized = run.node_costs && Object.values(run.node_costs);
+  if (normalized && normalized.length)
+    return normalized.reduce((sum, c) => sum + Number(c.cost_usd || 0), 0);
   if (!run.manifest?.nodes) return 0;
   return run.manifest.nodes.reduce((sum, node) => sum + Number(node.cost_usd || 0), 0);
+};
+
+const runCostEstimated = (run) =>
+  !!(run.node_costs && Object.values(run.node_costs).some((c) => c.estimated));
+
+// Node-panel cost label from the normalized payload: "$0.4552 est." for a price-table figure,
+// "12.5 credits" for Kiro, a plain dollar figure when backend-reported, "—" when unknown.
+const nodeCostLabel = (run, node) => {
+  const nc = run.node_costs && run.node_costs[nodeIdOf(node)];
+  if (nc && nc.cost_usd != null)
+    return `$${Number(nc.cost_usd).toFixed(4)}${nc.estimated ? " est." : ""}`;
+  if (nc && nc.credits != null) return `${nc.credits} credits`;
+  if (node.cost_usd != null) return `$${Number(node.cost_usd).toFixed(4)}`;
+  return "—";
 };
 
 const runIdFromPath = () => {
@@ -244,6 +459,18 @@ const renderFinops = (usage) => {
   `;
 };
 
+// An "active" run whose status file hasn't been touched for this long is probably a zombie —
+// a SIGKILLed conductor leaves status "running" forever. 45 min sits above the 30-min default
+// node timeout, so a healthy long generation can't trip it; a gate parked at a human review is
+// exempt entirely (with --review-timeout 0 it legitimately writes nothing for hours).
+const STALE_AFTER_SECONDS = 45 * 60;
+
+const isStaleRun = (run) => {
+  if (!run.active || run.status_age_seconds == null) return false;
+  const waitingOnHuman = nodesOf(run).some((n) => n.status === "review_waiting");
+  return !waitingOnHuman && run.status_age_seconds > STALE_AFTER_SECONDS;
+};
+
 const renderRun = (run) => {
   const status = statusOf(run);
   const nodes = nodesOf(run);
@@ -257,16 +484,27 @@ const renderRun = (run) => {
     : `<span class="segment idle"></span>`;
   const executor = run.manifest?.executor || run.status?.executor || "unknown";
   const topology = run.manifest?.topology || run.status?.topology || "unknown";
+  // With several archives on one dashboard, say which project a run belongs to.
+  const archiveTag =
+    servedArchives.length > 1 && run.archive
+      ? `<span class="archive-tag" title="${escapeHtml(run.archive)}">${escapeHtml(run.archive.split("/").filter(Boolean).slice(-2).join("/"))}</span>`
+      : "";
   return `
     <a class="run" href="/runs/${encodeURIComponent(run.run_id)}">
       <div class="run-head">
         <span class="run-id">${escapeHtml(run.run_id)}</span>
+        ${archiveTag}
+        ${
+          isStaleRun(run)
+            ? `<span class="pill stale" title="status.json untouched for ${fmtDuration(run.status_age_seconds)} — the conductor process may be dead (killed or crashed without finalizing)">stale?</span>`
+            : ""
+        }
         ${renderPill(status)}
       </div>
       <div class="segments">${segments}</div>
       <div class="run-meta muted">
         <span>${escapeHtml(executor)} / ${escapeHtml(topology)}</span>
-        <span>${nodes.length} node${nodes.length === 1 ? "" : "s"} / $${runCost(run).toFixed(4)}</span>
+        <span>${nodes.length} node${nodes.length === 1 ? "" : "s"} / $${runCost(run).toFixed(4)}${runCostEstimated(run) ? " est." : ""}</span>
       </div>
     </a>
   `;
@@ -302,6 +540,15 @@ const loadOverview = async () => {
   const usage = await usageResponse.json();
   const runs = runsData.runs || [];
   const active = runs.filter((run) => run.active);
+
+  // Name the archives this dashboard serves — a reviewer must never wonder whether their
+  // project's gates can even appear here (a claims-only dashboard once hid a citadel review).
+  servedArchives = Array.isArray(runsData.archives) ? runsData.archives : [];
+  const subtitle = document.querySelector(".topbar p");
+  if (subtitle && Array.isArray(runsData.archives) && runsData.archives.length) {
+    subtitle.textContent = `Serving ${runsData.archives.join(" · ")}`;
+    subtitle.title = runsData.archives.join("\n");
+  }
 
   document.getElementById("metric-runs").textContent = usage.run_count || 0;
   document.getElementById("metric-generation").textContent = fmtTokens(usage.generation_tokens);
@@ -430,7 +677,7 @@ const renderActivity = (events, nodeEvents) => {
       const payload = event.payload || event;
       return `
         <div class="activity-row">
-          <span>${escapeHtml(event.ts || "")}</span>
+          <span>${escapeHtml(fmtTime(event.ts))}</span>
           <strong>${escapeHtml(type)}</strong>
           <code>${escapeHtml(JSON.stringify(payload).slice(0, 500))}</code>
         </div>`;
@@ -490,11 +737,59 @@ const nodeFailure = (node) => {
     </div>`;
 };
 
+// --- HITL review: the interactive gate. Docs as links, a decision + comments back to the run. ---
+const renderReviewPanel = (review) => {
+  if (!review || !review.pending) return "";
+  const docs = (review.documents || [])
+    .map(
+      (doc) => `
+        <div class="review-doc">
+          <a href="${escapeHtml(doc.url)}" target="_blank" rel="noopener">${escapeHtml(doc.path)}</a>
+          <span class="doc-kind">${escapeHtml(doc.kind || "")}</span>
+          <button class="doc-preview" data-doc="${escapeHtml(doc.url)}" data-path="${escapeHtml(doc.path)}">preview</button>
+          <button class="doc-open" data-doc="${escapeHtml(doc.url)}" data-path="${escapeHtml(doc.path)}">full screen</button>
+        </div>`,
+    )
+    .join("");
+  const docOptions = (review.documents || [])
+    .map((doc) => `<option value="${escapeHtml(doc.path)}">${escapeHtml(doc.path.split("/").pop())}</option>`)
+    .join("");
+  const convo = docOptions
+    ? `
+      <div class="review-convo">
+        <div class="convo-row">
+          <select id="convo-doc" aria-label="Document to ask about">${docOptions}</select>
+          <input id="convo-input" type="text" placeholder="Ask about this document, or describe a revision…" aria-label="Message to the agent">
+          <button class="convo-btn" data-msg="question">Ask ↩</button>
+          <button class="convo-btn" data-msg="revision">Revise ↩</button>
+        </div>
+        <div class="review-reply md-view" id="review-reply"></div>
+      </div>`
+    : "";
+  return `
+    <div class="review-callout">
+      <div class="review-head"><span class="review-flag">Review required</span><span><strong>${escapeHtml(review.node_id)}</strong> is waiting for your decision</span></div>
+      <div class="review-docs">${docs || '<p class="empty">No changed documents surfaced</p>'}</div>
+      <div class="review-preview md-view" id="review-preview"></div>
+      ${convo}
+      <textarea id="review-comments" rows="2" placeholder="Comments — required to request changes"></textarea>
+      <div class="review-actions">
+        <button class="review-btn approve" data-decision="approve">Approve</button>
+        <button class="review-btn changes" data-decision="request_changes">Request changes</button>
+        <button class="review-btn abort" data-decision="abort">Abort</button>
+        <span class="review-msg" id="review-msg"></span>
+      </div>
+    </div>`;
+};
+
 const loadRunDetail = async (runId) => {
   const response = await fetch(`/api/runs/${encodeURIComponent(runId)}`);
   const data = await response.json();
   const inputResponse = await fetch(`/api/runs/${encodeURIComponent(runId)}/input`);
   const runInput = inputResponse.ok ? await inputResponse.json() : null;
+  const reviewResponse = await fetch(`/api/runs/${encodeURIComponent(runId)}/review`);
+  const review = reviewResponse.ok ? await reviewResponse.json() : null;
+  reviewPending = !!(review && review.pending);
   const nodes = nodesOf(data);
   const failedNode = nodes.find((n) => String(n.status || "").toLowerCase() === "failed");
   const runError =
@@ -527,6 +822,7 @@ const loadRunDetail = async (runId) => {
           <span>${nodes.length} node${nodes.length === 1 ? "" : "s"}</span>
         </div>
       </div>
+      ${renderReviewPanel(review)}
       ${runError && (runStatus === "failed" || failedNode) ? `<div class="failure-banner">✗ <strong>${escapeHtml((failedNode && nodeIdOf(failedNode)) || "run")}</strong> — ${escapeHtml(runError)}</div>` : ""}
       ${renderRunInput(runInput)}
       <div class="run-workspace">
@@ -545,9 +841,9 @@ const loadRunDetail = async (runId) => {
             <div class="node-facts">
               <span>model <strong>${escapeHtml(node.model || "unknown")}</strong></span>
               <span>backend <strong>${escapeHtml(node.executor || "—")}</strong></span>
-              <span>cost <strong>$${Number(node.cost_usd || 0).toFixed(4)}</strong></span>
+              <span>cost <strong>${nodeCostLabel(data, node)}</strong></span>
               ${node.credits != null ? `<span>credits <strong>${escapeHtml(node.credits)}</strong></span>` : ""}
-              <span>duration <strong>${node.duration_seconds != null ? escapeHtml(node.duration_seconds) + "s" : "—"}</strong></span>
+              <span>duration <strong>${escapeHtml(fmtDuration(node.duration_seconds))}</strong></span>
               <span>context <strong>${fmtTokens(node.context_tokens)}</strong></span>
               <span>review <strong>${escapeHtml(node.review || "none")}</strong></span>
             </div>
@@ -599,16 +895,99 @@ const loadRunDetail = async (runId) => {
           : `<pre>${escapeHtml(text)}</pre>`;
     });
   });
+  document.querySelectorAll(".doc-preview").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const docResponse = await fetch(button.dataset.doc);
+      const text = docResponse.ok ? await docResponse.text() : "Could not load document";
+      document.getElementById("review-preview").innerHTML =
+        docResponse.ok && previewKindFor(button.dataset.path) === "markdown"
+          ? renderMarkdown(text)
+          : `<pre>${escapeHtml(text)}</pre>`;
+    });
+  });
+  document.querySelectorAll(".doc-open").forEach((button) => {
+    button.addEventListener("click", () => openDocModal(button.dataset.doc, button.dataset.path));
+  });
+  document.querySelectorAll("[data-decision]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const msg = document.getElementById("review-msg");
+      msg.textContent = "submitting…";
+      const submitResponse = await fetch(`/api/runs/${encodeURIComponent(runId)}/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          decision: button.dataset.decision,
+          comments: document.getElementById("review-comments").value,
+        }),
+      });
+      const result = await submitResponse.json().catch(() => ({}));
+      if (result.submitted) {
+        msg.textContent = `submitted: ${result.submitted}`;
+        setTimeout(() => loadRunDetail(runId), 900);
+      } else {
+        msg.textContent = result.error || "submission failed";
+      }
+    });
+  });
+  document.querySelectorAll(".convo-btn").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const kind = button.dataset.msg;
+      const message = document.getElementById("convo-input").value.trim();
+      const path = document.getElementById("convo-doc").value;
+      const reply = document.getElementById("review-reply");
+      if (!message) {
+        reply.textContent = "Type a question or a revision instruction first.";
+        return;
+      }
+      reply.textContent = kind === "revision" ? "revising…" : "thinking…";
+      const sent = await fetch(`/api/runs/${encodeURIComponent(runId)}/review/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, message, path }),
+      })
+        .then((r) => r.json())
+        .catch(() => ({}));
+      if (!sent.sent) {
+        reply.textContent = sent.error || "could not send";
+        return;
+      }
+      // Poll for the run's reply — the parked node runs the executor to answer, then writes it.
+      for (let i = 0; i < 120; i++) {
+        const rep = await fetch(`/api/runs/${encodeURIComponent(runId)}/review/reply`)
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null);
+        if (rep && rep.error) {
+          reply.textContent = rep.error;
+          return;
+        }
+        if (rep && rep.reply != null) {
+          reply.innerHTML = renderMarkdown(rep.reply);
+          if (kind === "revision") {
+            reply.insertAdjacentHTML(
+              "afterbegin",
+              '<p class="convo-note">Revised in place — approve to keep it, or revise again.</p>',
+            );
+          }
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      reply.textContent = "no reply yet — the run may still be working";
+    });
+  });
 };
 
 const load = () => {
   const runId = runIdFromPath();
   if (runId) return loadRunDetail(runId);
   selectedNodeId = null;
+  reviewPending = false;
   document.querySelector(".topbar h1").textContent = "Cadora";
   return loadOverview();
 };
 
 document.getElementById("refresh").addEventListener("click", load);
 load();
-setInterval(load, 5000);
+setInterval(() => {
+  if (!reviewPending) load();
+}, 5000);

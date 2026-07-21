@@ -54,6 +54,9 @@ _EXCLUDED_PARTS = {
     "dist",
     "node_modules",
     "runs",
+    # Third-party installed code by definition — never the agent's own implementation. Also the
+    # catch-all for env layouts without a pyvenv.cfg marker (e.g. conda).
+    "site-packages",
 }
 _KNOWN_TS_BUILDERS = re.compile(
     r"(?:^|[\s/&|])(?:tsc|tsup|esbuild|swc|vite|rollup|bun\s+build|deno\s+task)(?:$|[\s/&|])"
@@ -67,15 +70,40 @@ _EXTERNAL_TOOL = re.compile(
 def scan_toolchain_integrity(workspace: str | Path) -> IntegrityReport:
     """Return deterministic findings for suspicious toolchain substitutions."""
     root = Path(workspace).resolve()
+    venvs = _virtualenv_roots(root)
     findings: list[IntegrityFinding] = []
-    findings.extend(_find_shadow_tools(root))
-    findings.extend(_find_typescript_build_substitutions(root))
+    findings.extend(_find_shadow_tools(root, venvs))
+    findings.extend(_find_typescript_build_substitutions(root, venvs))
     findings.extend(_find_external_workspace_tools(root))
-    findings.extend(_find_stub_implementations(root))
+    findings.extend(_find_stub_implementations(root, venvs))
     return IntegrityReport(
         passed=not any(f.severity == "blocking" for f in findings),
         findings=findings,
     )
+
+
+def _virtualenv_roots(root: Path) -> set[tuple[str, ...]]:
+    """Relative dir-parts of every virtualenv under the workspace.
+
+    A venv is a structural fact — PEP 405 puts ``pyvenv.cfg`` at its root — not a naming
+    convention, and the name list can't keep up: a gate command that built its env as
+    ``.gatevenv`` had pytest's own vendored internals flagged as a BLOCKING stub-implementation
+    finding on two otherwise-clean runs. Recomputed per scan (never cached) because the
+    remediation loop creates gate venvs *between* scans in the same process.
+    """
+    roots: set[tuple[str, ...]] = set()
+    for cfg in root.rglob("pyvenv.cfg"):
+        try:
+            rel = cfg.parent.relative_to(root)
+        except ValueError:
+            continue
+        if rel.parts:  # the workspace itself being a venv is a different problem
+            roots.add(rel.parts)
+    return roots
+
+
+def _under_venv(parts: tuple[str, ...], venvs: set[tuple[str, ...]]) -> bool:
+    return any(parts[: len(v)] == v for v in venvs)
 
 
 # Stub-implementation detection ------------------------------------------------------------
@@ -130,12 +158,12 @@ def _is_stub_body(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     return False
 
 
-def _find_stub_implementations(root: Path) -> list[IntegrityFinding]:
+def _find_stub_implementations(root: Path, venvs: set[tuple[str, ...]]) -> list[IntegrityFinding]:
     """Flag genuinely hollow code — a threshold of non-abstract stub function bodies."""
     stubs: list[str] = []
     for py in sorted(root.rglob("*.py")):
         rel = py.relative_to(root)
-        if py.suffix == ".pyi" or _EXCLUDED_PARTS.intersection(rel.parts):
+        if py.suffix == ".pyi" or _EXCLUDED_PARTS.intersection(rel.parts) or _under_venv(rel.parts, venvs):
             continue
         try:
             tree = ast.parse(py.read_text(encoding="utf-8", errors="replace"))
@@ -198,7 +226,7 @@ Hard requirements:
 """
 
 
-def _find_shadow_tools(root: Path) -> list[IntegrityFinding]:
+def _find_shadow_tools(root: Path, venvs: set[tuple[str, ...]]) -> list[IntegrityFinding]:
     findings: list[IntegrityFinding] = []
     for name in _SHADOW_DIRS:
         candidate = root / name
@@ -228,7 +256,7 @@ def _find_shadow_tools(root: Path) -> list[IntegrityFinding]:
         if not base.is_dir():
             continue
         for candidate in base.rglob("*"):
-            if not candidate.is_file() or _excluded(candidate, root):
+            if not candidate.is_file() or _excluded(candidate, root, venvs):
                 continue
             lowered = candidate.name.lower()
             if lowered in _SHADOW_FILES or lowered in {"pytest", "typescript", "tsc"}:
@@ -243,9 +271,9 @@ def _find_shadow_tools(root: Path) -> list[IntegrityFinding]:
     return findings
 
 
-def _find_typescript_build_substitutions(root: Path) -> list[IntegrityFinding]:
+def _find_typescript_build_substitutions(root: Path, venvs: set[tuple[str, ...]]) -> list[IntegrityFinding]:
     package_file = root / "package.json"
-    if not package_file.is_file() or not _has_typescript_sources(root):
+    if not package_file.is_file() or not _has_typescript_sources(root, venvs):
         return []
     try:
         package = json.loads(package_file.read_text())
@@ -292,17 +320,17 @@ def _find_external_workspace_tools(root: Path) -> list[IntegrityFinding]:
     return findings
 
 
-def _has_typescript_sources(root: Path) -> bool:
+def _has_typescript_sources(root: Path, venvs: set[tuple[str, ...]]) -> bool:
     for base_name in ("src", "test", "tests"):
         base = root / base_name
-        if base.is_dir() and any(not _excluded(p, root) for p in base.rglob("*.ts")):
+        if base.is_dir() and any(not _excluded(p, root, venvs) for p in base.rglob("*.ts")):
             return True
     return False
 
 
-def _excluded(path: Path, root: Path) -> bool:
+def _excluded(path: Path, root: Path, venvs: set[tuple[str, ...]] = frozenset()) -> bool:
     try:
         parts = path.relative_to(root).parts
     except ValueError:
         return True
-    return any(part in _EXCLUDED_PARTS for part in parts)
+    return any(part in _EXCLUDED_PARTS for part in parts) or _under_venv(parts, venvs)

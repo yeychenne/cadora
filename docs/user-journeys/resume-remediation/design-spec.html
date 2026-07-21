@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resume & remediation, by their surfaces · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;
+    --card:#fffefb;--amber:#b3760f;
+    --scr-bg:#0f172a;--scr-canvas:#111c2f;--scr-panel:#1e2937;--scr-panel2:#162237;--scr-line:#334158;
+    --scr-text:#f5f7fb;--scr-muted:#9aa8bc;--scr-blue:#6ba5f0;--scr-green:#16c784;--scr-greensoft:#75f0a8;
+    --scr-red:#fb7185;--scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;
+    --ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}}
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;--card:#fffefb;--amber:#b3760f}
+  *{box-sizing:border-box}
+  .wrap{max-width:840px;margin:0 auto;padding:2.6rem 1.5rem 4rem;color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0 0 .5rem}
+  h1{font-size:2.1rem;letter-spacing:-.02em;margin:.1rem 0 .4rem;font-weight:640}
+  .lede{color:var(--ink-soft);margin:0;max-width:64ch}
+  h2{font-size:1.15rem;margin:2.8rem 0 .3rem;font-weight:600;letter-spacing:-.01em}
+  .sub{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 1rem}
+  .rule{height:1px;background:var(--rule);border:0;margin:.4rem 0 0}
+  /* swatches */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:.6rem}
+  .sw{border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--card)}
+  .sw .chip{height:44px}
+  .sw .lab{padding:7px 9px}
+  .sw .lab b{font-size:12px;display:block}
+  .sw .lab code{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .sw .lab span{font-size:11px;color:var(--ink-soft);display:block;margin-top:1px}
+  /* type scale */
+  table{width:100%;border-collapse:collapse;margin-top:.5rem;font-size:13px}
+  th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ink-faint);font-weight:500;padding:6px 10px;border-bottom:1px solid var(--rule)}
+  td{padding:8px 10px;border-bottom:1px solid var(--rule);color:var(--ink-soft);vertical-align:top}
+  td b{color:var(--ink)}
+  td code,.mn{font-family:var(--mono);font-size:12px;color:var(--amber)}
+  /* dashboard component render */
+  .stage{background:var(--scr-bg);border:1px solid var(--rule);border-radius:12px;padding:16px;margin-top:.8rem}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px;position:relative}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .rhead span:last-child{color:var(--scr-text);font-size:13px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .msg.err{color:var(--scr-red)}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0;color:var(--scr-muted);font-size:12px}
+  .empty{color:var(--scr-muted);font-size:12px;font-style:italic;padding:4px 2px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:130px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted)}
+  /* anatomy pins */
+  .pin{position:absolute;font-family:var(--mono);font-size:10px;font-weight:600;width:18px;height:18px;
+    border-radius:50%;background:var(--scr-amber);color:#1a1205;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 3px var(--scr-panel2)}
+  .legend{margin-top:1rem;display:grid;gap:6px}
+  .legend div{display:flex;gap:9px;font-size:13px;color:var(--ink-soft)}
+  .legend .k{font-family:var(--mono);font-size:11px;font-weight:600;width:18px;height:18px;flex:none;
+    border-radius:50%;background:var(--amber);color:var(--paper);display:flex;align-items:center;justify-content:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:.8rem}
+  .state{background:var(--scr-bg);border:1px solid var(--rule);border-radius:10px;padding:12px}
+  .state .cap{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+  .foot{margin-top:3rem;padding-top:1.1rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+</style>
+
+<style>
+  /* resume & remediation — appended after the verbatim base, reusing the same --scr-* tokens */
+  /* the node line + verdict cards, rendered with a semantic left accent */
+  .verdict{background:var(--scr-bg);border:1px solid var(--scr-line);border-left:4px solid var(--scr-green);
+    border-radius:10px;padding:14px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.85;
+    color:var(--scr-muted);white-space:pre-wrap;word-break:break-word;position:relative}
+  .verdict.bad{border-left-color:var(--scr-red)}
+  .verdict.warn{border-left-color:var(--scr-amber)}
+  .verdict .id{color:var(--scr-text)}
+  .verdict .ok{color:var(--scr-greensoft)}
+  .verdict .no{color:var(--scr-red)}
+  .verdict .amber{color:var(--scr-amber)}
+  .verdict .final{font-weight:700}
+  .verdict .final.y{color:var(--scr-greensoft)}
+  .verdict .final.n{color:var(--scr-red)}
+  /* the loop, rendered as a monospace tree */
+  .tree{background:var(--scr-bg);border:1px solid var(--scr-line);border-radius:10px;padding:14px 16px;
+    font-family:var(--mono);font-size:12.5px;line-height:1.85;color:var(--scr-muted);white-space:pre;overflow-x:auto}
+  .tree .dir{color:var(--scr-blue)}
+  .tree .f{color:var(--scr-text)}
+  .tree .sig{color:var(--scr-amber)}
+  .tree .c{color:var(--scr-muted)}
+  /* state verdict mini-cards */
+  .vstate{background:var(--scr-canvas);border:1px solid var(--rule);border-left:4px solid var(--scr-green);
+    border-radius:10px;padding:11px 13px;font-family:var(--mono);font-size:11.5px;line-height:1.7;
+    color:var(--scr-muted);white-space:pre-wrap;word-break:break-word;margin-top:8px}
+  .vstate.no{border-left-color:var(--scr-red)}
+  .vstate.warn{border-left-color:var(--scr-amber)}
+  .vstate .ok{color:var(--scr-greensoft)}
+  .vstate .bad{color:var(--scr-red)}
+  .vstate .amber{color:var(--scr-amber)}
+  .vstate .id{color:var(--scr-text)}
+  .vstate .final{font-weight:700}
+  .vstate .final.y{color:var(--scr-greensoft)}
+  .vstate .final.n{color:var(--scr-red)}
+  /* resume/remediation node badges + attempt-trail rows */
+  .rbadge{font-family:var(--mono);font-size:11px;padding:2px 9px;border-radius:999px}
+  .rbadge.trust{background:#2a2410;color:var(--scr-amber)}
+  .rbadge.fresh{background:#0f3d2c;color:var(--scr-greensoft)}
+  .rbadge.wait{background:#12314e;color:#7db8ff}
+  .att{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .att .n{font-family:var(--mono);font-size:11px;color:var(--scr-muted);flex:none;min-width:80px}
+  .att .g{font-family:var(--mono);font-size:12px;color:var(--scr-muted);flex:1}
+  .att .v{font-family:var(--mono);font-weight:600;font-size:11px;padding:2px 10px;border-radius:999px;white-space:nowrap}
+  .att .v.no{color:var(--scr-red);border:1px solid var(--scr-red)}
+  .att .v.ok{color:var(--scr-greensoft);border:1px solid var(--scr-green)}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Design specification for Cadora's resume and remediation surfaces: the color and type tokens, the anatomy of a node line, the bounded remediation loop, the resume and remediation states (verified, drift refused, drift allowed, completed-green, honest-blocked on max attempts and on the cost ceiling, and not-remediable prerequisite), the gate-status vocabulary, the flags each behavior reads, and the voice.</h2>
+  <p class="eyebrow">Cadora · design spec</p>
+  <h1>Resume &amp; remediation, by their surfaces</h1>
+  <p class="lede">Everything needed to render or extend the recovery surfaces — the exact tokens, the node line's anatomy, the bounded remediation loop, every resume and remediation state, and the flags that drive them. The rendered components are live HTML; edit them here or lift the specs into Figma.</p>
+
+  <h2>Palette</h2>
+  <p class="sub">Semantic first · green re-passes, red blocks, amber marks trusted &amp; drifted</p>
+  <hr class="rule">
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#16c784"></div><div class="lab"><b>Green</b><code>--scr-green · #16c784</code><span>Gate re-passed · completed-green</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fb7185"></div><div class="lab"><b>Red</b><code>--scr-red · #fb7185</code><span>Gate FAILED · refused · honest-blocked</span></div></div>
+    <div class="sw"><div class="chip" style="background:#ffd08a"></div><div class="lab"><b>Amber</b><code>--scr-amber · #ffd08a</code><span>Trusted · drift · remediate tag</span></div></div>
+    <div class="sw"><div class="chip" style="background:#6ba5f0"></div><div class="lab"><b>Blue</b><code>--scr-blue · #6ba5f0</code><span>Run ids · paths</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0f172a"></div><div class="lab"><b>Ink</b><code>--scr-bg · #0f172a</code><span>Card ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#111c2f"></div><div class="lab"><b>Canvas</b><code>--scr-canvas · #111c2f</code><span>Inset · attempt rows</span></div></div>
+    <div class="sw"><div class="chip" style="background:#162237"></div><div class="lab"><b>Panel</b><code>--scr-panel2 · #162237</code><span>Raised surface</span></div></div>
+    <div class="sw"><div class="chip" style="background:#334158"></div><div class="lab"><b>Line</b><code>--scr-line · #334158</code><span>Borders</span></div></div>
+    <div class="sw"><div class="chip" style="background:#f5f7fb"></div><div class="lab"><b>Text</b><code>--scr-text · #f5f7fb</code><span>Primary · node id · path</span></div></div>
+    <div class="sw"><div class="chip" style="background:#9aa8bc"></div><div class="lab"><b>Muted</b><code>--scr-muted · #9aa8bc</code><span>Labels · trusted nodes</span></div></div>
+  </div>
+
+  <h2>Type &amp; metrics</h2>
+  <p class="sub">Monospace is the instrument voice — recovery is read at the shell</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Role</th><th>Family</th><th>Size / weight</th><th>Notes</th></tr>
+    <tr><td><b>Node line</b></td><td class="mn">mono</td><td>12px / 400</td><td>The one-line verdict per node in <code>cadora run</code></td></tr>
+    <tr><td><b>Marks</b></td><td class="mn">mono</td><td>green / red</td><td><code>✓</code> ok green · <code>✗</code> blocked red — the only status glyphs</td></tr>
+    <tr><td><b>Gate mark</b></td><td class="mn">mono</td><td>text / caps</td><td><code>gate:&lt;name&gt; ok</code> or the status in caps: <code>FAILED</code> · <code>VACUOUS</code> · <code>PACKAGING_FAILED</code></td></tr>
+    <tr><td><b>Remediate tag</b></td><td class="mn">mono</td><td>amber</td><td><code>remediate:&lt;state&gt; x&lt;n&gt;</code> — state + attempt count</td></tr>
+    <tr><td><b>Cost</b></td><td class="mn">mono</td><td>text</td><td>Always suffixed <code>est.</code> when from the price table, not metered</td></tr>
+    <tr><td><b>Run id / path</b></td><td class="mn">mono</td><td>blue</td><td><code>run-YYYYmmdd-HHMMSS</code> · <code>runs/&lt;id&gt;</code></td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Metric</th><th>Value</th><th>Metric</th><th>Value</th></tr>
+    <tr><td>Card radius</td><td class="mn">10px</td><td>Semantic accent</td><td class="mn">4px left border</td></tr>
+    <tr><td>Node line-height</td><td class="mn">1.85</td><td>Attempt row radius</td><td class="mn">8px</td></tr>
+    <tr><td>Card padding</td><td class="mn">14px 16px</td><td>State padding</td><td class="mn">11px 13px</td></tr>
+    <tr><td>Trusted node border</td><td class="mn">dashed</td><td>Remediate default</td><td class="mn">0 = off</td></tr>
+  </table>
+
+  <h2>Anatomy — the node line</h2>
+  <p class="sub">One line says what ran, what it cost, and whether the gate really passed</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="verdict"><span class="pin" style="top:-9px;left:-9px">1</span><span class="pin" style="top:-9px;left:78px">2</span><span class="pin" style="top:-9px;right:120px">3</span><span class="pin" style="top:-9px;right:-9px">4</span>  <span class="ok">✓ build</span>   $3.4100 est.   gate:tests ok   <span class="amber">remediate:completed-green x2</span></div>
+  </div>
+  <div class="legend">
+    <div><span class="k">1</span><span><b style="color:var(--ink)">Node + mark</b> — the node id, prefixed <span class="mn">✓</span> (ran clean) or <span class="mn">✗</span> (blocked). One line per node, in DAG order.</span></div>
+    <div><span class="k">2</span><span><b style="color:var(--ink)">Cost</b> — per-node spend, marked <span class="mn">est.</span> when it comes from the price table. On a remediated node it includes the attempts' cost.</span></div>
+    <div><span class="k">3</span><span><b style="color:var(--ink)">Gate</b> — <span class="mn">gate:&lt;name&gt; ok</span> in green, or the failing status in caps (<span class="mn">FAILED</span>, <span class="mn">VACUOUS</span>, <span class="mn">PACKAGING_FAILED</span>, <span class="mn">BLOCKED_PREREQUISITE</span>). This is the deterministic check — the source of truth for green.</span></div>
+    <div><span class="k">4</span><span><b style="color:var(--ink)">Remediate tag</b> — present only when <span class="mn">--remediate</span> engaged: <span class="mn">completed-green</span> or <span class="mn">honest-blocked</span>, and <span class="mn">x&lt;n&gt;</span> attempts run.</span></div>
+  </div>
+
+  <h2>The bounded remediation loop</h2>
+  <p class="sub">Fresh session → re-run the SAME gate → green only if it truly passes</p>
+  <hr class="rule">
+  <div class="tree">failing gate (or blocking integrity finding)
+  │
+  ├─ <span class="f">attempt k</span>  fresh, constrained session — gate detail fed back verbatim
+  │     <span class="c"># told: do not weaken, skip, or bypass the gate; write real tests</span>
+  │
+  ├─ re-run the <span class="sig">SAME</span> ShellGate.check  <span class="c"># + re-scan integrity when enforced</span>
+  │     ├─ pass  → <span class="f">completed-green</span>            <span class="c"># the gate decides, never execution.ok</span>
+  │     └─ fail  → next attempt, if any remain
+  │
+  └─ bound hit (attempts, or --remediate-max-cost)
+        → <span class="sig">honest-blocked</span>  <span class="c"># full attempt trail kept; never a fabricated pass</span></div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem"><b style="color:var(--ink)">Green is decided here</b>, by re-running the deterministic check — not by the agent's claim of success. A <span class="mn">blocked_prerequisite</span> gate never enters the loop: missing tooling is not agent-repairable.</p>
+
+  <h2>Anatomy — the resumed run</h2>
+  <p class="sub">Two node kinds: trusted (skipped) and fresh (re-run)</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="callout" style="border-color:var(--scr-line);background:var(--scr-panel)">
+      <div class="rhead"><span class="flag" style="background:var(--scr-amber)">resumed</span><span>run-20260717-163150 · resumed from 'build' · verified vs run-20260717-140205 · no drift</span></div>
+      <div class="docrow"><span class="kind">node</span><a style="color:var(--scr-muted)">plan</a><span class="rbadge trust">trusted</span><span class="mini">not re-run</span></div>
+      <div class="docrow"><span class="kind">node</span><a style="color:var(--scr-muted)">design</a><span class="rbadge trust">trusted</span><span class="mini">not re-run</span></div>
+      <div class="docrow"><span class="kind">node</span><a style="color:var(--scr-greensoft)">build</a><span class="rbadge fresh">gate passed</span><span class="mini">re-run · resume point</span></div>
+      <div class="docrow"><span class="kind">node</span><a style="color:var(--scr-greensoft)">test</a><span class="rbadge fresh">gate passed</span><span class="mini">re-run · downstream</span></div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem"><span style="color:var(--amber)">Trusted</span> nodes are recorded <span class="mn">skipped</span> in telemetry with a reason (<span class="mn">resumed from 'build'</span> or <span class="mn">explicitly skipped</span>) and add no agent cost. <span style="color:var(--green)">Fresh</span> nodes re-execute and re-gate. The banner names the resume point and the baseline the workspace was verified against.</p>
+
+  <h2>Resume states</h2>
+  <p class="sub">Provenance is checked before any skipped node is trusted</p>
+  <hr class="rule">
+  <div class="grid2">
+    <div class="state"><p class="cap">Verified · no drift → proceed</p>
+      <div class="vstate">↩ resume: skipping plan, design · running from <span class="id">'build'</span>
+  ↳ workspace verified against <span class="id">run-20260717-140205</span>
+    <span class="ok">— no drift (37 files)</span></div>
+    </div>
+    <div class="state"><p class="cap">Drifted · default → refuse</p>
+      <div class="vstate no"><span class="bad">✗ resume refused: workspace drifted</span>
+  since run-20260717-140205
+  <span class="bad">(2 modified, 0 removed, 1 added)</span>
+  <span class="final n">=&gt; pass --allow-drift to override</span></div>
+    </div>
+    <div class="state"><p class="cap">Drifted · --allow-drift → proceed, recorded</p>
+      <div class="vstate warn"><span class="amber">⚠ workspace DRIFTED since run-20260717-140205</span>
+  (2 modified, 0 removed, 1 added)
+  <span class="amber">proceeding under --allow-drift</span>
+    recorded in the evidence pack</div>
+    </div>
+    <div class="state"><p class="cap">No baseline → resume on trust</p>
+      <div class="vstate"><span class="id">↳ no prior workspace manifest</span>
+  to verify against
+    <span class="amber">— resuming on trust</span></div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">Drift is classified <b style="color:var(--ink)">modified / removed / added</b>, most-actionable first, bounded to twelve lines per class. Refuse is the default; <span class="mn">--allow-drift</span> is opt-in and always leaves a record.</p>
+
+  <h2>Remediation states</h2>
+  <p class="sub">Green is earned, blocked is honest — never a fabricated pass</p>
+  <hr class="rule">
+  <div class="grid2">
+    <div class="state"><p class="cap">completed-green · gate re-passed</p>
+      <div class="vstate"><span class="ok">✓ build</span>  gate:tests ok
+  <span class="amber">remediate:completed-green x2</span>
+  <span class="final y">=&gt; node passes</span></div>
+    </div>
+    <div class="state"><p class="cap">honest-blocked · attempts exhausted</p>
+      <div class="vstate no"><span class="bad">✗ build</span>  gate:tests <span class="bad">FAILED</span>
+  <span class="amber">remediate:honest-blocked x2</span>
+  <span class="bad">(max_attempts)</span>
+  <span class="final n">=&gt; NOT a pass</span></div>
+    </div>
+    <div class="state"><p class="cap">honest-blocked · cost ceiling</p>
+      <div class="vstate no"><span class="bad">✗ build</span>  gate:tests <span class="bad">FAILED</span>
+  <span class="amber">remediate:honest-blocked x2</span>
+  <span class="bad">(cost_ceiling)</span>
+  <span class="final n">=&gt; stopped before overspend</span></div>
+    </div>
+    <div class="state"><p class="cap">not remediable · missing prerequisite</p>
+      <div class="vstate warn"><span class="bad">✗ build</span>  gate:tests <span class="amber">BLOCKED_PREREQUISITE</span>
+  <span class="amber">remediation does not engage</span>
+  <span class="final n">=&gt; truthfully blocked</span></div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">Blocked reasons recorded in the pack: <span class="mn">max_attempts</span>, <span class="mn">cost_ceiling</span>, <span class="mn">executor_failed</span>, <span class="mn">integrity_blocked</span>. Every state keeps the full attempt trail — the archived proof of what was tried.</p>
+
+  <h2>The attempt trail</h2>
+  <p class="sub">One row per fresh session — archived under <span class="mn">&lt;node&gt;/remediation/</span></p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="att"><span class="n">attempt 1</span><span class="g">fresh session · re-ran gate:tests</span><span class="v no">FAILED</span></div>
+    <div class="att"><span class="n">attempt 2</span><span class="g">fresh session · re-ran gate:tests</span><span class="v ok">PASSED</span></div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">Each attempt gets its own synthetic id <span class="mn">&lt;node&gt;-remediate-&lt;k&gt;</span> and a prompt built from the current gate/integrity detail — never the agent's own claim. The verdict pill is the <em>re-run gate</em> result, not the session's self-report.</p>
+
+  <h2>Gate-status vocabulary</h2>
+  <p class="sub">Which statuses the loop will try, and which it won't</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Status</th><th>Means</th><th>Remediable?</th></tr>
+    <tr><td class="mn">failed</td><td>The gate command ran and did not pass</td><td>Yes — default</td></tr>
+    <tr><td class="mn">vacuous</td><td>The gate "passed" having run zero real tests</td><td>Yes — default</td></tr>
+    <tr><td class="mn">packaging_failed</td><td>The package won't build / install</td><td>Yes — default</td></tr>
+    <tr><td class="mn">blocked_prerequisite</td><td>Gate tooling is missing from the environment</td><td><b style="color:var(--scr-red)">No</b> — not agent-repairable</td></tr>
+    <tr><td class="mn">passed</td><td>The deterministic check holds</td><td>— nothing to repair</td></tr>
+  </table>
+
+  <h2>What each flag drives</h2>
+  <p class="sub">Two recovery paths · resume trusts, remediate repairs</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Flag</th><th>Reads</th><th>Effect</th></tr>
+    <tr><td><b><span class="mn">--resume-from NODE</span></b></td><td class="mn">node id</td><td>Skip every node upstream of NODE (trust their artifacts in --cwd); run NODE and downstream. Re-runs NODE itself.</td></tr>
+    <tr><td><b><span class="mn">--skip NODE[,NODE...]</span></b></td><td class="mn">node ids</td><td>Skip exactly the named nodes, trusting their existing workspace artifacts. Fine-grained alternative to --resume-from.</td></tr>
+    <tr><td><b><span class="mn">--allow-drift</span></b></td><td class="mn">flag</td><td>On --resume-from/--skip, proceed even if the workspace drifted (default: refuse). The drift is recorded either way.</td></tr>
+    <tr><td><b><span class="mn">--remediate N</span></b></td><td class="mn">integer</td><td>On a failed/vacuous gate (or a blocking integrity finding), run up to N repair attempts in a fresh constrained session (default 0 = off).</td></tr>
+    <tr><td><b><span class="mn">--remediate-max-cost USD</span></b></td><td class="mn">float</td><td>Stop remediation honest-blocked if the attempts' summed cost would exceed this ceiling.</td></tr>
+  </table>
+
+  <h2>Voice</h2>
+  <p class="sub">The verdict is evidence, not effort</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Do</th><th>Not</th></tr>
+    <tr><td>Name the trusted set — <span class="mn">skipping plan, design</span></td><td>“Resumed ✓”</td></tr>
+    <tr><td>State the drift — <span class="mn">2 modified, 0 removed, 1 added</span></td><td>“Workspace changed”</td></tr>
+    <tr><td>Show the state + count — <span class="mn">honest-blocked x2 (max_attempts)</span></td><td>“Gave up”</td></tr>
+    <tr><td>Keep the exact words — <span class="mn">completed-green</span> / <span class="mn">honest-blocked</span> / <span class="mn">trusted</span></td><td>“Fixed!” / “Failed”</td></tr>
+  </table>
+
+  <div class="foot">Tokens and behavior are taken verbatim from <span class="mn">cadora/runner.py</span>, <span class="mn">cadora/provenance.py</span>, and <span class="mn">cadora/remediation.py</span>. Edit the rendered components in place, or hand the palette and metrics tables to a Figma library.</div>
+</div>
+</body>
+</html>

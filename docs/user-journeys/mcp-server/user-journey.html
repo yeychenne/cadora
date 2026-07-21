@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drive the conductor from inside another agent · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec; --ink:#1b2130; --ink-soft:#4a5265; --ink-faint:#7b8496;
+    --rule:#e0dccf; --card:#fffefb; --amber:#b3760f; --amber-bg:#f6ecd6;
+    --green:#0f7a54; --red:#b23a4b; --blue:#245bb5;
+    --scr-bg:#0f172a; --scr-canvas:#111c2f; --scr-panel:#1e2937; --scr-panel2:#162237;
+    --scr-line:#334158; --scr-text:#f5f7fb; --scr-muted:#9aa8bc; --scr-blue:#6ba5f0;
+    --scr-green:#16c784; --scr-greensoft:#75f0a8; --scr-red:#fb7185; --scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+      --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;
+      --green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  }
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+    --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;--green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;
+    --rule:#e0dccf;--card:#fffefb;--amber:#b3760f;--amber-bg:#f6ecd6;--green:#0f7a54;--red:#b23a4b;--blue:#245bb5;}
+  *{box-sizing:border-box}
+  .wrap{max-width:760px;margin:0 auto;padding:3rem 1.5rem 4rem;color:var(--ink);
+    font-family:var(--sans);line-height:1.65;font-size:16px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--amber);margin:0 0 .6rem}
+  h1{font-size:2.5rem;line-height:1.05;letter-spacing:-.02em;margin:.2rem 0 .5rem;text-wrap:balance;font-weight:640}
+  .lede{font-size:1.15rem;color:var(--ink-soft);margin:0;max-width:60ch}
+  .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:1.4rem;
+    padding-top:1rem;border-top:1px solid var(--rule);display:flex;gap:1.5rem;flex-wrap:wrap}
+  .step{margin-top:3.4rem}
+  .step-head{display:flex;align-items:baseline;gap:.9rem;margin-bottom:.5rem}
+  .num{font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:600;
+    border:1px solid var(--rule);border-radius:6px;padding:2px 8px;flex:none}
+  h2{font-size:1.5rem;letter-spacing:-.01em;margin:0;font-weight:600;text-wrap:balance}
+  .step p{color:var(--ink-soft);margin:.5rem 0 0}
+  .step p strong{color:var(--ink);font-weight:600}
+  .note{font-size:.95rem;color:var(--ink-faint);border-left:2px solid var(--amber);
+    padding:.1rem 0 .1rem .9rem;margin:1.1rem 0 0}
+  /* faux browser frame holding a faithful dark-dashboard screen */
+  .screen{margin:1.4rem 0 .3rem;border-radius:12px;overflow:hidden;border:1px solid var(--rule);
+    background:var(--scr-bg);box-shadow:0 1px 0 var(--rule)}
+  .chrome{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#0b1220;border-bottom:1px solid #1e2a3d}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .url{margin-left:8px;font-family:var(--mono);font-size:11px;color:#5f6d84;background:#0f1a2c;
+    border-radius:6px;padding:3px 10px;flex:1}
+  .body{padding:14px;color:var(--scr-text);font-size:13px}
+  .hero{display:flex;justify-content:space-between;align-items:center;background:var(--scr-panel);
+    border-radius:10px;padding:11px 14px;margin-bottom:12px}
+  .hero b{font-size:15px}.hero small{color:var(--scr-muted);display:block;font-size:11px;margin-top:2px}
+  .pill{font-size:11px;padding:3px 9px;border-radius:999px}
+  .pill.run{background:#12314e;color:#7db8ff}.pill.done{background:#0f3d2c;color:var(--scr-greensoft)}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);
+    padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:150px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted);line-height:1.55}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0}
+  .prev h4{margin:2px 0 4px;font-size:13px;color:var(--scr-text)}
+  .prev p,.prev li{color:var(--scr-muted);font-size:12px;margin:2px 0}
+  .dag{display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:6px}
+  .node{width:180px;text-align:center;border-radius:8px;padding:7px;font-size:12px;
+    background:var(--scr-panel);border:1px solid var(--scr-line);color:var(--scr-muted)}
+  .node.on{background:#123024;border-color:#1f6a49;color:var(--scr-greensoft)}
+  .node .badge{font-size:9px;background:#0f3d2c;color:var(--scr-greensoft);border-radius:4px;padding:1px 6px;margin:0 2px}
+  .node.wait{background:#2a2410;border-color:#7a6320;color:var(--scr-amber)}
+  .arrow{color:var(--scr-line);font-size:12px}
+  .foot{margin-top:3.5rem;padding-top:1.2rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  a{color:var(--blue)}
+</style>
+
+<style>
+  /* mcp server — appended after the verbatim base, reusing the same --scr-* tokens (no new colors) */
+  .mn{font-family:var(--mono);font-size:.9em}
+  /* terminal recreation — same dark palette, monospace, one pre-wrap region per screen */
+  .term{font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--scr-muted);
+    white-space:pre-wrap;word-break:break-word}
+  .term .p{color:var(--scr-greensoft)}          /* the $ prompt */
+  .term .cmd{color:var(--scr-text)}             /* the command you type */
+  .term .cmt{color:var(--scr-muted)}            /* # inline comment */
+  .term .path{color:var(--scr-blue)}
+  .term .ok{color:var(--scr-greensoft)}
+  .term .amber{color:var(--scr-amber)}
+  .term .bad{color:var(--scr-red)}
+  /* JSON frame — client config + tool returns, keys blue, strings green, literals amber */
+  .json{font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--scr-muted);white-space:pre;overflow-x:auto}
+  .json .k{color:var(--scr-blue)}
+  .json .s{color:var(--scr-greensoft)}
+  .json .n{color:var(--scr-amber)}
+  /* five-tool inventory — dark table inside a screen */
+  .ttbl{width:100%;border-collapse:collapse;font-size:12px}
+  .ttbl th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--scr-muted);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--scr-line)}
+  .ttbl td{padding:8px;border-bottom:1px solid var(--scr-line);color:var(--scr-muted);vertical-align:top;line-height:1.5}
+  .ttbl tr:last-child td{border-bottom:0}
+  .ttbl .tool{font-family:var(--mono);color:var(--scr-blue);white-space:nowrap}
+  .ttbl .ret{font-family:var(--mono);font-size:11px;color:var(--scr-text)}
+  .fm{font-size:10px;letter-spacing:.03em;border-radius:6px;padding:2px 8px;white-space:nowrap;border:1px solid var(--scr-line)}
+  .fm.closed{color:var(--scr-red);border-color:var(--scr-red)}
+  .fm.soft{color:var(--scr-amber);border-color:var(--scr-amber)}
+  .fm.read{color:var(--scr-greensoft);border-color:#1f6a49}
+  /* tool-call trace — the round trip, one step per call/return pair */
+  .trace{font-family:var(--mono);font-size:12px;line-height:1.65}
+  .tstep{padding:9px 0;border-bottom:1px solid var(--scr-line)}
+  .tstep:last-child{border-bottom:0}
+  .tcall{color:var(--scr-text);display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .tname{color:var(--scr-blue)}
+  .tret{color:var(--scr-muted);margin-top:4px;padding-left:28px;white-space:pre-wrap;word-break:break-word}
+  .tret .ok{color:var(--scr-greensoft)}
+  .tret .amber{color:var(--scr-amber)}
+  .tret .s{color:var(--scr-text)}
+  .tnum{font-size:10px;color:var(--scr-amber);border:1px solid var(--scr-line);border-radius:5px;padding:1px 7px;flex:none}
+  /* posture rows inside the closing callout */
+  .post{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--scr-line)}
+  .post:first-child{border-top:0}
+  .post .mk{font-family:var(--mono);font-size:12px;flex:none;width:16px}
+  .post .mk.g{color:var(--scr-greensoft)}
+  .post .mk.r{color:var(--scr-red)}
+  .post .mk.a{color:var(--scr-amber)}
+  .post .tx{font-size:12px;color:var(--scr-muted)}
+  .post .tx b{color:var(--scr-text);font-weight:600}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">How another agent drives Cadora over MCP: wire cadora mcp into a client config as a stdio server, bring the server up on loopback, use its five tools (start_run, run_status, get_artifact, review_gate, submit_review) to start a gated AI-DLC run, watch it reach the requirements review gate, read the artifacts, approve, and let it finish — then expose it over HTTP behind a bearer token and TLS, with the same fail-closed review timeout, fail-soft submit, and traversal-safe artifact reads Cadora enforces everywhere.</h2>
+
+  <p class="eyebrow">Cadora · MCP server</p>
+  <h1>Drive the conductor from inside another agent</h1>
+  <p class="lede"><span class="mn">cadora mcp</span> runs the audit-grade conductor as an MCP server, so another agent — Claude Desktop, Claude Code, the Codex CLI — can <strong>start gated runs, watch them, pull artifacts, and service the human-review gate</strong>, all over five tools. It is the programmatic control plane, and the review tools are the same fail-closed / fail-soft HITL surface Cadora enforces everywhere — now reachable by an MCP client.</p>
+  <div class="meta"><span>Surface · MCP server (stdio / http)</span><span>Role · client agent + reviewer</span><span>Tools · five, HITL-native</span></div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">01</span><h2>Wire it into your client</h2></div>
+    <p>A client launches Cadora as a local <strong>stdio</strong> server. Drop this block into the client's MCP config — the same <span class="mn">mcpServers</span> shape Claude Code, Claude Desktop, and the Codex CLI all read. One <span class="mn">command</span>, one <span class="mn">args</span> list: no port, no network, nothing to expose.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">.mcp.json — Claude Code · Claude Desktop · Codex CLI</span></div>
+      <div class="body">
+        <div class="json">{
+  <span class="k">"mcpServers"</span>: {
+    <span class="k">"cadora"</span>: {
+      <span class="k">"command"</span>: <span class="s">"cadora"</span>,
+      <span class="k">"args"</span>: [<span class="s">"mcp"</span>, <span class="s">"--transport"</span>, <span class="s">"stdio"</span>]
+    }
+  }
+}</div>
+      </div>
+    </div>
+    <p class="note">Or register it in one line — <span class="mn">claude mcp add cadora -- cadora mcp --transport stdio</span>. The server needs the optional extra: <span class="mn">pip install 'cadora[mcp]'</span>.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">02</span><h2>The server comes up on stdio</h2></div>
+    <p>The client spawns <span class="mn">cadora mcp</span>. The default transport is <strong>stdio</strong> and the default bind is <strong>loopback</strong> — the server talks only to the one client that started it, and nothing on the network can reach it. It registers five tools: start a run, watch it, read its artifacts, and service the review gate.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora mcp</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora mcp --transport stdio</span>
+<span class="cmt"># run Cadora as an MCP server (HITL review + run control)</span>
+<span class="cmt"># transport <span class="path">stdio</span> · bind <span class="path">127.0.0.1</span> (loopback) · unauthenticated — local only</span>
+<span class="cmt"># tools: <span class="ok">start_run</span> · <span class="ok">run_status</span> · <span class="ok">get_artifact</span> · <span class="ok">review_gate</span> · <span class="ok">submit_review</span></span>
+[cadora] serving over stdio — waiting for the client</div>
+      </div>
+    </div>
+    <p class="note">stdio is the local path for Claude Desktop / Code and the Codex CLI; <span class="mn">--transport http</span> is the remote path (step 05). The default is the safe one.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">03</span><h2>Five tools, and how each fails</h2></div>
+    <p>The whole control plane is five tools: two drive the run, one reads its output, two service the human gate. Each ships with a guardrail — the review gate <strong>fails closed</strong> on timeout, <span class="mn">submit_review</span> <strong>fails soft</strong> on bad input, and <span class="mn">get_artifact</span> refuses to read outside the run's workspace.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">cadora/mcp/server.py — the five @app.tool()s</span></div>
+      <div class="body">
+        <table class="ttbl">
+          <tr><th>Tool</th><th>Returns</th><th>Fail-mode</th></tr>
+          <tr>
+            <td class="tool">start_run</td>
+            <td class="ret">{run_id, status: "started"}</td>
+            <td><span class="fm closed">fail-closed timeout</span></td>
+          </tr>
+          <tr>
+            <td class="tool">run_status</td>
+            <td class="ret">{running, result_path, error}</td>
+            <td><span class="fm read">read-only</span></td>
+          </tr>
+          <tr>
+            <td class="tool">review_gate</td>
+            <td class="ret">{pending, node_id, docs_dir, artifacts}</td>
+            <td><span class="fm read">read-only</span></td>
+          </tr>
+          <tr>
+            <td class="tool">submit_review</td>
+            <td class="ret">{submitted} | {error}</td>
+            <td><span class="fm soft">fail-soft</span></td>
+          </tr>
+          <tr>
+            <td class="tool">get_artifact</td>
+            <td class="ret">&lt;text&gt; | error: …</td>
+            <td><span class="fm closed">traversal-safe</span></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    <p class="note">Signatures and defaults — <span class="mn">start_run(…, review_timeout=3600.0)</span>, <span class="mn">submit_review(run_id, decision, comments="")</span> — are spelled out in the design spec and manual.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">04</span><h2>A gated run, end to end</h2></div>
+    <p>Here is the round trip. The client calls <span class="mn">start_run</span>, polls <span class="mn">run_status</span>, and finds the <strong>requirements</strong> node waiting at its review gate — Cadora hands back the node id and the artifacts it produced. The client reads one with <span class="mn">get_artifact</span>, approves, and the run proceeds to <strong>design</strong> and <strong>construction</strong>.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">MCP tool-call trace — run "checkout-api"</span></div>
+      <div class="body">
+        <div class="trace">
+          <div class="tstep">
+            <div class="tcall"><span class="tnum">1</span><span><span class="tname">start_run</span>(topology=<span style="color:var(--scr-greensoft)">"examples/aidlc-hitl.topology.yaml"</span>, run_id=<span style="color:var(--scr-greensoft)">"checkout-api"</span>, review_timeout=<span style="color:var(--scr-amber)">0</span>)</span></div>
+            <div class="tret">→ {<span class="s">"run_id"</span>: "checkout-api", <span class="s">"status"</span>: <span class="ok">"started"</span>}</div>
+          </div>
+          <div class="tstep">
+            <div class="tcall"><span class="tnum">2</span><span><span class="tname">run_status</span>(run_id=<span style="color:var(--scr-greensoft)">"checkout-api"</span>)</span></div>
+            <div class="tret">→ {<span class="s">"running"</span>: <span class="amber">true</span>, <span class="s">"result_path"</span>: null, <span class="s">"error"</span>: null}</div>
+          </div>
+          <div class="tstep">
+            <div class="tcall"><span class="tnum">3</span><span><span class="tname">review_gate</span>(run_id=<span style="color:var(--scr-greensoft)">"checkout-api"</span>)</span></div>
+            <div class="tret">→ {<span class="s">"pending"</span>: <span class="amber">true</span>, <span class="s">"node_id"</span>: <span class="amber">"requirements"</span>,
+       <span class="s">"docs_dir"</span>: "aidlc-docs",
+       <span class="s">"artifacts"</span>: [<span class="s">"aidlc-docs/inception/requirements/requirements.md"</span>]}</div>
+          </div>
+          <div class="tstep">
+            <div class="tcall"><span class="tnum">4</span><span><span class="tname">get_artifact</span>(run_id=<span style="color:var(--scr-greensoft)">"checkout-api"</span>, path=<span style="color:var(--scr-greensoft)">"aidlc-docs/inception/requirements/requirements.md"</span>)</span></div>
+            <div class="tret">→ <span class="s">"# Requirements\n\n## FR-1 Place an order …"</span></div>
+          </div>
+          <div class="tstep">
+            <div class="tcall"><span class="tnum">5</span><span><span class="tname">submit_review</span>(run_id=<span style="color:var(--scr-greensoft)">"checkout-api"</span>, decision=<span style="color:var(--scr-greensoft)">"approve"</span>)</span></div>
+            <div class="tret">→ {<span class="s">"submitted"</span>: <span class="ok">"approve"</span>}</div>
+          </div>
+          <div class="tstep">
+            <div class="tcall"><span class="tnum">6</span><span><span class="tname">run_status</span>(run_id=<span style="color:var(--scr-greensoft)">"checkout-api"</span>)</span></div>
+            <div class="tret">→ {<span class="s">"running"</span>: <span class="ok">false</span>, <span class="s">"result_path"</span>: <span class="s">"runs/checkout-api/manifest.json"</span>, <span class="s">"error"</span>: null}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note">A <span class="mn">request_changes</span> instead of <span class="mn">approve</span> re-runs the same node with the reviewer's comments (up to three revisions); an <span class="mn">abort</span> stops the run. Poll <span class="mn">run_status</span> until <span class="mn">running</span> is false — <span class="mn">result_path</span> points at the run manifest.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">05</span><h2>Expose it over HTTP, safely</h2></div>
+    <p>To let a remote agent connect, switch to the <strong>http</strong> transport. It still binds loopback by default; an <span class="mn">--auth-token</span> (or <span class="mn">CADORA_MCP_TOKEN</span>) requires <span class="mn">Authorization: Bearer &lt;token&gt;</span> on every request — and only a present token lets you bind a routable host. A non-loopback bind with no auth is <strong>refused</strong> unless you pass <span class="mn">--i-understand-no-auth</span>. Either way, front it with TLS.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora mcp --transport http</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">export CADORA_MCP_TOKEN=$(openssl rand -hex 32)</span>
+<span class="p">$</span> <span class="cmd">cadora mcp --transport http --host 127.0.0.1 --port 8000 --auth-token "$CADORA_MCP_TOKEN"</span>
+<span class="cmt"># endpoint <span class="path">http://127.0.0.1:8000/mcp</span> — every request needs Authorization: Bearer &lt;token&gt;</span>
+[cadora] serving streamable-http on 127.0.0.1:8000 — bearer auth <span class="ok">required</span>
+
+<span class="cmt"># without a token, a routable bind fails closed:</span>
+<span class="p">$</span> <span class="cmd">cadora mcp --transport http --host 0.0.0.0</span>
+<span class="bad">refusing to bind the MCP server to '0.0.0.0': it has NO authentication and would be</span>
+<span class="bad">reachable from the network. Front it with TLS + auth, or pass --i-understand-no-auth</span>
+<span class="bad">to bind anyway (do this only on a trusted network).</span></div>
+      </div>
+    </div>
+    <p class="note">Bearer auth is transport auth, not a substitute for TLS — a wrong or missing token gets <span class="mn">401 {"error":"unauthorized"}</span>; the token itself still crosses the wire in the clear unless a TLS-terminating proxy sits in front.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">06</span><h2>The same audit guarantees, over MCP</h2></div>
+    <p>The review tools exposed here are the exact HITL surface Cadora enforces on the CLI — no weaker for being driven by a remote agent. Four guardrails travel with the seam, so an MCP client can automate a run without automating away its safety.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">safety posture — exposed over MCP</span></div>
+      <div class="body">
+        <div class="callout">
+          <div class="rhead"><span class="flag">fail-closed / fail-soft</span><span style="color:var(--scr-text);font-size:13px">the guarantees that ride the seam</span></div>
+          <div class="post"><span class="mk r">✗</span><span class="tx"><b>Review fails closed.</b> A gate waits <span class="mn">review_timeout</span> seconds (default 3600) then aborts the run — a client that walks away can't pin it forever. Pass <span class="mn">0</span> to wait indefinitely for a genuinely interactive reviewer.</span></div>
+          <div class="post"><span class="mk a">!</span><span class="tx"><b>Submit fails soft.</b> A bad decision, a <span class="mn">request_changes</span> with no comments, or a double-submit returns <span class="mn">{"error": …}</span> — never a raw traceback through the tool call.</span></div>
+          <div class="post"><span class="mk g">✓</span><span class="tx"><b>Artifact reads are traversal-safe.</b> A <span class="mn">../</span>-shaped path returns <span class="mn">error: path '…' escapes the run workspace</span> and never reads outside the run.</span></div>
+          <div class="post"><span class="mk g">✓</span><span class="tx"><b>HTTP is gated on auth.</b> Loopback + stdio by default; a routable bind needs <span class="mn">--auth-token</span> (bearer) or the explicit <span class="mn">--i-understand-no-auth</span> — TLS in front either way.</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Same conductor, same gates, same evidence — the MCP server only changes <em>who holds the controls</em>, not what the controls enforce.</p>
+  </div>
+
+  <div class="foot">
+    <p>The frames above reproduce real <span class="mn">cadora mcp</span> behavior — the stdio startup, the client config, the five-tool table, the tool-call round trip, and the HTTP auth guard — rendered as editable HTML rather than raster captures, so you can lift them into Figma or iterate directly. This is Cadora's control plane: another agent drives the audit-grade conductor, and the gates hold on the other side of the seam.</p>
+  </div>
+</div>
+</body>
+</html>

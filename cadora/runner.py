@@ -23,6 +23,11 @@ from cadora.archive import RunArchive
 from cadora.executors.base import ExecutionResult, NodeExecutor
 from cadora.gates import GATE_BLOCKED_PREREQUISITE, GateResult, ShellGate
 from cadora.integrity import IntegrityReport, repair_prompt, scan_toolchain_integrity
+from cadora.provenance import (
+    diff_fingerprints,
+    fingerprint_workspace,
+    latest_prior_fingerprint,
+)
 from cadora.remediation import (
     STATE_COMPLETED_GREEN,
     STATE_HONEST_BLOCKED,
@@ -91,6 +96,7 @@ def run_topology(
     max_parallel: int = 1,
     resume_from: str | None = None,
     skip: list[str] | None = None,
+    allow_drift: bool = False,
 ) -> Path:
     if integrity_mode not in {"off", "audit", "enforce", "repair"}:
         raise ValueError(f"invalid integrity mode: {integrity_mode!r}")
@@ -108,6 +114,7 @@ def run_topology(
     skip_ids, skipped_sorted = _compute_skip_set(topology, resume_from, skip)
 
     archive = RunArchive(archive_root, run_id, executor.name, topology.name)
+    archive.track_workspace(cwd, archive_root)
     telemetry = RunTelemetry(archive_root, run_id, topology, executor.name)
     telemetry.run_started()
     _write_run_input(archive_root, run_id, topology, cwd)
@@ -117,8 +124,17 @@ def run_topology(
             "↩ resume: skipping "
             + (", ".join(skipped_sorted) or "(none)")
             + (f" · running from {resume_from!r}" if resume_from else "")
-            + " — trusting their artifacts in the workspace"
         )
+        # A resume trusts the skipped nodes' artifacts already in --cwd. VERIFY that trust against
+        # the last run's recorded fingerprint instead of assuming it — a drifted workspace must not
+        # silently certify gates over source that never passed the earlier stages.
+        resume_drift = _verify_resume_workspace(cwd, archive_root, run_id, allow_drift)
+        archive.manifest["resume"] = {
+            "resume_from": resume_from,
+            "skipped": skipped_sorted,
+            "allow_drift": allow_drift,
+            "workspace_drift": resume_drift.as_dict() if resume_drift else None,
+        }
     outputs: dict[str, str] = {}
     funding = getattr(executor, "funding", None)
     _log(
@@ -387,6 +403,8 @@ def run_topology(
                 _log(_node_line(node, result, gate_result, integrity, repair_result, remediation_outcome))
                 break
 
+    # The workspace fingerprint (provenance + the baseline a future --resume-from verifies against)
+    # is captured inside archive.finalize(), so it covers the failure exits too — see track_workspace.
     out = archive.finalize(True)
     telemetry.run_completed(True)
     _log(f"✓ run complete -> {out}")
@@ -471,6 +489,59 @@ def _compute_skip_set(
     return skip_ids, sorted(skip_ids)
 
 
+def _verify_resume_workspace(cwd, archive_root, run_id, allow_drift):
+    """Verify a resume's workspace against the most recent prior run's fingerprint.
+
+    Returns the :class:`WorkspaceDrift` (possibly empty) or ``None`` when there is no baseline to
+    check against. Raises ``SystemExit`` on drift unless ``allow_drift`` is set — a resumed run must
+    not silently certify gates over source that never matched the run it claims to continue. When
+    drift is allowed, it is logged and recorded in the run manifest so the evidence stays honest.
+    """
+    prior = latest_prior_fingerprint(archive_root, exclude_run_id=run_id)
+    if prior is None:
+        _log("  ↳ no prior workspace manifest to verify against — resuming on trust")
+        return None
+    baseline_run, baseline = prior
+    drift = diff_fingerprints(
+        baseline, fingerprint_workspace(cwd, archive_root=archive_root), baseline_run=baseline_run
+    )
+    if not drift.has_drift:
+        _log(f"  ↳ workspace verified against {baseline_run} — no drift ({len(baseline)} files)")
+        return drift
+    detail = _format_drift(drift)
+    if allow_drift:
+        _log(
+            f"  ⚠ workspace DRIFTED since {baseline_run} ({drift.summary()}) — "
+            "proceeding under --allow-drift"
+        )
+        for line in detail:
+            _log(f"      {line}")
+        _log("    this run's evidence will record that it resumed against a drifted workspace")
+        return drift
+    raise SystemExit(
+        f"✗ resume refused: workspace drifted since {baseline_run} ({drift.summary()}).\n"
+        + "\n".join(f"    {line}" for line in detail)
+        + "\n  The skipped nodes' artifacts no longer match the run you are resuming, so the gates\n"
+        "  would certify source that never passed the earlier stages. Re-run from scratch, or pass\n"
+        "  --allow-drift to resume anyway (the drift is recorded in the evidence pack)."
+    )
+
+
+def _format_drift(drift, limit: int = 12) -> list[str]:
+    """Human-readable, bounded listing of a workspace drift (most-actionable classes first)."""
+    lines: list[str] = []
+    for tag, items in (
+        ("modified", drift.modified),
+        ("removed", drift.removed),
+        ("added", drift.added),
+    ):
+        for path in items[:limit]:
+            lines.append(f"{tag:>8}: {path}")
+        if len(items) > limit:
+            lines.append(f"{'':>8}  … +{len(items) - limit} more {tag}")
+    return lines
+
+
 def _write_run_input(archive_root: str, run_id: str, topology: Topology, cwd: str) -> None:
     """Capture *the prompt given at entry* into the run archive.
 
@@ -492,7 +563,17 @@ def _write_run_input(archive_root: str, run_id: str, topology: Topology, cwd: st
         out = Path(archive_root) / run_id / "run-input.json"
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(
-            json.dumps({"topology": topology.name, "roots": roots, "vision": vision}, indent=2)
+            json.dumps(
+                {
+                    "topology": topology.name,
+                    # The live workspace, so an out-of-process surface (the dashboard) can find the
+                    # documents a --review-file gate is waiting on and drop the decision back.
+                    "cwd": str(Path(cwd).resolve()),
+                    "roots": roots,
+                    "vision": vision,
+                },
+                indent=2,
+            )
         )
     except OSError:
         pass

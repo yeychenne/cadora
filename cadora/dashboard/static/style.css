@@ -405,9 +405,18 @@ main {
   color: #052e16;
   display: grid;
   gap: 10px;
-  grid-template-columns: 150px 160px minmax(0, 1fr);
+  /* minmax(0, …) on every column: a grid item's implicit min-width is its content, so an
+     over-long timestamp/event name used to spill over its neighbor instead of clipping. */
+  grid-template-columns: minmax(0, 90px) minmax(0, 170px) minmax(0, 1fr);
   margin-bottom: 8px;
   padding: 11px 12px;
+}
+
+.activity-row span,
+.activity-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .activity-row strong {
@@ -746,4 +755,264 @@ pre {
 }
 .md-view a {
   color: #8ab4f8;
+}
+
+/* --- HITL review panel: the interactive gate ------------------------------- */
+.review-callout {
+  border: 1px solid var(--amber);
+  background: var(--panel-2);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.review-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+.review-flag {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a1205;
+  background: var(--amber);
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.review-docs { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.review-doc {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.review-doc a { color: var(--blue); text-decoration: none; font-size: 14px; word-break: break-all; flex: 1; }
+.review-doc a:hover { text-decoration: underline; }
+.doc-kind { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.doc-preview {
+  font-size: 12px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.doc-preview:hover { color: var(--text); border-color: var(--muted); }
+.review-preview:not(:empty) {
+  max-height: 320px;
+  overflow: auto;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+#review-comments {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--canvas);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  resize: vertical;
+  margin-bottom: 10px;
+}
+.review-actions { display: flex; align-items: center; gap: 8px; }
+.review-btn {
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.review-btn.approve { border-color: var(--green); color: var(--green-soft); }
+.review-btn.approve:hover { background: rgba(22, 199, 132, 0.12); }
+.review-btn.changes:hover { background: rgba(59, 130, 246, 0.12); border-color: var(--blue); }
+.review-btn.abort { border-color: var(--red); color: var(--red); }
+.review-btn.abort:hover { background: rgba(251, 113, 133, 0.12); }
+.review-msg { font-size: 13px; color: var(--muted); margin-left: 4px; }
+
+/* --- Conversational review: ask a question / request a revision ------------ */
+.review-convo { margin-bottom: 12px; }
+.convo-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+#convo-doc {
+  background: var(--canvas); color: var(--text); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 8px; font: inherit; max-width: 170px;
+}
+#convo-input {
+  flex: 1; min-width: 180px; background: var(--canvas); color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font: inherit;
+}
+.convo-btn {
+  font-size: 12px; padding: 7px 13px; border-radius: 8px; border: 1px solid var(--line);
+  background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap;
+}
+.convo-btn:hover { color: var(--text); border-color: var(--blue); }
+.review-reply:not(:empty) {
+  margin-top: 10px; max-height: 300px; overflow: auto; background: var(--canvas);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 13px; color: var(--muted);
+}
+.convo-note { color: var(--green-soft); font-size: 12px; margin: 0 0 6px; }
+
+/* markdown pipe tables in the doc preview (traceability matrices, decision tables) */
+.md-view .md-table-wrap {
+  overflow-x: auto;
+  margin: 10px 0;
+}
+.md-view .md-table {
+  border-collapse: collapse;
+  font-size: 13px;
+  width: 100%;
+}
+.md-view .md-table th,
+.md-view .md-table td {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.md-view .md-table th {
+  background: rgba(148, 163, 184, 0.12);
+  font-weight: 600;
+}
+
+/* full-screen document review + annotations */
+.doc-modal {
+  background: rgba(4, 10, 22, 0.82);
+  display: none;
+  inset: 0;
+  position: fixed;
+  z-index: 60;
+}
+.doc-modal.open {
+  display: flex;
+}
+.doc-modal-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  margin: 3vh auto;
+  max-height: 94vh;
+  width: min(1100px, 94vw);
+}
+.doc-modal-head {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+}
+.doc-modal-head strong {
+  flex: 1;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doc-modal-hint {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.doc-modal-body {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 20px;
+}
+.ann-bar {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  padding: 10px 16px 12px;
+}
+.ann-input-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+.ann-input-row input {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  flex: 1;
+  font: inherit;
+  padding: 7px 10px;
+}
+.ann-quote {
+  color: var(--amber);
+  font-size: 12px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ann-list {
+  display: grid;
+  gap: 6px;
+  max-height: 130px;
+  overflow: auto;
+}
+.ann-chip {
+  align-items: baseline;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  font-size: 12px;
+  gap: 8px;
+  padding: 6px 10px;
+}
+.ann-chip .ann-note {
+  color: var(--text);
+  flex: 1;
+}
+.ann-del {
+  background: none;
+  border: none;
+  color: var(--muted);
+  padding: 0 2px;
+}
+.ann-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+.ann-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* which archive a run belongs to, when several are served */
+.archive-tag {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  margin-left: auto;
+  margin-right: 8px;
+  max-width: 220px;
+  overflow: hidden;
+  padding: 3px 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* an "active" run whose conductor has probably died (status untouched too long) */
+.pill.stale {
+  background: #3b2f15;
+  color: var(--amber);
 }

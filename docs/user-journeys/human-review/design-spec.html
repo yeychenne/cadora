@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The review gate, by the numbers · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;
+    --card:#fffefb;--amber:#b3760f;
+    --scr-bg:#0f172a;--scr-canvas:#111c2f;--scr-panel:#1e2937;--scr-panel2:#162237;--scr-line:#334158;
+    --scr-text:#f5f7fb;--scr-muted:#9aa8bc;--scr-blue:#6ba5f0;--scr-green:#16c784;--scr-greensoft:#75f0a8;
+    --scr-red:#fb7185;--scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;
+    --ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}}
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;--card:#fffefb;--amber:#b3760f}
+  *{box-sizing:border-box}
+  .wrap{max-width:840px;margin:0 auto;padding:2.6rem 1.5rem 4rem;color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0 0 .5rem}
+  h1{font-size:2.1rem;letter-spacing:-.02em;margin:.1rem 0 .4rem;font-weight:640}
+  .lede{color:var(--ink-soft);margin:0;max-width:64ch}
+  h2{font-size:1.15rem;margin:2.8rem 0 .3rem;font-weight:600;letter-spacing:-.01em}
+  .sub{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 1rem}
+  .rule{height:1px;background:var(--rule);border:0;margin:.4rem 0 0}
+  /* swatches */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:.6rem}
+  .sw{border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--card)}
+  .sw .chip{height:44px}
+  .sw .lab{padding:7px 9px}
+  .sw .lab b{font-size:12px;display:block}
+  .sw .lab code{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .sw .lab span{font-size:11px;color:var(--ink-soft);display:block;margin-top:1px}
+  /* type scale */
+  table{width:100%;border-collapse:collapse;margin-top:.5rem;font-size:13px}
+  th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ink-faint);font-weight:500;padding:6px 10px;border-bottom:1px solid var(--rule)}
+  td{padding:8px 10px;border-bottom:1px solid var(--rule);color:var(--ink-soft);vertical-align:top}
+  td b{color:var(--ink)}
+  td code,.mn{font-family:var(--mono);font-size:12px;color:var(--amber)}
+  /* dashboard component render */
+  .stage{background:var(--scr-bg);border:1px solid var(--rule);border-radius:12px;padding:16px;margin-top:.8rem}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px;position:relative}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .rhead span:last-child{color:var(--scr-text);font-size:13px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .msg.err{color:var(--scr-red)}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0;color:var(--scr-muted);font-size:12px}
+  .empty{color:var(--scr-muted);font-size:12px;font-style:italic;padding:4px 2px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:130px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted)}
+  /* anatomy pins */
+  .pin{position:absolute;font-family:var(--mono);font-size:10px;font-weight:600;width:18px;height:18px;
+    border-radius:50%;background:var(--scr-amber);color:#1a1205;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 3px var(--scr-panel2)}
+  .legend{margin-top:1rem;display:grid;gap:6px}
+  .legend div{display:flex;gap:9px;font-size:13px;color:var(--ink-soft)}
+  .legend .k{font-family:var(--mono);font-size:11px;font-weight:600;width:18px;height:18px;flex:none;
+    border-radius:50%;background:var(--amber);color:var(--paper);display:flex;align-items:center;justify-content:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:.8rem}
+  .state{background:var(--scr-bg);border:1px solid var(--rule);border-radius:10px;padding:12px}
+  .state .cap{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+  .foot{margin-top:3rem;padding-top:1.1rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Design specification for Cadora's human-in-the-loop review panel: color and type tokens, the panel's anatomy, its states, and interaction rules.</h2>
+  <p class="eyebrow">Cadora · design spec</p>
+  <h1>The review gate, by the numbers</h1>
+  <p class="lede">Everything needed to rebuild or extend the human review surface — the exact tokens, the panel's anatomy, its states, and how it behaves. The rendered components are live HTML; edit them here or lift the specs into Figma.</p>
+
+  <h2>Palette</h2>
+  <p class="sub">Dark instrument surface · amber signals a human is needed</p>
+  <hr class="rule">
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#ffd08a"></div><div class="lab"><b>Amber</b><code>--amber · #ffd08a</code><span>Review-gate accent</span></div></div>
+    <div class="sw"><div class="chip" style="background:#16c784"></div><div class="lab"><b>Green</b><code>--green · #16c784</code><span>Approve · gate pass</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fb7185"></div><div class="lab"><b>Red</b><code>--red · #fb7185</code><span>Abort · failure</span></div></div>
+    <div class="sw"><div class="chip" style="background:#3b82f6"></div><div class="lab"><b>Blue</b><code>--blue · #3b82f6</code><span>Document links</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0f172a"></div><div class="lab"><b>Ink</b><code>--bg · #0f172a</code><span>Page ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#111c2f"></div><div class="lab"><b>Canvas</b><code>--canvas · #111c2f</code><span>Inset · doc rows</span></div></div>
+    <div class="sw"><div class="chip" style="background:#162237"></div><div class="lab"><b>Panel</b><code>--panel-2 · #162237</code><span>Callout surface</span></div></div>
+    <div class="sw"><div class="chip" style="background:#334158"></div><div class="lab"><b>Line</b><code>--line · #334158</code><span>Borders</span></div></div>
+    <div class="sw"><div class="chip" style="background:#f5f7fb"></div><div class="lab"><b>Text</b><code>--text · #f5f7fb</code><span>Primary</span></div></div>
+    <div class="sw"><div class="chip" style="background:#9aa8bc"></div><div class="lab"><b>Muted</b><code>--muted · #9aa8bc</code><span>Secondary · captions</span></div></div>
+  </div>
+
+  <h2>Type &amp; metrics</h2>
+  <p class="sub">System sans for reading · monospace for the instrument voice</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Role</th><th>Family</th><th>Size / weight</th><th>Notes</th></tr>
+    <tr><td><b>Node / doc title</b></td><td class="mn">system-ui</td><td>15px / 500</td><td>Run and node names</td></tr>
+    <tr><td><b>Body · doc link</b></td><td class="mn">system-ui</td><td>13px / 400</td><td>Link color <code>--blue</code>, underline on hover</td></tr>
+    <tr><td><b>Label · badge · kind</b></td><td class="mn">mono</td><td>10–11px / 600</td><td>Uppercase, letter-spacing .05em</td></tr>
+    <tr><td><b>Time · duration</b></td><td class="mn">system-ui</td><td>13px</td><td><code>HH:MM:SS</code> · <code>2m 30s</code> — never raw ISO</td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Metric</th><th>Value</th><th>Metric</th><th>Value</th></tr>
+    <tr><td>Card radius</td><td class="mn">12px</td><td>Control radius</td><td class="mn">8px</td></tr>
+    <tr><td>Pill radius</td><td class="mn">999px</td><td>Callout border</td><td class="mn">1px var(--amber)</td></tr>
+    <tr><td>Panel padding</td><td class="mn">12–14px</td><td>Row gap</td><td class="mn">6px</td></tr>
+    <tr><td>Button padding</td><td class="mn">7px 15px</td><td>Doc row padding</td><td class="mn">8px 10px</td></tr>
+  </table>
+
+  <h2>Anatomy — the review panel</h2>
+  <p class="sub">The one component the whole journey turns on</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="callout">
+      <span class="pin" style="top:-9px;left:-9px">1</span>
+      <div class="rhead"><span class="flag">Review required</span><span><b>requirements</b> is waiting for your decision</span></div>
+      <span class="pin" style="top:40px;right:-9px">2</span>
+      <div class="docrow"><a href="#">aidlc-docs/inception/requirements/requirements.md</a><span class="kind">NEW</span><span class="mini">preview</span></div>
+      <div class="docrow"><a href="#">aidlc-docs/inception/plans/execution-plan.md</a><span class="kind">NEW</span><span class="mini">preview</span></div>
+      <span class="pin" style="top:118px;left:-9px">3</span>
+      <div class="ta">Comments — required to request changes</div>
+      <span class="pin" style="bottom:2px;right:-9px">4</span>
+      <div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span><span class="btn no">Abort</span></div>
+    </div>
+  </div>
+  <div class="legend">
+    <div><span class="k">1</span><span><b style="color:var(--ink)">Gate header</b> — an amber flag plus the waiting node's name. Amber is reserved: it means only one thing, a human is needed.</span></div>
+    <div><span class="k">2</span><span><b style="color:var(--ink)">Document list</b> — each changed file this stage produced, as a link (opens the rendered doc) with a <span class="mn">NEW</span>/<span class="mn">MODIFIED</span> kind and an inline <span class="mn">preview</span>.</span></div>
+    <div><span class="k">3</span><span><b style="color:var(--ink)">Comments</b> — free text; required before Request changes, optional otherwise. Travels with the decision into the agent's next prompt.</span></div>
+    <div><span class="k">4</span><span><b style="color:var(--ink)">Decision row</b> — Approve (green), Request changes (neutral), Abort (red). Semantic color, left-to-right by increasing consequence.</span></div>
+  </div>
+
+  <div class="stage" style="margin-top:1rem">
+    <div class="callout" style="border-color:var(--scr-line)">
+      <div class="selrow"><span class="sel">execution-plan.md ▾</span><span class="inp">Ask about this document, or describe a revision…</span><span class="cbtn">Ask ↩</span><span class="cbtn">Revise ↩</span></div>
+      <div class="reply">The run's answer renders here — a question answered inline, or the revised draft shown before you accept it.</div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">The <b style="color:var(--ink)">conversation row</b> sits between the documents and the comments: a document picker, one input, and <b style="color:var(--ink)">Ask</b> / <b style="color:var(--ink)">Revise</b>. Ask answers in place; Revise rewrites the chosen document and re-surfaces it. Each is a real executor turn — style the reply area for streamed text and rendered markdown.</p>
+
+  <h2>States</h2>
+  <p class="sub">Every condition the panel must render</p>
+  <hr class="rule">
+  <div class="grid2">
+    <div class="state"><p class="cap">Default · gate open</p>
+      <div class="callout"><div class="rhead"><span class="flag">Review required</span><span><b>requirements</b></span></div>
+        <div class="docrow"><a href="#">requirements.md</a><span class="kind">NEW</span><span class="mini">preview</span></div>
+        <div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span><span class="btn no">Abort</span></div></div>
+    </div>
+    <div class="state"><p class="cap">Preview open</p>
+      <div class="callout"><div class="docrow"><a href="#">requirements.md</a><span class="mini">preview</span></div>
+        <div class="prev">Requirements — four agents + a supervisor synthesizing APPROVED / MANUAL_REVIEW / DENIED…</div>
+        <div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span></div></div>
+    </div>
+    <div class="state"><p class="cap">Submitting</p>
+      <div class="callout"><div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span><span class="btn no">Abort</span><span class="msg">submitting…</span></div></div>
+    </div>
+    <div class="state"><p class="cap">Error · fail-soft</p>
+      <div class="callout"><div class="ta">(empty)</div><div class="acts"><span class="btn">Request changes</span><span class="msg err">request_changes requires reviewer comments</span></div></div>
+    </div>
+    <div class="state"><p class="cap">No changed documents</p>
+      <div class="callout"><div class="rhead"><span class="flag">Review required</span><span><b>design</b></span></div>
+        <p class="empty">No changed documents surfaced</p>
+        <div class="acts"><span class="btn ok">Approve</span><span class="btn no">Abort</span></div></div>
+    </div>
+    <div class="state"><p class="cap">Resolved · advances</p>
+      <div class="callout" style="border-color:var(--scr-line)"><div class="rhead"><span style="font-size:11px;padding:3px 10px;border-radius:999px;background:#0f3d2c;color:var(--scr-greensoft)">approved</span><span style="color:var(--scr-muted);font-size:13px">next: design</span></div></div>
+    </div>
+    <div class="state"><p class="cap">Asking · awaiting reply</p>
+      <div class="callout" style="border-color:var(--scr-line)"><div class="selrow"><span class="sel">plan.md ▾</span><span class="inp">Why step 2?</span><span class="cbtn">Ask ↩</span></div><div class="reply">thinking…</div></div>
+    </div>
+    <div class="state"><p class="cap">Answered / revised</p>
+      <div class="callout" style="border-color:var(--scr-line)"><div class="reply"><span style="color:var(--scr-greensoft)">Revised in place — approve to keep it.</span><br>Step 2 pauses for human review when the node is marked review: true…</div></div>
+    </div>
+  </div>
+
+  <h2>Interaction &amp; behavior</h2>
+  <p class="sub">What each control does, and the rules that protect the reviewer</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Control</th><th>Action</th><th>Result on the run</th></tr>
+    <tr><td><b>Approve</b></td><td>POST decision <code>approve</code></td><td>Node passes; run continues to the next gate. Comments (if any) pass downstream.</td></tr>
+    <tr><td><b>Request changes</b></td><td>POST <code>request_changes</code> + comments</td><td>Same stage re-runs with the comments in its prompt (up to 3 revisions).</td></tr>
+    <tr><td><b>Abort</b></td><td>POST <code>abort</code></td><td>Run stops, recorded in the evidence pack.</td></tr>
+    <tr><td><b>Document link</b></td><td>Open the rendered file</td><td>Serves the live under-review doc from the run workspace.</td></tr>
+    <tr><td><b>Preview</b></td><td>Render the doc inline</td><td>No navigation; markdown rendered in the panel.</td></tr>
+    <tr><td><b>Ask</b></td><td>POST a <code>question</code> message</td><td>The parked run runs the executor scoped to the doc; the answer renders in the reply area.</td></tr>
+    <tr><td><b>Revise</b></td><td>POST a <code>revision</code> message</td><td>The executor rewrites the doc in place; the new draft is shown and re-surfaced for a decision.</td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Rule</th><th>Why</th></tr>
+    <tr><td><b>Auto-refresh pauses during review</b></td><td>The 5s poll never rebuilds the panel under the reviewer — no wiped comment, no missed click.</td></tr>
+    <tr><td><b>Fail-soft submission</b></td><td>A bad decision or empty required-comment returns a message in place; the gate stays open to retry.</td></tr>
+    <tr><td><b>Indefinite wait</b> (<span class="mn">--review-timeout 0</span>)</td><td>An async reviewer can step away; the gate holds rather than failing closed.</td></tr>
+    <tr><td><b>Loopback + JSON-only POST</b></td><td>The write path is local and guarded; the surface is unauthenticated by design.</td></tr>
+  </table>
+
+  <h2>Voice</h2>
+  <p class="sub">Words are part of the design</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Do</th><th>Not</th></tr>
+    <tr><td>Sentence case — “Request changes”</td><td>Title Case — “Request Changes”</td></tr>
+    <tr><td>Name the outcome — “submitted: approve”</td><td>“Success!”</td></tr>
+    <tr><td>Say what to do — “Comments required to request changes”</td><td>“Invalid input”</td></tr>
+    <tr><td><span class="mn">09:34:06</span> · <span class="mn">2m 30s</span></td><td><span class="mn">2026-07-17T07:34:06.215495+00:00</span></td></tr>
+  </table>
+
+  <div class="foot">Tokens and metrics are taken verbatim from <span class="mn">cadora/dashboard/static/style.css</span>. Edit the rendered components in place, or hand the palette and metrics tables to a Figma library.</div>
+</div>
+</body>
+</html>

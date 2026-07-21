@@ -97,7 +97,8 @@ def cmd_run(args) -> int:
         # Headless HITL: no TTY (Quick Desktop / CI). Write a request file, poll for a decision.
         from cadora.review import file_review_fn
 
-        review_fn = file_review_fn(timeout=args.review_timeout)
+        # Pass the executor so the parked gate can also answer conversational review (ask / revise).
+        review_fn = file_review_fn(timeout=args.review_timeout, executor=executor)
     run_id = args.run_id or _default_run_id()
     out = run_topology(
         topology,
@@ -114,6 +115,7 @@ def cmd_run(args) -> int:
         max_parallel=args.max_parallel,
         resume_from=getattr(args, "resume_from", None),
         skip=_split_csv(getattr(args, "skip", None)),
+        allow_drift=getattr(args, "allow_drift", False),
     )
     print(f"run complete: {out}")
     return 0
@@ -230,7 +232,7 @@ def cmd_dashboard(args) -> int:
     from cadora.dashboard.server import serve_dashboard
 
     _guard_bind(args.host, "dashboard", args.i_understand_no_auth)
-    serve_dashboard(args.archive_dir, host=args.host, port=args.port)
+    serve_dashboard(args.archive_dir or ["runs"], host=args.host, port=args.port)
     return 0
 
 
@@ -755,6 +757,12 @@ def main(argv=None) -> int:
         "(fine-grained alternative to --resume-from)",
     )
     r.add_argument(
+        "--allow-drift",
+        action="store_true",
+        help="on --resume-from/--skip, proceed even if the workspace has drifted since the run "
+        "being resumed (default: refuse). The drift is recorded in the evidence pack either way",
+    )
+    r.add_argument(
         "--remediate",
         type=int,
         default=0,
@@ -842,7 +850,13 @@ def main(argv=None) -> int:
     m.set_defaults(func=cmd_mcp)
 
     dash = sub.add_parser("dashboard", help="serve a lightweight local run dashboard")
-    dash.add_argument("--archive-dir", default="runs")
+    dash.add_argument(
+        "--archive-dir",
+        action="append",
+        default=None,
+        help="run archive to serve; repeat to serve several projects on one dashboard "
+        "(default: runs)",
+    )
     dash.add_argument(
         "--host",
         default="127.0.0.1",

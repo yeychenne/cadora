@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verification, by the numbers · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;
+    --card:#fffefb;--amber:#b3760f;
+    --scr-bg:#0f172a;--scr-canvas:#111c2f;--scr-panel:#1e2937;--scr-panel2:#162237;--scr-line:#334158;
+    --scr-text:#f5f7fb;--scr-muted:#9aa8bc;--scr-blue:#6ba5f0;--scr-green:#16c784;--scr-greensoft:#75f0a8;
+    --scr-red:#fb7185;--scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;
+    --ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}}
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;--card:#fffefb;--amber:#b3760f}
+  *{box-sizing:border-box}
+  .wrap{max-width:840px;margin:0 auto;padding:2.6rem 1.5rem 4rem;color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0 0 .5rem}
+  h1{font-size:2.1rem;letter-spacing:-.02em;margin:.1rem 0 .4rem;font-weight:640}
+  .lede{color:var(--ink-soft);margin:0;max-width:64ch}
+  h2{font-size:1.15rem;margin:2.8rem 0 .3rem;font-weight:600;letter-spacing:-.01em}
+  .sub{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 1rem}
+  .rule{height:1px;background:var(--rule);border:0;margin:.4rem 0 0}
+  /* swatches */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:.6rem}
+  .sw{border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--card)}
+  .sw .chip{height:44px}
+  .sw .lab{padding:7px 9px}
+  .sw .lab b{font-size:12px;display:block}
+  .sw .lab code{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .sw .lab span{font-size:11px;color:var(--ink-soft);display:block;margin-top:1px}
+  /* type scale */
+  table{width:100%;border-collapse:collapse;margin-top:.5rem;font-size:13px}
+  th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ink-faint);font-weight:500;padding:6px 10px;border-bottom:1px solid var(--rule)}
+  td{padding:8px 10px;border-bottom:1px solid var(--rule);color:var(--ink-soft);vertical-align:top}
+  td b{color:var(--ink)}
+  td code,.mn{font-family:var(--mono);font-size:12px;color:var(--amber)}
+  /* dashboard component render */
+  .stage{background:var(--scr-bg);border:1px solid var(--rule);border-radius:12px;padding:16px;margin-top:.8rem}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px;position:relative}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .rhead span:last-child{color:var(--scr-text);font-size:13px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .msg.err{color:var(--scr-red)}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0;color:var(--scr-muted);font-size:12px}
+  .empty{color:var(--scr-muted);font-size:12px;font-style:italic;padding:4px 2px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:130px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted)}
+  /* anatomy pins */
+  .pin{position:absolute;font-family:var(--mono);font-size:10px;font-weight:600;width:18px;height:18px;
+    border-radius:50%;background:var(--scr-amber);color:#1a1205;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 3px var(--scr-panel2)}
+  .legend{margin-top:1rem;display:grid;gap:6px}
+  .legend div{display:flex;gap:9px;font-size:13px;color:var(--ink-soft)}
+  .legend .k{font-family:var(--mono);font-size:11px;font-weight:600;width:18px;height:18px;flex:none;
+    border-radius:50%;background:var(--amber);color:var(--paper);display:flex;align-items:center;justify-content:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:.8rem}
+  .state{background:var(--scr-bg);border:1px solid var(--rule);border-radius:10px;padding:12px}
+  .state .cap{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+  .foot{margin-top:3rem;padding-top:1.1rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+
+  /* ── Gates & integrity — additions on the verbatim token system above.
+       Badge + failure-panel values are taken verbatim from
+       cadora/dashboard/static/style.css; the terminal frame reuses --scr-* tokens. ── */
+  .term{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:11px 13px;font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--scr-text)}
+  .term .ln{white-space:pre-wrap;word-break:break-word;margin:0}
+  .term .pr{color:var(--scr-blue)}
+  .term .mut{color:var(--scr-muted)}
+  .term .oks{color:var(--scr-greensoft)}
+  .term .bad{color:var(--scr-red)}
+  .term .amb{color:var(--scr-amber)}
+  /* dashboard badge chips — authentic dashboard tones */
+  .badge{display:inline-block;background:#26324a;border-radius:4px;color:#cdd7e5;font-size:10px;font-weight:700;line-height:1;padding:3px 5px;font-family:var(--mono)}
+  .badge.ok{background:#0f5132;color:var(--scr-greensoft)}
+  .badge.warn{background:#5a4a15;color:var(--scr-amber)}
+  .badge.bad{background:#5a1622;color:var(--scr-red)}
+  .chipwrap{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  /* failure panel — authentic .node-failure */
+  .nfail{position:relative;background:rgba(190,62,62,.12);border:1px solid rgba(210,90,90,.35);border-radius:10px;padding:11px 13px}
+  .nfail .why{color:#ffb4b4;font-weight:600;font-size:13px}
+  .nfail .fblock{margin-top:9px}
+  .nfail .flabel{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--scr-muted)}
+  .nfail pre{white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.28);border-radius:8px;padding:10px;font-size:12px;margin:6px 0;color:var(--scr-text);font-family:var(--mono);overflow:auto}
+  .nfail ul{margin:4px 0 0;padding-left:18px;font-size:12px;color:var(--scr-muted)}
+  .nfail ul li{margin:2px 0}
+  .nfail ul strong{color:var(--scr-text)}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Design specification for Cadora's verification surfaces: the color and type tokens, the badge system for gate and integrity states, the anatomy of a failure panel, every state it must render, and the gate and integrity CLI reference.</h2>
+  <p class="eyebrow">Cadora · design spec</p>
+  <h1>Verification, by the numbers</h1>
+  <p class="lede">Everything needed to rebuild or extend the surfaces that prove agent work — the exact tokens, the badge system, the failure panel's anatomy, and every state each must render. The rendered components are live HTML; edit them here or lift the specs into Figma.</p>
+
+  <h2>Palette</h2>
+  <p class="sub">Dark instrument surface · green proves · amber warns · red blocks</p>
+  <hr class="rule">
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#16c784"></div><div class="lab"><b>Green</b><code>--green · #16c784</code><span>Gate passed · integrity clean</span></div></div>
+    <div class="sw"><div class="chip" style="background:#ffd08a"></div><div class="lab"><b>Amber</b><code>--amber · #ffd08a</code><span>Vacuous · prerequisite · flagged</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fb7185"></div><div class="lab"><b>Red</b><code>--red · #fb7185</code><span>Failed · packaging · blocking</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0f5132"></div><div class="lab"><b>Chip · ok</b><code>bg · #0f5132</code><span>Green badge ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#5a4a15"></div><div class="lab"><b>Chip · warn</b><code>bg · #5a4a15</code><span>Amber badge ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#5a1622"></div><div class="lab"><b>Chip · bad</b><code>bg · #5a1622</code><span>Red badge ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#26324a"></div><div class="lab"><b>Chip · neutral</b><code>bg · #26324a</code><span>Untoned badge ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0f172a"></div><div class="lab"><b>Ink</b><code>--bg · #0f172a</code><span>Page ground · terminal</span></div></div>
+    <div class="sw"><div class="chip" style="background:#111c2f"></div><div class="lab"><b>Canvas</b><code>--canvas · #111c2f</code><span>Inset · terminal frame</span></div></div>
+    <div class="sw"><div class="chip" style="background:#334158"></div><div class="lab"><b>Line</b><code>--line · #334158</code><span>Borders</span></div></div>
+    <div class="sw"><div class="chip" style="background:#f5f7fb"></div><div class="lab"><b>Text</b><code>--text · #f5f7fb</code><span>Primary · gate output</span></div></div>
+    <div class="sw"><div class="chip" style="background:#9aa8bc"></div><div class="lab"><b>Muted</b><code>--muted · #9aa8bc</code><span>Secondary · labels</span></div></div>
+  </div>
+
+  <h2>Type &amp; metrics</h2>
+  <p class="sub">System sans for reading · monospace for the instrument voice</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Role</th><th>Family</th><th>Size / weight</th><th>Notes</th></tr>
+    <tr><td><b>Badge chip</b></td><td class="mn">mono</td><td>10px / 700</td><td>Radius <code>4px</code>, padding <code>3px 5px</code>; tone = semantic ground + text</td></tr>
+    <tr><td><b>Gate / terminal output</b></td><td class="mn">mono</td><td>12px / 400</td><td>Verbatim stdout+stderr; line-height 1.7; wraps, never truncates mid-token</td></tr>
+    <tr><td><b>Failure reason</b></td><td class="mn">system-ui</td><td>13px / 600</td><td>Colour <code>#ffb4b4</code>; leads with <code>✗</code></td></tr>
+    <tr><td><b>Block label</b></td><td class="mn">mono</td><td>11px</td><td>e.g. <code>gate vacuous output</code>, <code>integrity findings</code></td></tr>
+    <tr><td><b>Exit code · counts</b></td><td class="mn">mono</td><td>12px</td><td><code>exit 1</code> · <code>2 blocking</code> — the numbers, never a stack dump</td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Metric</th><th>Value</th><th>Metric</th><th>Value</th></tr>
+    <tr><td>Badge radius</td><td class="mn">4px</td><td>Panel radius</td><td class="mn">10px</td></tr>
+    <tr><td>Badge padding</td><td class="mn">3px 5px</td><td>Panel border</td><td class="mn">1px rgba(210,90,90,.35)</td></tr>
+    <tr><td>Badge gap</td><td class="mn">3px</td><td>Pre ground</td><td class="mn">rgba(0,0,0,.28)</td></tr>
+    <tr><td>Terminal frame</td><td class="mn">radius 8px</td><td>Pre max-height</td><td class="mn">300px · scroll</td></tr>
+  </table>
+
+  <h2>Badge system</h2>
+  <p class="sub">Every verdict a node can carry — gate state, then integrity state</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="chipwrap">
+      <span class="badge ok">gate passed</span>
+      <span class="badge bad">gate failed</span>
+      <span class="badge warn">gate vacuous</span>
+      <span class="badge warn">gate blocked_prerequisite</span>
+      <span class="badge bad">gate packaging_failed</span>
+      <span class="badge ok">clean</span>
+      <span class="badge warn">flagged</span>
+    </div>
+  </div>
+  <table style="margin-top:1rem">
+    <tr><th>Badge</th><th>Tone</th><th>Means</th><th>Passes?</th></tr>
+    <tr><td><span class="badge ok">gate passed</span></td><td><b style="color:var(--ink)">green</b></td><td>Exited <code>0</code> and — for a test gate — at least one test actually ran.</td><td><b>Yes</b></td></tr>
+    <tr><td><span class="badge bad">gate failed</span></td><td><b style="color:var(--ink)">red</b></td><td>Non-zero exit for a real, in-workspace reason (a genuine test/lint failure).</td><td>No</td></tr>
+    <tr><td><span class="badge warn">gate vacuous</span></td><td><b style="color:var(--ink)">amber</b></td><td>Exited <code>0</code> but a test runner executed <b>zero</b> tests — verified nothing.</td><td>No</td></tr>
+    <tr><td><span class="badge warn">gate blocked_prerequisite</span></td><td><b style="color:var(--ink)">amber</b></td><td>Failed on <b>external</b> missing tooling — not the agent's fault, not its to fix.</td><td>No</td></tr>
+    <tr><td><span class="badge bad">gate packaging_failed</span></td><td><b style="color:var(--ink)">red</b></td><td>A declared installable package that does not <code>pip install</code>.</td><td>No</td></tr>
+    <tr><td><span class="badge ok">clean</span></td><td><b style="color:var(--ink)">green</b></td><td>Integrity: no counterfeit or substituted build/test tooling found.</td><td>—</td></tr>
+    <tr><td><span class="badge warn">flagged</span></td><td><b style="color:var(--ink)">amber</b></td><td>Integrity: findings present — open the failure panel to read them.</td><td>—</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">Tone is computed, not authored: a status containing <span class="mn">passed</span> is green, one containing <span class="mn">fail</span> is red, everything else is amber — so <span class="mn">vacuous</span> and <span class="mn">blocked_prerequisite</span> read as "ran, but proved nothing," while <span class="mn">packaging_failed</span> reads as a hard block. Integrity is green when <span class="mn">clean</span>, amber otherwise.</p>
+
+  <h2>Anatomy — the failure panel</h2>
+  <p class="sub">Why a node is blocked, shown verbatim — never paraphrased</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="nfail">
+      <span class="pin" style="top:-9px;left:-9px">1</span>
+      <div class="why">✗ gate 'build-test' blocked</div>
+      <span class="pin" style="top:44px;right:-9px">2</span>
+      <div class="fblock"><span class="flabel">gate vacuous output</span>
+        <pre>All checks passed!
+no tests ran in 0.01s
+warning: No Python files found under the given path(s)</pre></div>
+      <span class="pin" style="bottom:30px;left:-9px">3</span>
+      <div class="fblock"><span class="flabel">integrity findings</span>
+        <ul><li><strong>stub-implementation</strong> 3 function(s) have a stub body (pass / ... / raise NotImplementedError) — the code looks implemented but isn't; tests that pass over stubs verify nothing</li></ul></div>
+    </div>
+  </div>
+  <div class="legend">
+    <div><span class="k">1</span><span><b style="color:var(--ink)">Failure reason</b> — one line, led by <span class="mn">✗</span>: the run's own <span class="mn">node.error</span>, e.g. <span class="mn">gate 'build-test' blocked</span> or <span class="mn">gate 'build-test' blocked by missing prerequisite(s): quotes</span>.</span></div>
+    <div><span class="k">2</span><span><b style="color:var(--ink)">Gate output block</b> — a mono label naming the status (<span class="mn">gate vacuous output</span>) over the command's combined stdout+stderr in a scrollable <span class="mn">&lt;pre&gt;</span>. Shown only when the gate itself failed.</span></div>
+    <div><span class="k">3</span><span><b style="color:var(--ink)">Integrity findings</b> — each finding as <span class="mn">&lt;rule&gt; &lt;detail&gt;</span> in a list; the rule (e.g. <span class="mn">stub-implementation</span>) bolded. Shown only when findings exist.</span></div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.8rem">The two blocks are independent: a node can fail on the gate, on integrity, or on both. The panel renders whichever applies. The gate output is the last <span class="mn">~2000</span> chars, verbatim — the reader sees exactly what the process printed, not a summary of it.</p>
+
+  <h2>States</h2>
+  <p class="sub">Every verdict the surface must render</p>
+  <hr class="rule">
+  <div class="grid2">
+    <div class="state"><p class="cap">Passed · proven</p>
+      <div class="chipwrap"><span class="badge ok">gate passed</span><span class="badge ok">clean</span></div>
+    </div>
+    <div class="state"><p class="cap">Failed · real bug</p>
+      <div class="chipwrap"><span class="badge bad">gate failed</span></div>
+      <div class="term" style="margin-top:8px"><p class="ln mut">F401 `typing.List` imported but unused</p><p class="ln bad">Found 1 error. · exit 1</p></div>
+    </div>
+    <div class="state"><p class="cap">Vacuous · tested nothing</p>
+      <div class="chipwrap"><span class="badge warn">gate vacuous</span></div>
+      <div class="term" style="margin-top:8px"><p class="ln mut">no tests ran in 0.01s</p><p class="ln amb">exited 0 — verified nothing</p></div>
+    </div>
+    <div class="state"><p class="cap">Blocked prerequisite · external</p>
+      <div class="chipwrap"><span class="badge warn">gate blocked_prerequisite</span></div>
+      <div class="term" style="margin-top:8px"><p class="ln mut">No module named 'quotes'</p><p class="ln amb">missing: quotes · not remediable</p></div>
+    </div>
+    <div class="state"><p class="cap">Packaging failed · won't build</p>
+      <div class="chipwrap"><span class="badge bad">gate packaging_failed</span></div>
+      <div class="term" style="margin-top:8px"><p class="ln mut">Multiple top-level packages discovered in a flat-layout</p><p class="ln bad">pip install -e . refused</p></div>
+    </div>
+    <div class="state"><p class="cap">Integrity flagged · counterfeit tool</p>
+      <div class="chipwrap"><span class="badge warn">flagged</span></div>
+      <div class="term" style="margin-top:8px"><p class="ln bad">✗ blocking shadowed-toolchain: pytest</p></div>
+    </div>
+  </div>
+
+  <h2>Gate &amp; integrity CLI</h2>
+  <p class="sub">Every flag that shapes a verdict</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Flag</th><th>On</th><th>Effect</th></tr>
+    <tr><td><code>--gate-cmd</code></td><td class="mn">run · gate-check</td><td>Command a gate runs when not overridden in the topology <code>gates:</code> map. Default <code>ruff check . &amp;&amp; pytest -q</code>; non-zero exit blocks.</td></tr>
+    <tr><td><code>--gate-setup {off,auto}</code></td><td class="mn">run · gate-check</td><td>Provision an isolated Python gate venv from <code>requirements-dev.txt</code> (default <code>auto</code>). The venv lives <b>outside</b> the workspace.</td></tr>
+    <tr><td><code>--gate-wheelhouse DIR</code></td><td class="mn">run · gate-check</td><td>Offline wheel directory — installs with <code>--no-index --find-links</code>, no network.</td></tr>
+    <tr><td><code>--integrity-mode {off,audit,enforce,repair}</code></td><td class="mn">run</td><td>Toolchain integrity handling (default <code>audit</code>): audit records; enforce blocks; repair drives one fresh repair session.</td></tr>
+    <tr><td><code>--remediate N</code></td><td class="mn">run</td><td>On a <code>failed</code>/<code>vacuous</code>/<code>packaging_failed</code> gate (or a blocking integrity finding), run up to N fresh constrained repair sessions (default <code>0</code> = off).</td></tr>
+    <tr><td><code>--remediate-max-cost USD</code></td><td class="mn">run</td><td>Stop remediation honestly (<code>honest-blocked</code>) before its summed cost exceeds this ceiling.</td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Command</th><th>Cost</th><th>What it does</th></tr>
+    <tr><td><code>cadora gate-check &lt;topology&gt; --cwd &lt;ws&gt;</code></td><td class="mn">no executor · no LLM</td><td>Runs the topology's gates against an existing workspace; a shared gate runs once; exits non-zero if any gate fails.</td></tr>
+    <tr><td><code>cadora integrity [workspace] [--json]</code></td><td class="mn">no executor · no LLM</td><td>Scans a workspace for counterfeit/substituted tooling; exits non-zero on a blocking finding.</td></tr>
+  </table>
+
+  <h2>Reading the verdict — what to do</h2>
+  <p class="sub">Each badge maps to one action</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Badge</th><th>What it means</th><th>What to do</th></tr>
+    <tr><td><span class="badge ok">gate passed</span></td><td>Proven — real command, real tests, exit 0.</td><td>Nothing. Ship it.</td></tr>
+    <tr><td><span class="badge bad">gate failed</span></td><td>A real lint or test failure in the workspace.</td><td>Read the gate output; fix it — or <code>--remediate N</code> to drive a fix.</td></tr>
+    <tr><td><span class="badge warn">gate vacuous</span></td><td>The suite ran zero tests.</td><td>Write real, substantive tests — a green on nothing is not a fix.</td></tr>
+    <tr><td><span class="badge warn">gate blocked_prerequisite</span></td><td>External tooling is missing.</td><td>Provide the dependency/compiler yourself; the agent cannot author it (not remediable).</td></tr>
+    <tr><td><span class="badge bad">gate packaging_failed</span></td><td>Declared package won't <code>pip install</code>.</td><td>Declare packages (<code>[tool.setuptools.packages.find]</code>) or move code under <code>src/</code>.</td></tr>
+    <tr><td><span class="badge warn">flagged</span></td><td>Integrity found counterfeit/hollow tooling.</td><td>Remove the shim / fill the stubs; run under <code>enforce</code> or <code>repair</code> to gate on it.</td></tr>
+  </table>
+
+  <h2>Voice</h2>
+  <p class="sub">Words are part of the design</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Do</th><th>Not</th></tr>
+    <tr><td>Name the status — "gate vacuous"</td><td>Generic "failed"</td></tr>
+    <tr><td>"Green means proven, not claimed"</td><td>"Success!"</td></tr>
+    <tr><td>Show the gate output verbatim</td><td>Paraphrase what the command "probably" said</td></tr>
+    <tr><td>Say what to do — "suite ran zero tests — write real tests"</td><td>"Invalid"</td></tr>
+    <tr><td><span class="mn">exit 1</span> · <span class="mn">2 blocking</span></td><td>A raw multi-page stack trace</td></tr>
+  </table>
+
+  <div class="foot">Tokens and metrics are taken verbatim from <span class="mn">cadora/dashboard/static/style.css</span>; the status vocabulary and tone rules from <span class="mn">cadora/gates.py</span> and <span class="mn">app.js</span>. Edit the rendered components in place, or hand the palette and tables to a Figma library.</div>
+</div>
+</body>
+</html>

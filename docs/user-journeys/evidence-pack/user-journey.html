@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The audit trail you can hand off · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec; --ink:#1b2130; --ink-soft:#4a5265; --ink-faint:#7b8496;
+    --rule:#e0dccf; --card:#fffefb; --amber:#b3760f; --amber-bg:#f6ecd6;
+    --green:#0f7a54; --red:#b23a4b; --blue:#245bb5;
+    --scr-bg:#0f172a; --scr-canvas:#111c2f; --scr-panel:#1e2937; --scr-panel2:#162237;
+    --scr-line:#334158; --scr-text:#f5f7fb; --scr-muted:#9aa8bc; --scr-blue:#6ba5f0;
+    --scr-green:#16c784; --scr-greensoft:#75f0a8; --scr-red:#fb7185; --scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+      --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;
+      --green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  }
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+    --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;--green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;
+    --rule:#e0dccf;--card:#fffefb;--amber:#b3760f;--amber-bg:#f6ecd6;--green:#0f7a54;--red:#b23a4b;--blue:#245bb5;}
+  *{box-sizing:border-box}
+  .wrap{max-width:760px;margin:0 auto;padding:3rem 1.5rem 4rem;color:var(--ink);
+    font-family:var(--sans);line-height:1.65;font-size:16px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--amber);margin:0 0 .6rem}
+  h1{font-size:2.5rem;line-height:1.05;letter-spacing:-.02em;margin:.2rem 0 .5rem;text-wrap:balance;font-weight:640}
+  .lede{font-size:1.15rem;color:var(--ink-soft);margin:0;max-width:60ch}
+  .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:1.4rem;
+    padding-top:1rem;border-top:1px solid var(--rule);display:flex;gap:1.5rem;flex-wrap:wrap}
+  .step{margin-top:3.4rem}
+  .step-head{display:flex;align-items:baseline;gap:.9rem;margin-bottom:.5rem}
+  .num{font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:600;
+    border:1px solid var(--rule);border-radius:6px;padding:2px 8px;flex:none}
+  h2{font-size:1.5rem;letter-spacing:-.01em;margin:0;font-weight:600;text-wrap:balance}
+  .step p{color:var(--ink-soft);margin:.5rem 0 0}
+  .step p strong{color:var(--ink);font-weight:600}
+  .note{font-size:.95rem;color:var(--ink-faint);border-left:2px solid var(--amber);
+    padding:.1rem 0 .1rem .9rem;margin:1.1rem 0 0}
+  /* faux browser frame holding a faithful dark-dashboard screen */
+  .screen{margin:1.4rem 0 .3rem;border-radius:12px;overflow:hidden;border:1px solid var(--rule);
+    background:var(--scr-bg);box-shadow:0 1px 0 var(--rule)}
+  .chrome{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#0b1220;border-bottom:1px solid #1e2a3d}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .url{margin-left:8px;font-family:var(--mono);font-size:11px;color:#5f6d84;background:#0f1a2c;
+    border-radius:6px;padding:3px 10px;flex:1}
+  .body{padding:14px;color:var(--scr-text);font-size:13px}
+  .hero{display:flex;justify-content:space-between;align-items:center;background:var(--scr-panel);
+    border-radius:10px;padding:11px 14px;margin-bottom:12px}
+  .hero b{font-size:15px}.hero small{color:var(--scr-muted);display:block;font-size:11px;margin-top:2px}
+  .pill{font-size:11px;padding:3px 9px;border-radius:999px}
+  .pill.run{background:#12314e;color:#7db8ff}.pill.done{background:#0f3d2c;color:var(--scr-greensoft)}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);
+    padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:150px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted);line-height:1.55}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0}
+  .prev h4{margin:2px 0 4px;font-size:13px;color:var(--scr-text)}
+  .prev p,.prev li{color:var(--scr-muted);font-size:12px;margin:2px 0}
+  .dag{display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:6px}
+  .node{width:180px;text-align:center;border-radius:8px;padding:7px;font-size:12px;
+    background:var(--scr-panel);border:1px solid var(--scr-line);color:var(--scr-muted)}
+  .node.on{background:#123024;border-color:#1f6a49;color:var(--scr-greensoft)}
+  .node .badge{font-size:9px;background:#0f3d2c;color:var(--scr-greensoft);border-radius:4px;padding:1px 6px;margin:0 2px}
+  .node.wait{background:#2a2410;border-color:#7a6320;color:var(--scr-amber)}
+  .arrow{color:var(--scr-line);font-size:12px}
+  .foot{margin-top:3.5rem;padding-top:1.2rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  a{color:var(--blue)}
+</style>
+
+<style>
+  /* evidence pack — appended after the verbatim base, reusing the same --scr-* tokens */
+  .mn{font-family:var(--mono);font-size:.9em}
+  /* terminal recreation — same dark palette, monospace, one pre-wrap region per screen */
+  .term{font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--scr-muted);
+    white-space:pre-wrap;word-break:break-word}
+  .term .p{color:var(--scr-greensoft)}          /* the $ prompt */
+  .term .cmd{color:var(--scr-text)}             /* the command you type */
+  .term .cmt{color:var(--scr-muted)}            /* # inline comment */
+  .term .path{color:var(--scr-blue)}
+  .term .ok{color:var(--scr-greensoft)}
+  .term .amber{color:var(--scr-amber)}
+  .term .bad{color:var(--scr-red)}
+  .term .verdict{color:var(--scr-greensoft);font-weight:700}
+  .term .verdict.no{color:var(--scr-red)}
+  /* mini archived-file list — a checksums.txt preview */
+  .chk{margin-top:11px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:9px 11px}
+  .chk .cap{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted);margin-bottom:6px}
+  .chk .row{display:flex;gap:12px;font-family:var(--mono);font-size:11px;padding:2px 0;line-height:1.5}
+  .chk .h{color:var(--scr-green);flex:none}
+  .chk .f{color:var(--scr-text);word-break:break-all}
+  .chk .more{color:var(--scr-muted);font-size:11px;margin-top:5px}
+  /* the sealed pack, ready to hand off */
+  .packrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .packrow .fn{font-family:var(--mono);font-size:12px;color:var(--scr-text);flex:none;min-width:150px}
+  .packrow .d{font-size:11px;color:var(--scr-muted);flex:1}
+  .packrow .tag{font-size:10px;letter-spacing:.05em;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 8px;white-space:nowrap}
+  .packrow .tag.sig{color:var(--scr-amber);border-color:var(--scr-amber)}
+  /* the arc: tamper-evident -> attributable -> verified */
+  .arc{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:1.6rem;font-family:var(--mono);font-size:12px}
+  .arc span.node{border:1px solid var(--rule);border-radius:999px;padding:4px 13px;color:var(--ink-soft)}
+  .arc span.node.on{border-color:var(--amber);color:var(--amber)}
+  .arc span.sep{color:var(--ink-faint)}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Cadora's evidence pack, step by step: a run finishes green, cadora report packs it into a tamper-evident bundle (report.html, report.json, checksums.txt), cadora sign adds an attributable detached SSH signature, the pack is handed off, and cadora verify on the other side recomputes every hash and checks the signature — 23 file(s) OK, signature VALID, VERIFIED.</h2>
+
+  <p class="eyebrow">Cadora · evidence pack</p>
+  <h1>The audit trail you can hand off</h1>
+  <p class="lede">A run finishes green — but green on your machine is a claim until someone else can check it. Cadora packs each run into a portable evidence pack: <strong>tamper-evident</strong> by checksum, <strong>attributable</strong> by signature, and <strong>verifiable</strong> by anyone, offline. This is that pack's journey off your machine.</p>
+  <div class="meta"><span>Surface · CLI + portable pack</span><span>Role · operator / auditor</span><span>Captured · fixture run, aidlc-hitl</span></div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">01</span><h2>A run completes, green</h2></div>
+    <p>Every gate cleared and the DAG reads clean — three green nodes, each stamped with its gate and review outcome. The evidence is all there in the archive: per-node cost, duration, gate and integrity verdicts, and who decided what at each human gate. What's missing is a way to carry that proof to someone who wasn't watching.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8768/runs/pr1-verify</span></div>
+      <div class="body">
+        <div class="hero"><div><b>pr1-verify</b><small>fixture · aidlc-hitl · 3 nodes</small></div><span class="pill done">completed</span></div>
+        <div class="dag">
+          <div class="node on">requirements<div style="margin-top:3px"><span class="badge">clean</span><span class="badge">approve</span></div></div>
+          <div class="arrow">↓</div>
+          <div class="node on">design<div style="margin-top:3px"><span class="badge">clean</span><span class="badge">approve</span></div></div>
+          <div class="arrow">↓</div>
+          <div class="node on">construction<div style="margin-top:3px"><span class="badge">gate passed</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">02</span><h2><span class="mn">cadora report</span> packs the evidence</h2></div>
+    <p>One command turns the archived run into a self-contained pack under <span class="mn">runs/pr1-verify/report/</span>: <strong>report.html</strong> to read, <strong>report.json</strong> for machines, and <strong>checksums.txt</strong> — the SHA-256 of every archived file plus report.json. That last file is what makes the pack tamper-<em>evident</em>: change one byte anywhere and a hash stops matching.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora report</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora report pr1-verify --archive-dir runs</span>
+evidence pack for pr1-verify:
+  html      <span class="path">runs/pr1-verify/report/report.html</span>
+  json      <span class="path">runs/pr1-verify/report/report.json</span>
+  checksums <span class="path">runs/pr1-verify/report/checksums.txt</span>
+  verify:   cd runs/pr1-verify &amp;&amp; shasum -a 256 -c …/report/checksums.txt</div>
+        <div class="chk">
+          <div class="cap">checksums.txt — 23 hashed files, one line each: &lt;sha256&gt;␣␣&lt;path&gt;</div>
+          <div class="row"><span class="h">5172112d97…</span><span class="f">requirements/aidlc-docs/inception/requirements/requirements.md</span></div>
+          <div class="row"><span class="h">10227a21da…</span><span class="f">design/aidlc-docs/inception/application-design/application-design.md</span></div>
+          <div class="row"><span class="h">cb114f2b6d…</span><span class="f">design/aidlc-docs/audit.md</span></div>
+          <div class="row"><span class="h">a3f90c14e2…</span><span class="f">report.json</span></div>
+          <div class="more">…19 more</div>
+        </div>
+      </div>
+    </div>
+    <p class="note">The pack is checksummed, not yet signed — anyone can confirm it's <em>unchanged</em>, but not yet <em>who</em> stands behind it. That's the next step.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">03</span><h2><span class="mn">cadora sign</span> makes it attributable</h2></div>
+    <p>A detached SSH signature over <span class="mn">checksums.txt</span> binds the whole pack to a key you already have — no new dependency, just <span class="mn">ssh-keygen -Y sign</span> under the hood. Now the pack is tamper-evident <strong>and</strong> attributable: a verified pack proves both that nothing changed and who signed it.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora sign</span></div>
+      <div class="body">
+        <div class="term"><span class="cmt"># one-time: make a signing key you keep private</span>
+<span class="p">$</span> <span class="cmd">ssh-keygen -t ed25519 -f pack-key -N ""</span>
+<span class="p">$</span> <span class="cmd">cadora sign pr1-verify --key pack-key --identity yves@cadora.dev</span>
+signed evidence pack for pr1-verify:
+  signature  <span class="path">runs/pr1-verify/report/checksums.txt.sig</span>
+  signer     ssh-keygen · <span class="ok">yves@cadora.dev</span>
+  key        <span class="amber">SHA256:u4yCokMkI9o7tsmwDYVGM9WBBxkyz8uF53e8y9HJJx8</span>
+  verify:    cadora verify pr1-verify --archive-dir runs</div>
+      </div>
+    </div>
+    <p class="note">The signature travels beside the pack as <span class="mn">checksums.txt.sig</span> and <span class="mn">signature.json</span> (the public key plus its fingerprint), so a recipient can verify entirely offline.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">04</span><h2>Hand it off</h2></div>
+    <p>The pack is a handful of small files and nothing else — no server, no database, no live Cadora. Mail it, attach it to a deliverable, drop it in a ticket. It carries its own proof: the report to read, the checksums to recompute, the signature to attribute.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">runs/pr1-verify/report/ — the portable pack</span></div>
+      <div class="body">
+        <div class="packrow"><span class="fn">report.html</span><span class="d">human view — nodes, gates, cost, review trail</span><span class="tag">read</span></div>
+        <div class="packrow"><span class="fn">report.json</span><span class="d">the same evidence, structured for machines</span><span class="tag">data</span></div>
+        <div class="packrow"><span class="fn">checksums.txt</span><span class="d">SHA-256 of every archived file + report.json</span><span class="tag">hashes</span></div>
+        <div class="packrow"><span class="fn">checksums.txt.sig</span><span class="d">detached SSH signature over the checksums</span><span class="tag sig">signature</span></div>
+        <div class="packrow"><span class="fn">signature.json</span><span class="d">signer identity, public key, and its fingerprint</span><span class="tag sig">signer key</span></div>
+      </div>
+    </div>
+    <p class="note">Self-contained by design — report.html embeds its own styles and links to nothing external, so it renders the same on a machine that has never heard of Cadora.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">05</span><h2><span class="mn">cadora verify</span> — on the other side</h2></div>
+    <p>The recipient runs one command. Cadora recomputes every hash in the pack, then checks the signature against the public key that travels with it. The verdict is two plain lines and a bottom line — <strong>VERIFIED</strong> only if the hashes hold and the signature checks out; otherwise <strong>NOT VERIFIED</strong> and a non-zero exit.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora verify · recipient's machine</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora verify pr1-verify --archive-dir runs</span>
+evidence pack pr1-verify:
+  <span class="ok">✓ hashes    23 file(s) OK</span>
+  <span class="ok">✓ signature VALID</span> — yves@cadora.dev · <span class="amber">self-attested</span> — confirm signer
+              key <span class="amber">SHA256:u4yCokMkI9o7tsmwDYVGM9WBBxkyz8uF53e8y9HJJx8</span> out of band
+  <span class="verdict">=&gt; VERIFIED</span></div>
+      </div>
+    </div>
+    <p class="note">Self-attested means the signature was checked against the key <em>in the pack</em> — proof it hasn't changed since signing. To bind it to a person, confirm that fingerprint out of band, or verify against an <span class="mn">--allowed-signers</span> file you already trust.</p>
+    <div class="arc"><span class="node on">tamper-evident</span><span class="sep">→</span><span class="node on">attributable</span><span class="sep">→</span><span class="node on">verified</span></div>
+  </div>
+
+  <div class="foot">
+    <p>The terminal frames above reproduce real <span class="mn">cadora report / sign / verify</span> output, rendered as editable HTML rather than raster captures — lift them into Figma or iterate directly. This is Cadora's audit-grade endgame: a run's proof survives leaving the machine that made it — tamper-evident, attributable, and verifiable by anyone who receives it.</p>
+  </div>
+</div>
+</body>
+</html>

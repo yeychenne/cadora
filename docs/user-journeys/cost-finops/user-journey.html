@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Following the money, one node at a time · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec; --ink:#1b2130; --ink-soft:#4a5265; --ink-faint:#7b8496;
+    --rule:#e0dccf; --card:#fffefb; --amber:#b3760f; --amber-bg:#f6ecd6;
+    --green:#0f7a54; --red:#b23a4b; --blue:#245bb5;
+    --scr-bg:#0f172a; --scr-canvas:#111c2f; --scr-panel:#1e2937; --scr-panel2:#162237;
+    --scr-line:#334158; --scr-text:#f5f7fb; --scr-muted:#9aa8bc; --scr-blue:#6ba5f0;
+    --scr-green:#16c784; --scr-greensoft:#75f0a8; --scr-red:#fb7185; --scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+      --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;
+      --green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  }
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+    --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;--green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;
+    --rule:#e0dccf;--card:#fffefb;--amber:#b3760f;--amber-bg:#f6ecd6;--green:#0f7a54;--red:#b23a4b;--blue:#245bb5;}
+  *{box-sizing:border-box}
+  .wrap{max-width:760px;margin:0 auto;padding:3rem 1.5rem 4rem;color:var(--ink);
+    font-family:var(--sans);line-height:1.65;font-size:16px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--amber);margin:0 0 .6rem}
+  h1{font-size:2.5rem;line-height:1.05;letter-spacing:-.02em;margin:.2rem 0 .5rem;text-wrap:balance;font-weight:640}
+  .lede{font-size:1.15rem;color:var(--ink-soft);margin:0;max-width:60ch}
+  .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:1.4rem;
+    padding-top:1rem;border-top:1px solid var(--rule);display:flex;gap:1.5rem;flex-wrap:wrap}
+  .step{margin-top:3.4rem}
+  .step-head{display:flex;align-items:baseline;gap:.9rem;margin-bottom:.5rem}
+  .num{font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:600;
+    border:1px solid var(--rule);border-radius:6px;padding:2px 8px;flex:none}
+  h2{font-size:1.5rem;letter-spacing:-.01em;margin:0;font-weight:600;text-wrap:balance}
+  .step p{color:var(--ink-soft);margin:.5rem 0 0}
+  .step p strong{color:var(--ink);font-weight:600}
+  .note{font-size:.95rem;color:var(--ink-faint);border-left:2px solid var(--amber);
+    padding:.1rem 0 .1rem .9rem;margin:1.1rem 0 0}
+  /* faux browser frame holding a faithful dark-dashboard screen */
+  .screen{margin:1.4rem 0 .3rem;border-radius:12px;overflow:hidden;border:1px solid var(--rule);
+    background:var(--scr-bg);box-shadow:0 1px 0 var(--rule)}
+  .chrome{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#0b1220;border-bottom:1px solid #1e2a3d}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .url{margin-left:8px;font-family:var(--mono);font-size:11px;color:#5f6d84;background:#0f1a2c;
+    border-radius:6px;padding:3px 10px;flex:1}
+  .body{padding:14px;color:var(--scr-text);font-size:13px}
+  .hero{display:flex;justify-content:space-between;align-items:center;background:var(--scr-panel);
+    border-radius:10px;padding:11px 14px;margin-bottom:12px}
+  .hero b{font-size:15px}.hero small{color:var(--scr-muted);display:block;font-size:11px;margin-top:2px}
+  .pill{font-size:11px;padding:3px 9px;border-radius:999px}
+  .pill.run{background:#12314e;color:#7db8ff}.pill.done{background:#0f3d2c;color:var(--scr-greensoft)}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);
+    padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:150px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted);line-height:1.55}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0}
+  .prev h4{margin:2px 0 4px;font-size:13px;color:var(--scr-text)}
+  .prev p,.prev li{color:var(--scr-muted);font-size:12px;margin:2px 0}
+  .dag{display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:6px}
+  .node{width:180px;text-align:center;border-radius:8px;padding:7px;font-size:12px;
+    background:var(--scr-panel);border:1px solid var(--scr-line);color:var(--scr-muted)}
+  .node.on{background:#123024;border-color:#1f6a49;color:var(--scr-greensoft)}
+  .node .badge{font-size:9px;background:#0f3d2c;color:var(--scr-greensoft);border-radius:4px;padding:1px 6px;margin:0 2px}
+  .node.wait{background:#2a2410;border-color:#7a6320;color:var(--scr-amber)}
+  .arrow{color:var(--scr-line);font-size:12px}
+  .foot{margin-top:3.5rem;padding-top:1.2rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  a{color:var(--blue)}
+  /* --- FinOps surfaces: metric tiles, breakdown rows, token split, daily trend --- */
+  .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:4px 0 2px}
+  .metric{background:var(--scr-panel);border:1px solid var(--scr-line);border-radius:8px;padding:11px 12px}
+  .metric .mlabel{color:var(--scr-muted);font-size:11px}
+  .metric strong{display:block;margin-top:6px;font-size:22px;line-height:1.1;color:var(--scr-text);font-weight:700}
+  .finhead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+  .finhead b{font-size:15px;color:var(--scr-text)}
+  .since-toggle{display:flex;gap:6px}
+  .since-toggle span{font-size:11px;padding:4px 10px;border:1px solid var(--scr-line);border-radius:6px;color:var(--scr-muted)}
+  .since-toggle span.active{border-color:var(--scr-blue);color:var(--scr-blue)}
+  .finops-top{display:grid;gap:12px;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);margin-bottom:14px}
+  .finops-block{background:var(--scr-panel2);border:1px solid var(--scr-line);border-radius:8px;padding:12px}
+  .flabel{color:var(--scr-muted);font-size:11px;display:block;margin-bottom:6px}
+  .split{display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;font-size:15px;font-weight:700;color:var(--scr-text)}
+  .split em{color:var(--scr-muted);font-style:normal;font-weight:500;margin-right:4px}
+  .finops-cols{display:grid;gap:16px;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .cost-row{align-items:center;border-top:1px solid var(--scr-line);display:grid;gap:8px;
+    grid-template-columns:minmax(50px,.7fr) minmax(44px,1fr) auto;font-size:13px;padding:7px 0}
+  .cost-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--scr-text);font-size:12px}
+  .cost-row .cmuted{color:var(--scr-muted);font-family:var(--mono);font-size:11px}
+  .bar{background:#0d1526;border-radius:999px;display:block;height:8px;overflow:hidden}
+  .bar>span{background:linear-gradient(90deg,var(--scr-blue),var(--scr-green));display:block;height:100%}
+  .daily{align-items:end;display:flex;gap:4px;height:78px;margin-top:8px}
+  .daily-col{align-items:center;display:flex;flex:1;flex-direction:column;gap:4px;height:100%;justify-content:flex-end;min-width:0}
+  .daily-fill{background:linear-gradient(180deg,var(--scr-greensoft),var(--scr-blue));border-radius:3px 3px 0 0;display:block;width:68%}
+  .daily-col small{color:var(--scr-muted);font-size:10px}
+  .nodefoot{display:flex;justify-content:space-between;gap:8px;margin-top:5px;font-family:var(--mono);font-size:10px;color:var(--scr-muted)}
+  .factgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px 14px;margin:2px 0 2px}
+  .factgrid div{font-size:12px;color:var(--scr-muted)}
+  .factgrid b{display:block;color:var(--scr-text);font-family:var(--mono);font-size:12px;margin-top:2px;font-weight:600}
+  /* terminal frame for the usage CLI */
+  .cli{font-family:var(--mono);font-size:12px;line-height:1.7;white-space:pre-wrap;margin:0;color:var(--scr-muted)}
+  .cli .p{color:var(--scr-greensoft)}
+  .cli .c{color:var(--scr-text)}
+  .cli .hl{color:var(--scr-amber)}
+  .cli .g{color:var(--scr-greensoft)}
+  @media(max-width:760px){.finops-cols{grid-template-columns:1fr}}
+  @media(max-width:600px){.metrics{grid-template-columns:1fr 1fr}.finops-top{grid-template-columns:1fr}}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Cost attribution and FinOps in Cadora: every node captures its cost and tokens, the dashboard rolls them up by model, executor, funding, and day, the same numbers are on the CLI, and per-node cost plus an honest duration land in the signed evidence pack.</h2>
+
+  <p class="eyebrow">Cadora · cost attribution</p>
+  <h1>Following the money, one node at a time</h1>
+  <p class="lede">Cadora prices every node it runs — tokens and dollars — and rolls the total up four ways: by model, by executor, by funding source, and by day. This is the journey from a run that just spent money to a signed pack that can prove, to the cent, where it went.</p>
+  <div class="meta"><span>Surface · local dashboard</span><span>Panel · FinOps</span><span>Captured · run pr7-claims</span></div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">01</span><h2>A run spends</h2></div>
+    <p>Every node Cadora drives carries its own <strong>cost and tokens</strong>. The run detail canvas is a cost map: each box shows the dollars that node spent and the context tokens it moved. Add them up and you have the run — nothing is pooled into an unattributable total.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8765/runs/pr7-claims</span></div>
+      <div class="body">
+        <div class="hero"><div><b>pr7-claims</b><small>claude · aidlc · 3 nodes</small></div><span class="pill done">completed</span></div>
+        <div class="dag">
+          <div class="node on">requirements · analyst<div class="nodefoot"><span>$0.4213</span><span>210.4k ctx</span></div></div>
+          <div class="arrow">↓</div>
+          <div class="node on">design · architect<div class="nodefoot"><span>$0.6620</span><span>330.6k ctx</span></div></div>
+          <div class="arrow">↓</div>
+          <div class="node on">construction · engineer<div class="nodefoot"><span>$0.9062</span><span>449.8k ctx</span></div></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Claude Code reports dollars directly. A backend that reports only tokens — Codex — is priced from the public rate table and flagged as estimated, so an estimate never masquerades as a billed figure.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">02</span><h2>Where did the money go?</h2></div>
+    <p>Open the dashboard home and the top row answers it at a glance. Four <strong>metric tiles</strong> — a muted label over one large number — total the whole archive: how many runs, the generation tokens, the context tokens, and the cost in dollars to four places.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8765/</span></div>
+      <div class="body">
+        <div class="metrics">
+          <div class="metric"><span class="mlabel">Runs</span><strong>7</strong></div>
+          <div class="metric"><span class="mlabel">Generation Tokens</span><strong>26.0k</strong></div>
+          <div class="metric"><span class="mlabel">Context Tokens</span><strong>990.8k</strong></div>
+          <div class="metric"><span class="mlabel">Cost</span><strong>$1.9895</strong></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Two token totals, never collapsed into one: <span style="font-family:var(--mono);font-size:.9em">generation</span> is input + output; <span style="font-family:var(--mono);font-size:.9em">context</span> adds cache creation and cache reads. The gap between 26.0k and 990.8k is the cache doing its job.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">03</span><h2>Break it down</h2></div>
+    <p>Below the tiles, the FinOps panel slices the same spend three ways: <strong>by model</strong>, <strong>by executor</strong> (the backend that ran the node), and <strong>by funding</strong>. Each row is a label, a cost bar, and <span style="font-family:var(--mono);font-size:.9em">tokens / $cost</span>. One run on one backend: the same $1.9895 appears under all three lenses — the same money, read three ways.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8765/</span></div>
+      <div class="body">
+        <div class="finhead"><b>FinOps</b><div class="since-toggle"><span class="active">all</span><span>30d</span><span>7d</span></div></div>
+        <div class="finops-cols">
+          <div><span class="flabel">By model</span>
+            <div class="cost-row"><strong>claude-opus-4-7[1m]</strong><span class="bar"><span style="width:100%"></span></span><span class="cmuted">990.8k / $1.9895</span></div>
+          </div>
+          <div><span class="flabel">By executor</span>
+            <div class="cost-row"><strong>claude</strong><span class="bar"><span style="width:100%"></span></span><span class="cmuted">990.8k / $1.9895</span></div>
+          </div>
+          <div><span class="flabel">By funding</span>
+            <div class="cost-row"><strong>subscription</strong><span class="bar"><span style="width:100%"></span></span><span class="cmuted">990.8k / $1.9895</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Fan a run across backends and every lens splits. Route construction to Codex and <b>by executor</b> gains a <span style="font-family:var(--mono);font-size:.9em">codex</span> row and <b>by funding</b> a <span style="font-family:var(--mono);font-size:.9em">metered</span> row — each priced on its own line. Rows sort by context, so the heaviest spend sits on top.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">04</span><h2>The token split, and the trend</h2></div>
+    <p>The top of the FinOps panel keeps two blocks side by side. The <strong>token split</strong> separates input, output, and cache — the number that matters for a cached backend is how little you paid in fresh output against a wall of cache. Beside it, <strong>cost by day</strong> plots the archive as a small bar trend.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8765/</span></div>
+      <div class="body">
+        <div class="finops-top">
+          <div class="finops-block">
+            <span class="flabel">Token split</span>
+            <div class="split"><span><em>in</em> 6.4k</span><span><em>out</em> 19.6k</span><span><em>cache</em> 964.8k</span></div>
+          </div>
+          <div class="finops-block">
+            <span class="flabel">Cost by day</span>
+            <div class="daily">
+              <div class="daily-col" title="07-11: $0.0000"><span class="daily-fill" style="height:4%"></span><small>07-11</small></div>
+              <div class="daily-col" title="07-12: $0.0000"><span class="daily-fill" style="height:4%"></span><small>07-12</small></div>
+              <div class="daily-col" title="07-13: $0.0000"><span class="daily-fill" style="height:4%"></span><small>07-13</small></div>
+              <div class="daily-col" title="07-14: $0.0000"><span class="daily-fill" style="height:4%"></span><small>07-14</small></div>
+              <div class="daily-col" title="07-15: $0.0000"><span class="daily-fill" style="height:4%"></span><small>07-15</small></div>
+              <div class="daily-col" title="07-16: $0.0000"><span class="daily-fill" style="height:4%"></span><small>07-16</small></div>
+              <div class="daily-col" title="07-17: $1.9895 (1 run)"><span class="daily-fill" style="height:100%"></span><small>07-17</small></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note">The <span style="font-family:var(--mono);font-size:.9em">all / 30d / 7d</span> toggle narrows every block at once. The window is applied server-side over the archive — the same filter as <span style="font-family:var(--mono);font-size:.9em">cadora usage --since</span>.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">05</span><h2>The same numbers, on the CLI</h2></div>
+    <p>You don't need the browser. <strong>cadora usage</strong> prints the identical aggregation in the terminal — totals, the token split spelled out, and the by-model breakdown — with a <span style="font-family:var(--mono);font-size:.9em">--since</span> window and a <span style="font-family:var(--mono);font-size:.9em">--json</span> mode for piping into anything else.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh · cadora</span></div>
+      <div class="body">
+<pre class="cli"><span class="p">$</span> <span class="c">cadora usage --archive-dir runs --since 7d</span>
+usage since 2026-07-10T09:00:00+00:00: 7 run(s), 12 node(s)
+  tokens: input=<span class="hl">6.4k</span>  output=<span class="hl">19.6k</span>  cache_create=118.4k  cache_read=846.4k
+  totals: generation=<span class="hl">26.0k</span>  context=<span class="hl">990.8k</span>  cost=<span class="hl">$1.9895</span>
+  by model:
+    claude-opus-4-7[1m]         990.8k context  $1.9895</pre>
+      </div>
+    </div>
+    <p class="note">A Codex node would add a line here too — priced from the public table and marked <span style="font-family:var(--mono);font-size:.9em">est.</span> — plus a note counting the estimated nodes, so the dollars stay legible as billed versus computed.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">06</span><h2>It's audit-grade</h2></div>
+    <p>The per-node cost isn't only for the dashboard. It's written into the run's manifest, and the <strong>evidence pack</strong> hashes and signs that manifest. So the cost and duration you read here are the same numbers a verifier recomputes — provable after the pack leaves your machine.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8765/runs/pr7-claims</span></div>
+      <div class="body">
+        <div class="callout" style="border-color:var(--scr-line);margin-bottom:12px">
+          <div class="rhead"><span style="font-size:11px;padding:3px 10px;border-radius:999px;background:#0f3d2c;color:var(--scr-greensoft)">signed</span><span style="color:var(--scr-text);font-size:13px"><b>construction</b> · in the sealed pack</span></div>
+          <div class="factgrid">
+            <div>model<b>claude-opus-4-7[1m]</b></div>
+            <div>backend<b>claude</b></div>
+            <div>cost<b>$0.9062</b></div>
+            <div>duration<b>41.2s</b></div>
+            <div>review wait<b>18m 40s</b></div>
+            <div>funding<b>subscription</b></div>
+          </div>
+        </div>
+<pre class="cli"><span class="p">$</span> <span class="c">cadora verify pr7-claims</span>
+evidence pack pr7-claims:
+  hashes    14 file(s) OK
+  signature <span class="g">VALID</span> — Yves Eychenne · ssh-ed25519
+  => <span class="g">VERIFIED</span></pre>
+      </div>
+    </div>
+    <p class="note">Honest duration, on purpose (fix W5): the 18m 40s a reviewer spent deliberating is recorded as <span style="font-family:var(--mono);font-size:.9em">review_wait_seconds</span> but <em>subtracted</em> from the signed <span style="font-family:var(--mono);font-size:.9em">duration_seconds</span> — a gate held open twenty minutes never signs a twenty-minute node.</p>
+  </div>
+
+  <div class="foot">
+    <p>The screens above reproduce the live Cadora FinOps panel exactly — the metric tiles, the breakdown rows, the token split, and the daily trend — rendered as editable HTML rather than raster captures, so they lift straight into Figma. Every dollar is attributed to a node, rolled up four ways, and sealed into a pack that proves the number.</p>
+  </div>
+</div>
+</body>
+</html>

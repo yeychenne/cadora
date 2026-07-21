@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The story on top of the proof · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec; --ink:#1b2130; --ink-soft:#4a5265; --ink-faint:#7b8496;
+    --rule:#e0dccf; --card:#fffefb; --amber:#b3760f; --amber-bg:#f6ecd6;
+    --green:#0f7a54; --red:#b23a4b; --blue:#245bb5;
+    --scr-bg:#0f172a; --scr-canvas:#111c2f; --scr-panel:#1e2937; --scr-panel2:#162237;
+    --scr-line:#334158; --scr-text:#f5f7fb; --scr-muted:#9aa8bc; --scr-blue:#6ba5f0;
+    --scr-green:#16c784; --scr-greensoft:#75f0a8; --scr-red:#fb7185; --scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+      --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;
+      --green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  }
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+    --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;--green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;
+    --rule:#e0dccf;--card:#fffefb;--amber:#b3760f;--amber-bg:#f6ecd6;--green:#0f7a54;--red:#b23a4b;--blue:#245bb5;}
+  *{box-sizing:border-box}
+  .wrap{max-width:760px;margin:0 auto;padding:3rem 1.5rem 4rem;color:var(--ink);
+    font-family:var(--sans);line-height:1.65;font-size:16px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--amber);margin:0 0 .6rem}
+  h1{font-size:2.5rem;line-height:1.05;letter-spacing:-.02em;margin:.2rem 0 .5rem;text-wrap:balance;font-weight:640}
+  .lede{font-size:1.15rem;color:var(--ink-soft);margin:0;max-width:60ch}
+  .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:1.4rem;
+    padding-top:1rem;border-top:1px solid var(--rule);display:flex;gap:1.5rem;flex-wrap:wrap}
+  .step{margin-top:3.4rem}
+  .step-head{display:flex;align-items:baseline;gap:.9rem;margin-bottom:.5rem}
+  .num{font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:600;
+    border:1px solid var(--rule);border-radius:6px;padding:2px 8px;flex:none}
+  h2{font-size:1.5rem;letter-spacing:-.01em;margin:0;font-weight:600;text-wrap:balance}
+  .step p{color:var(--ink-soft);margin:.5rem 0 0}
+  .step p strong{color:var(--ink);font-weight:600}
+  .note{font-size:.95rem;color:var(--ink-faint);border-left:2px solid var(--amber);
+    padding:.1rem 0 .1rem .9rem;margin:1.1rem 0 0}
+  /* faux browser frame holding a faithful dark-dashboard screen */
+  .screen{margin:1.4rem 0 .3rem;border-radius:12px;overflow:hidden;border:1px solid var(--rule);
+    background:var(--scr-bg);box-shadow:0 1px 0 var(--rule)}
+  .chrome{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#0b1220;border-bottom:1px solid #1e2a3d}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .url{margin-left:8px;font-family:var(--mono);font-size:11px;color:#5f6d84;background:#0f1a2c;
+    border-radius:6px;padding:3px 10px;flex:1}
+  .body{padding:14px;color:var(--scr-text);font-size:13px}
+  .hero{display:flex;justify-content:space-between;align-items:center;background:var(--scr-panel);
+    border-radius:10px;padding:11px 14px;margin-bottom:12px}
+  .hero b{font-size:15px}.hero small{color:var(--scr-muted);display:block;font-size:11px;margin-top:2px}
+  .pill{font-size:11px;padding:3px 9px;border-radius:999px}
+  .pill.run{background:#12314e;color:#7db8ff}.pill.done{background:#0f3d2c;color:var(--scr-greensoft)}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);
+    padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:150px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted);line-height:1.55}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0}
+  .prev h4{margin:2px 0 4px;font-size:13px;color:var(--scr-text)}
+  .prev p,.prev li{color:var(--scr-muted);font-size:12px;margin:2px 0}
+  .dag{display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:6px}
+  .node{width:180px;text-align:center;border-radius:8px;padding:7px;font-size:12px;
+    background:var(--scr-panel);border:1px solid var(--scr-line);color:var(--scr-muted)}
+  .node.on{background:#123024;border-color:#1f6a49;color:var(--scr-greensoft)}
+  .node .badge{font-size:9px;background:#0f3d2c;color:var(--scr-greensoft);border-radius:4px;padding:1px 6px;margin:0 2px}
+  .node.wait{background:#2a2410;border-color:#7a6320;color:var(--scr-amber)}
+  .arrow{color:var(--scr-line);font-size:12px}
+  .foot{margin-top:3.5rem;padding-top:1.2rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  a{color:var(--blue)}
+</style>
+
+<style>
+  /* deliverable pack — appended after the verbatim base, reusing the same --scr-* tokens only */
+  .mn{font-family:var(--mono);font-size:.9em}
+  /* terminal recreation — identical to the sibling packs: one pre-wrap region per screen */
+  .term{font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--scr-muted);
+    white-space:pre-wrap;word-break:break-word}
+  .term .p{color:var(--scr-greensoft)}          /* the $ prompt */
+  .term .cmd{color:var(--scr-text)}             /* the command you type */
+  .term .cmt{color:var(--scr-muted)}            /* # inline comment */
+  .term .path{color:var(--scr-blue)}
+  .term .ok{color:var(--scr-greensoft)}
+  .term .amber{color:var(--scr-amber)}
+  .term .bad{color:var(--scr-red)}
+  /* the delivery report, rendered as a document inside the browser frame */
+  .rdoc{color:var(--scr-text)}
+  .rdoc .t1{font-size:16px;font-weight:700;color:var(--scr-text);margin:0 0 3px;letter-spacing:-.01em}
+  .rdoc .rmeta{font-family:var(--mono);font-size:11px;color:var(--scr-muted);margin:0 0 13px}
+  .rdoc .h{font-size:12px;font-weight:700;color:var(--scr-text);margin:15px 0 7px;
+    padding-bottom:4px;border-bottom:1px solid var(--scr-line);letter-spacing:.01em}
+  .rdoc p{color:var(--scr-muted);font-size:12px;margin:0 0 8px;line-height:1.62}
+  .rdoc strong{color:var(--scr-text);font-weight:600}
+  .rdoc ul{margin:0 0 8px;padding-left:15px}
+  .rdoc li{color:var(--scr-muted);font-size:12px;line-height:1.62;margin:3px 0}
+  .rdoc .est{color:var(--scr-amber)}
+  .rdoc .ok{color:var(--scr-greensoft)}
+  .rtab{width:100%;border-collapse:collapse;margin:2px 0 6px;font-size:11.5px}
+  .rtab th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--scr-muted);font-weight:500;padding:5px 8px;border-bottom:1px solid var(--scr-line)}
+  .rtab td{padding:5px 8px;border-bottom:1px solid var(--scr-line);color:var(--scr-muted);vertical-align:top}
+  .rtab td.f{font-family:var(--mono);color:var(--scr-text)}
+  .rsub{font-size:10.5px;color:var(--scr-muted);font-style:italic;margin:2px 0 0}
+  /* proof-underneath / story-on-top stack — one archived run, two readers */
+  .stack{display:flex;flex-direction:column;gap:7px;margin-top:4px}
+  .layer{border:1px solid var(--scr-line);border-radius:10px;padding:10px 13px;background:var(--scr-canvas)}
+  .layer.top{border-left:3px solid var(--scr-blue)}
+  .layer.base{border-left:3px solid var(--scr-green)}
+  .layer .lc{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted);margin-bottom:4px}
+  .layer b{font-size:13px;color:var(--scr-text);font-weight:600}
+  .layer .files{font-family:var(--mono);font-size:11px;color:var(--scr-muted);margin-top:3px}
+  .layer .aud{font-size:11px;color:var(--scr-muted);margin-top:4px}
+  .layer .aud em{color:var(--scr-amber);font-style:normal}
+  .midline{text-align:center;font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);letter-spacing:.04em}
+  /* who-reads-what — verifier vs stakeholder, side by side */
+  .aud2{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:2px}
+  .col{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:10px;padding:11px 13px}
+  .col .who{font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--scr-amber);margin-bottom:5px}
+  .col b{font-size:13px;color:var(--scr-text);display:block;margin-bottom:3px}
+  .col p{font-size:11.5px;color:var(--scr-muted);margin:2px 0;line-height:1.5}
+  .col .cmdline{font-family:var(--mono);font-size:11px;color:var(--scr-blue);margin-top:5px}
+  @media(max-width:640px){.aud2{grid-template-columns:1fr}}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">How Cadora's deliverable pack works, step by step: an archived run already carries a checksummed evidence pack for a verifier; cadora deliverable pr1-verify turns the same run into a readable client-facing delivery report (deliverable.md) with an executive summary, what was delivered, quality and assurance, cost (FinOps), and an evidence appendix; every claim is exactly what the archive recorded, estimates flagged, checksummed not signed; --docx renders an optional Word copy via the cadora[deliverable] extra; the evidence pack is the proof for a verifier, the deliverable is the story for a stakeholder — same source, different reader.</h2>
+
+  <p class="eyebrow">Cadora · deliverable pack</p>
+  <h1>The story on top of the proof</h1>
+  <p class="lede">A run's evidence pack is the checksummed proof a <strong>verifier</strong> recomputes offline. But the person who signs off on the work usually isn't the verifier — they want the readable story. <span class="mn">cadora deliverable</span> turns one archived run into a client-facing <strong>delivery report</strong>: the persuasive narrative that sits on top of the same tamper-evident evidence, under the same honesty contract, for a different reader.</p>
+  <div class="meta"><span>Surface · CLI + delivery report</span><span>Role · consultant / stakeholder</span><span>Captured · fixture run, aidlc-hitl</span></div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">01</span><h2>One archived run, two readers</h2></div>
+    <p>The run finished green and its evidence pack already exists — <strong>report.json</strong>, <strong>checksums.txt</strong>, and a signature — the proof a verifier recomputes. What it doesn't do is <em>read</em> like something you hand a client. Both readers draw from the same archived run; the deliverable is the second surface over the same source of truth.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">one run · two surfaces</span></div>
+      <div class="body">
+        <div class="stack">
+          <div class="layer top">
+            <div class="lc">story on top</div>
+            <b>Delivery report</b>
+            <div class="files">deliverable.md · deliverable.docx</div>
+            <div class="aud">reader · <em>stakeholder</em> — reads the narrative and signs off</div>
+          </div>
+          <div class="midline">▲ &nbsp; both rendered from the same <span class="mn">build_report()</span> evidence &nbsp; ▼</div>
+          <div class="layer base">
+            <div class="lc">proof underneath</div>
+            <b>Evidence pack</b>
+            <div class="files">report.html · report.json · checksums.txt · checksums.txt.sig</div>
+            <div class="aud">reader · <em>verifier</em> — recomputes every hash, offline</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Same source, same honesty contract, different audience. The deliverable never adds a claim the evidence doesn't already support — it re-reads the pack's structured evidence, it doesn't re-derive anything.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">02</span><h2><span class="mn">cadora deliverable</span> writes the report</h2></div>
+    <p>One command reads the archived run and writes <strong>deliverable.md</strong> — a dependency-free Markdown delivery report. By default it lands beside the run at <span class="mn">runs/pr1-verify/</span> (not inside the evidence pack's <span class="mn">report/</span> — the deliverable is a sibling of the proof, not part of it).</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora deliverable</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora deliverable pr1-verify --archive-dir runs</span>
+delivery pack for pr1-verify:
+  md        <span class="path">runs/pr1-verify/deliverable.md</span></div>
+        <div class="ta">One file, Markdown, renders anywhere — paste it into a doc, a ticket, or an email. Want a Word copy? Add <span class="mn">--docx</span> (step 05). The Markdown core needs no extra dependency.</div>
+      </div>
+    </div>
+    <p class="note">Reads the same archive as <span class="mn">cadora report</span>. If the run isn't there you get <span class="mn">no such run 'pr1-verify' in runs/</span> — point <span class="mn">--archive-dir</span> at the right directory.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">03</span><h2>The delivery report itself</h2></div>
+    <p>Five sections, always in the same order: <strong>Executive summary</strong>, <strong>What was delivered</strong> (a per-node table across the AI-DLC phases), <strong>Quality &amp; assurance</strong>, <strong>Cost (FinOps)</strong>, and an <strong>Evidence appendix</strong> that points back at the checksummed pack. Every number is lifted from the archive — nothing is written by hand.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">runs/pr1-verify/deliverable.md — rendered</span></div>
+      <div class="body">
+        <div class="rdoc">
+          <div class="t1">Solution Delivery Report — aidlc-hitl</div>
+          <div class="rmeta">Run pr1-verify · generated by Cadora 0.10.0 · 2026-07-17T14:20:03+00:00</div>
+
+          <div class="h">Executive summary</div>
+          <p>Cadora conducted an AI-DLC pipeline (<strong>aidlc-hitl</strong>) across <strong>3 nodes</strong> on <strong>claude</strong>. Outcome: <strong class="ok">✅ PASS</strong>. Total metered cost <strong>$0.1873</strong> <span class="est">(1 node(s) priced from the public price table)</span>. Gate verdicts — passed: 1. Integrity findings: 0. Human-review decisions: 2.</p>
+
+          <div class="h">What was delivered</div>
+          <table class="rtab">
+            <tr><th>Node</th><th>Backend</th><th>Model</th><th>Outcome</th><th>Gate</th><th>Cost</th></tr>
+            <tr><td class="f">requirements</td><td>claude</td><td class="f">claude-opus-4-8</td><td class="ok">✓</td><td>—</td><td class="f">$0.0642</td></tr>
+            <tr><td class="f">design</td><td>claude</td><td class="f">claude-opus-4-8</td><td class="ok">✓</td><td>—</td><td class="f">$0.0511</td></tr>
+            <tr><td class="f">construction</td><td>claude</td><td class="f">claude-sonnet-4-5</td><td class="ok">✓</td><td>passed</td><td class="f">$0.0720<span class="est">*</span></td></tr>
+          </table>
+          <p class="rsub"><span class="est">*</span> = cost estimated from the public price table (backend reported tokens, not dollars).</p>
+
+          <div class="h">Quality &amp; assurance</div>
+          <ul>
+            <li><strong>Gate verdicts:</strong> passed: 1</li>
+            <li><strong>Integrity:</strong> 0 finding(s) across 0 node(s)</li>
+            <li><strong>Human review:</strong> 2 recorded decision(s)</li>
+            <li><strong>Verifiable evidence:</strong> every claim above is checksummed — run <span class="mn">cadora report pr1-verify</span> for the portable, SHA-256-verified evidence pack.</li>
+          </ul>
+
+          <div class="h">Cost (FinOps)</div>
+          <p>Total: <strong>$0.1873</strong> across 3 nodes, 1 estimated from the price table.</p>
+
+          <div class="h">Evidence appendix</div>
+          <ul>
+            <li>23 archived file(s), each SHA-256 checksummed.</li>
+            <li>Honesty contract: this report claims exactly what the run archive recorded (gate verdicts, integrity findings, human-review decisions, per-node cost); it is checksummed, not signed.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <p class="note">The nodes <em>are</em> the AI-DLC phases — requirements and design (inception), then construction. The table is one row per node; there is no invented per-phase prose, only what the manifest recorded.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">04</span><h2>Every claim traces to the archive</h2></div>
+    <p>The deliverable inherits the evidence pack's honesty contract wholesale. A gate verdict is what the gate returned; a cost is a backend-reported dollar figure <em>or</em> a price-table estimate — and if it's an estimate it carries an <span class="mn">*</span>. The report is <strong>checksummed, not signed</strong>, and it makes no claim about agent honesty beyond what the gates and integrity checks actually verified.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">honesty contract — inherited</span></div>
+      <div class="body">
+        <div class="callout">
+          <div class="rhead"><span class="flag">HONESTY CONTRACT</span><span style="color:var(--scr-text);font-size:13px">exactly what the run archive recorded</span></div>
+          <div class="prev">
+            <p><span style="color:var(--scr-greensoft)">✓</span> gate verdicts — deterministic, as the gate returned them</p>
+            <p><span style="color:var(--scr-greensoft)">✓</span> integrity findings &amp; human-review decisions — as archived</p>
+            <p><span style="color:var(--scr-amber)">*</span> per-node cost — backend dollars, <em>or</em> price-table estimate, flagged</p>
+            <p><span style="color:var(--scr-muted)">·</span> checksummed, not signed — no claim beyond what the gates verified</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note">The <span class="mn">*</span> on the construction node's cost isn't decoration — it says that figure came from the public price table (the backend reported tokens, not dollars). Estimates are always marked; nothing is silently rounded into a hard number.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">05</span><h2>An optional <span class="mn">.docx</span>, for the folder that expects Word</h2></div>
+    <p>Some stakeholders want a Word document, not Markdown. <span class="mn">--docx</span> renders <strong>deliverable.docx</strong> alongside the Markdown, and <span class="mn">--out</span> drops the whole thing into a client-pack directory. The <span class="mn">.docx</span> path needs one optional extra — the Markdown core stays dependency-free without it.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora deliverable --docx</span></div>
+      <div class="body">
+        <div class="term"><span class="cmt"># one-time: install the optional docx extra</span>
+<span class="p">$</span> <span class="cmd">pip install 'cadora[deliverable]'</span>
+<span class="p">$</span> <span class="cmd">cadora deliverable pr1-verify --docx --out ./client-pack</span>
+delivery pack for pr1-verify:
+  md        <span class="path">client-pack/deliverable.md</span>
+  docx      <span class="path">client-pack/deliverable.docx</span></div>
+        <div class="ta">Without the extra, <span class="mn">--docx</span> stops clean: <span style="color:var(--scr-amber)">cadora deliverable --docx requires python-docx: pip install 'cadora[deliverable]'</span>. Markdown alone never needs it.</div>
+      </div>
+    </div>
+    <p class="note">The <span class="mn">.docx</span> carries the same summary and delivery table as the Markdown — same evidence, a format the client's document folder expects.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">06</span><h2>Who reads what</h2></div>
+    <p>The two surfaces don't compete — they're aimed at different desks. Hand the <strong>evidence pack</strong> to whoever needs to <em>check</em> the work; hand the <strong>delivery report</strong> to whoever needs to <em>understand and approve</em> it. When a stakeholder wants to go deeper, the appendix points them straight at the pack.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">two surfaces · two desks</span></div>
+      <div class="body">
+        <div class="aud2">
+          <div class="col">
+            <div class="who">evidence pack</div>
+            <b>The verifier</b>
+            <p>Wants proof, not prose. Recomputes every SHA-256 hash and checks the signature — offline, no live Cadora.</p>
+            <div class="cmdline">$ cadora verify pr1-verify</div>
+          </div>
+          <div class="col">
+            <div class="who">delivery report</div>
+            <b>The stakeholder</b>
+            <p>Wants the outcome, the cost, and the assurance in plain language. Reads the narrative; signs off.</p>
+            <div class="cmdline">open deliverable.md / .docx</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note">The checksummed evidence pack — <span class="mn">cadora report / sign / verify</span> — is documented on its own. The deliverable cross-references it (the appendix names it) rather than repeating it.</p>
+  </div>
+
+  <div class="foot">
+    <p>The frames above reproduce real <span class="mn">cadora deliverable</span> output and the exact sections of <span class="mn">deliverable.md</span>, rendered as editable HTML rather than raster captures — lift them into Figma or iterate directly. This is Cadora's consulting endgame: the same tamper-evident run, told two ways — a checksummed proof for the verifier, and a readable delivery report for the stakeholder who signs.</p>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proving what the agent built · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec; --ink:#1b2130; --ink-soft:#4a5265; --ink-faint:#7b8496;
+    --rule:#e0dccf; --card:#fffefb; --amber:#b3760f; --amber-bg:#f6ecd6;
+    --green:#0f7a54; --red:#b23a4b; --blue:#245bb5;
+    --scr-bg:#0f172a; --scr-canvas:#111c2f; --scr-panel:#1e2937; --scr-panel2:#162237;
+    --scr-line:#334158; --scr-text:#f5f7fb; --scr-muted:#9aa8bc; --scr-blue:#6ba5f0;
+    --scr-green:#16c784; --scr-greensoft:#75f0a8; --scr-red:#fb7185; --scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+      --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;
+      --green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  }
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+    --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;--green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;
+    --rule:#e0dccf;--card:#fffefb;--amber:#b3760f;--amber-bg:#f6ecd6;--green:#0f7a54;--red:#b23a4b;--blue:#245bb5;}
+  *{box-sizing:border-box}
+  .wrap{max-width:760px;margin:0 auto;padding:3rem 1.5rem 4rem;color:var(--ink);
+    font-family:var(--sans);line-height:1.65;font-size:16px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--amber);margin:0 0 .6rem}
+  h1{font-size:2.5rem;line-height:1.05;letter-spacing:-.02em;margin:.2rem 0 .5rem;text-wrap:balance;font-weight:640}
+  .lede{font-size:1.15rem;color:var(--ink-soft);margin:0;max-width:60ch}
+  .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:1.4rem;
+    padding-top:1rem;border-top:1px solid var(--rule);display:flex;gap:1.5rem;flex-wrap:wrap}
+  .step{margin-top:3.4rem}
+  .step-head{display:flex;align-items:baseline;gap:.9rem;margin-bottom:.5rem}
+  .num{font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:600;
+    border:1px solid var(--rule);border-radius:6px;padding:2px 8px;flex:none}
+  h2{font-size:1.5rem;letter-spacing:-.01em;margin:0;font-weight:600;text-wrap:balance}
+  .step p{color:var(--ink-soft);margin:.5rem 0 0}
+  .step p strong{color:var(--ink);font-weight:600}
+  .note{font-size:.95rem;color:var(--ink-faint);border-left:2px solid var(--amber);
+    padding:.1rem 0 .1rem .9rem;margin:1.1rem 0 0}
+  /* faux browser frame holding a faithful dark-dashboard screen */
+  .screen{margin:1.4rem 0 .3rem;border-radius:12px;overflow:hidden;border:1px solid var(--rule);
+    background:var(--scr-bg);box-shadow:0 1px 0 var(--rule)}
+  .chrome{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#0b1220;border-bottom:1px solid #1e2a3d}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .url{margin-left:8px;font-family:var(--mono);font-size:11px;color:#5f6d84;background:#0f1a2c;
+    border-radius:6px;padding:3px 10px;flex:1}
+  .body{padding:14px;color:var(--scr-text);font-size:13px}
+  .hero{display:flex;justify-content:space-between;align-items:center;background:var(--scr-panel);
+    border-radius:10px;padding:11px 14px;margin-bottom:12px}
+  .hero b{font-size:15px}.hero small{color:var(--scr-muted);display:block;font-size:11px;margin-top:2px}
+  .pill{font-size:11px;padding:3px 9px;border-radius:999px}
+  .pill.run{background:#12314e;color:#7db8ff}.pill.done{background:#0f3d2c;color:var(--scr-greensoft)}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);
+    padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:150px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted);line-height:1.55}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0}
+  .prev h4{margin:2px 0 4px;font-size:13px;color:var(--scr-text)}
+  .prev p,.prev li{color:var(--scr-muted);font-size:12px;margin:2px 0}
+  .dag{display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:6px}
+  .node{width:180px;text-align:center;border-radius:8px;padding:7px;font-size:12px;
+    background:var(--scr-panel);border:1px solid var(--scr-line);color:var(--scr-muted)}
+  .node.on{background:#123024;border-color:#1f6a49;color:var(--scr-greensoft)}
+  .node .badge{font-size:9px;background:#0f3d2c;color:var(--scr-greensoft);border-radius:4px;padding:1px 6px;margin:0 2px}
+  .node.wait{background:#2a2410;border-color:#7a6320;color:var(--scr-amber)}
+  .arrow{color:var(--scr-line);font-size:12px}
+  .foot{margin-top:3.5rem;padding-top:1.2rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  a{color:var(--blue)}
+
+  /* ── Gates & integrity — additions on the verbatim token system above.
+       Badge + failure-panel values are taken verbatim from
+       cadora/dashboard/static/style.css; the terminal frame reuses --scr-* tokens. ── */
+  .termlabel{margin-left:8px;font-family:var(--mono);font-size:11px;color:#5f6d84;background:#0f1a2c;border-radius:6px;padding:3px 10px;flex:1}
+  .term{padding:13px 14px;font-family:var(--mono);font-size:12.5px;line-height:1.75;color:var(--scr-text);background:var(--scr-bg)}
+  .term .ln{white-space:pre-wrap;word-break:break-word;margin:0}
+  .term .pr{color:var(--scr-blue)}
+  .term .mut{color:var(--scr-muted)}
+  .term .ok{color:var(--scr-green)}
+  .term .oks{color:var(--scr-greensoft)}
+  .term .bad{color:var(--scr-red)}
+  .term .amb{color:var(--scr-amber)}
+  /* dashboard node badge chips — authentic dashboard tones */
+  .dag-badges{display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:6px}
+  .badge{background:#26324a;border-radius:4px;color:#cdd7e5;font-size:10px;font-weight:700;line-height:1;padding:3px 5px;font-family:var(--mono)}
+  .badge.ok,.node .badge.ok{background:#0f5132;color:var(--scr-greensoft)}
+  .badge.warn,.node .badge.warn{background:#5a4a15;color:var(--scr-amber)}
+  .badge.bad,.node .badge.bad{background:#5a1622;color:var(--scr-red)}
+  /* failure panel — authentic .node-failure */
+  .nfail{background:rgba(190,62,62,.12);border:1px solid rgba(210,90,90,.35);border-radius:10px;padding:11px 13px;margin-top:2px}
+  .nfail .why{color:#ffb4b4;font-weight:600;font-size:13px}
+  .nfail .fblock{margin-top:9px}
+  .nfail .flabel{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--scr-muted)}
+  .nfail pre{white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.28);border-radius:8px;padding:10px;font-size:12px;margin:6px 0;color:var(--scr-text);font-family:var(--mono);overflow:auto}
+  .nfail ul{margin:4px 0 0;padding-left:18px;font-size:12px;color:var(--scr-muted)}
+  .nfail ul strong{color:var(--scr-text)}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">The verification-gate journey in Cadora: an agent reports done, a deterministic gate re-runs the real build and tests, a toolchain-integrity scan checks the tools are genuine, and the node earns a badge — green means proven, red means blocked and honest — with the whole verdict archived.</h2>
+
+  <p class="eyebrow">Cadora · verification gates</p>
+  <h1>Proving what the agent built</h1>
+  <p class="lede">Cadora drives a coding agent, then refuses to take its word for the result. After a node runs, a deterministic gate re-runs the real command and a toolchain-integrity scan checks the tools weren't faked. This is the journey from "the agent says done" to a verdict you can trust.</p>
+  <div class="meta"><span>Surface · dashboard + CLI</span><span>Role · operator / auditor</span><span>Captured · fixture run, aidlc-hitl</span></div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">01</span><h2>The agent says "done"</h2></div>
+    <p>The construction node finishes and the agent reports success — tests pass, lint clean, build green. Sometimes that's true. But the agent is <strong>narrating its own outcome</strong>, and a vendor's tool grading its own agent is the fox auditing the henhouse. Nothing is proven yet.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8768/runs/pr1-verify</span></div>
+      <div class="body">
+        <div class="hero"><div><b>pr1-verify</b><small>fixture · aidlc-hitl</small></div><span class="pill run">running</span></div>
+        <div class="dag">
+          <div class="node">construction · engineer<div style="color:var(--scr-muted);font-size:10px;margin-top:4px">agent reported: "tests pass"</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">The agent's own <span style="font-family:var(--mono);font-size:.9em">ok</span> never decides an outcome. Green has to be a fact Cadora observed — not a sentence the model emitted.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">02</span><h2>The gate runs the real command</h2></div>
+    <p>Cadora runs the gate <strong>itself</strong> — the same command a CI job would: <span style="font-family:var(--mono);font-size:.9em">ruff check . &amp;&amp; pytest -q</span>. Not a summary, the actual process, in the node's workspace. A zero exit with real tests is a pass; a non-zero exit blocks the run.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="termlabel">gate · build-test</span></div>
+      <div class="term">
+        <p class="ln"><span class="pr">$</span> ruff check . &amp;&amp; pytest -q</p>
+        <p class="ln mut">All checks passed!</p>
+        <p class="ln mut">12 passed in 1.84s</p>
+        <p class="ln oks">✓ construction · gate:build-test passed</p>
+      </div>
+    </div>
+    <p class="note">The gate is <strong>fail-closed</strong>: ambiguity resolves against the agent. There is no "agent says it passed" path — only the process return code and what Cadora reads out of the output.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">03</span><h2>Is the toolchain even real?</h2></div>
+    <p>A gate can be gamed. Under an offline sandbox an agent can stand up a local script named <span style="font-family:var(--mono);font-size:.9em">pytest</span> that always exits 0, or leave functions hollow — <span style="font-family:var(--mono);font-size:.9em">raise NotImplementedError</span> — that weak tests skip over. So a separate deterministic scan reads the workspace for counterfeit or substituted tooling. It runs alongside the gate.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="termlabel">cadora integrity</span></div>
+      <div class="term">
+        <p class="ln"><span class="pr">$</span> cadora integrity build-claude</p>
+        <p class="ln"><span class="bad">✗ blocking</span> <span class="mut">shadowed-toolchain: pytest</span></p>
+        <p class="ln mut">    repository-root directory shadows the real 'pytest' package/tool</p>
+        <p class="ln"><span class="bad">✗ blocking</span> <span class="mut">stub-implementation: adjudicator.py</span></p>
+        <p class="ln mut">    3 function(s) have a stub body (pass / ... / raise NotImplementedError)</p>
+        <p class="ln bad">2 blocking, 0 warning finding(s) in build-claude</p>
+      </div>
+    </div>
+    <p class="note">Integrity is deterministic too — it catches the dishonesty the shell can't express (a fake <span style="font-family:var(--mono);font-size:.9em">pytest</span>, hollow code that tests pass over) without ever asking an LLM to judge.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">04</span><h2>Green means proven, red means blocked-and-honest</h2></div>
+    <p>Two nodes, side by side. One ran real tests against a real toolchain: <strong>green</strong>, and here green is a fact. The other exited <span style="font-family:var(--mono);font-size:.9em">0</span> but its suite ran <strong>zero tests</strong> — a vacuous pass. The command ran; it verified nothing. Cadora refuses to green it.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="termlabel">gate · build-test — two outcomes</span></div>
+      <div class="term">
+        <p class="ln"><span class="pr">$</span> ruff check . &amp;&amp; pytest -q <span class="mut"># genuine run</span></p>
+        <p class="ln mut">12 passed in 1.84s</p>
+        <p class="ln oks">✓ construction · gate:build-test passed</p>
+        <p class="ln" style="margin-top:10px"><span class="pr">$</span> pytest -q <span class="mut"># exited 0, but…</span></p>
+        <p class="ln mut">no tests ran in 0.01s</p>
+        <p class="ln amb">✗ construction · gate:build-test vacuous</p>
+      </div>
+    </div>
+    <p class="note">A green that certifies a suite which tested nothing is exactly the false-green the gate exists to prevent. <strong>Substance over a green exit</strong> — red isn't failure theatre, it's an honest "not proven yet."</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">05</span><h2>The verdict on the node</h2></div>
+    <p>The outcome lands as a <strong>badge</strong> on the node. <span style="font-family:var(--mono);font-size:.85em">gate passed</span> in green; <span style="font-family:var(--mono);font-size:.85em">gate vacuous</span> or <span style="font-family:var(--mono);font-size:.85em">gate blocked_prerequisite</span> in amber — it ran, but proved nothing; integrity <span style="font-family:var(--mono);font-size:.85em">clean</span> or <span style="font-family:var(--mono);font-size:.85em">flagged</span>. When a node is blocked, a failure panel shows exactly why.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8768/runs/pr1-verify</span></div>
+      <div class="body">
+        <div class="dag" style="flex-direction:row;justify-content:center;gap:16px;flex-wrap:wrap">
+          <div class="node on">construction<div class="dag-badges"><span class="badge ok">gate passed</span><span class="badge ok">clean</span></div></div>
+          <div class="node wait">construction<div class="dag-badges"><span class="badge warn">gate vacuous</span><span class="badge warn">flagged</span></div></div>
+        </div>
+        <div class="nfail" style="margin-top:14px">
+          <div class="why">✗ gate 'build-test' blocked</div>
+          <div class="fblock"><span class="flabel">gate vacuous output</span>
+            <pre>All checks passed!
+no tests ran in 0.01s
+warning: No Python files found under the given path(s)</pre></div>
+          <div class="fblock"><span class="flabel">integrity findings</span>
+            <ul><li><strong>stub-implementation</strong> 3 function(s) have a stub body (pass / ... / raise NotImplementedError) — the code looks implemented but isn't; tests that pass over stubs verify nothing</li></ul></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Amber is reserved: it means <em>ran, but proved nothing</em>. The failure panel is the gate's own output, verbatim — not a paraphrase — so the reason is inspectable, not asserted.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">06</span><h2>The proof is kept</h2></div>
+    <p>Every gate outcome is archived whole — the status, the command's output, the exit code, what tooling was provisioned, and any integrity findings. A run's "green" isn't a claim you must trust; it's a <strong>record you can open later and read</strong>. That is what audit-grade means: not that the agent said it worked, but that Cadora proved it — and kept the proof.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8768/runs/pr1-verify</span></div>
+      <div class="body">
+        <div class="hero"><div><b>pr1-verify</b><small>fixture · aidlc-hitl · 3 nodes</small></div><span class="pill done">completed</span></div>
+        <div class="dag">
+          <div class="node on">requirements<div class="dag-badges"><span class="badge ok">review approve</span></div></div>
+          <div class="arrow">↓</div>
+          <div class="node on">design<div class="dag-badges"><span class="badge ok">review approve</span></div></div>
+          <div class="arrow">↓</div>
+          <div class="node on">construction<div class="dag-badges"><span class="badge ok">gate passed</span><span class="badge ok">clean</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <p>The screens above reproduce the live Cadora dashboard and CLI exactly — rendered as editable HTML rather than raster captures, so they can be lifted into Figma or iterated directly. Every gate is deterministic, fail-closed, and archived: green means proven, red means honestly blocked, and the proof outlives the run.</p>
+  </div>
+</div>
+</body>
+</html>

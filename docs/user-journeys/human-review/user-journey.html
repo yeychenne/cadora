@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reviewing agent work, without leaving the room · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec; --ink:#1b2130; --ink-soft:#4a5265; --ink-faint:#7b8496;
+    --rule:#e0dccf; --card:#fffefb; --amber:#b3760f; --amber-bg:#f6ecd6;
+    --green:#0f7a54; --red:#b23a4b; --blue:#245bb5;
+    --scr-bg:#0f172a; --scr-canvas:#111c2f; --scr-panel:#1e2937; --scr-panel2:#162237;
+    --scr-line:#334158; --scr-text:#f5f7fb; --scr-muted:#9aa8bc; --scr-blue:#6ba5f0;
+    --scr-green:#16c784; --scr-greensoft:#75f0a8; --scr-red:#fb7185; --scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+      --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;
+      --green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  }
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+    --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;--green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;
+    --rule:#e0dccf;--card:#fffefb;--amber:#b3760f;--amber-bg:#f6ecd6;--green:#0f7a54;--red:#b23a4b;--blue:#245bb5;}
+  *{box-sizing:border-box}
+  .wrap{max-width:760px;margin:0 auto;padding:3rem 1.5rem 4rem;color:var(--ink);
+    font-family:var(--sans);line-height:1.65;font-size:16px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--amber);margin:0 0 .6rem}
+  h1{font-size:2.5rem;line-height:1.05;letter-spacing:-.02em;margin:.2rem 0 .5rem;text-wrap:balance;font-weight:640}
+  .lede{font-size:1.15rem;color:var(--ink-soft);margin:0;max-width:60ch}
+  .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:1.4rem;
+    padding-top:1rem;border-top:1px solid var(--rule);display:flex;gap:1.5rem;flex-wrap:wrap}
+  .step{margin-top:3.4rem}
+  .step-head{display:flex;align-items:baseline;gap:.9rem;margin-bottom:.5rem}
+  .num{font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:600;
+    border:1px solid var(--rule);border-radius:6px;padding:2px 8px;flex:none}
+  h2{font-size:1.5rem;letter-spacing:-.01em;margin:0;font-weight:600;text-wrap:balance}
+  .step p{color:var(--ink-soft);margin:.5rem 0 0}
+  .step p strong{color:var(--ink);font-weight:600}
+  .note{font-size:.95rem;color:var(--ink-faint);border-left:2px solid var(--amber);
+    padding:.1rem 0 .1rem .9rem;margin:1.1rem 0 0}
+  /* faux browser frame holding a faithful dark-dashboard screen */
+  .screen{margin:1.4rem 0 .3rem;border-radius:12px;overflow:hidden;border:1px solid var(--rule);
+    background:var(--scr-bg);box-shadow:0 1px 0 var(--rule)}
+  .chrome{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#0b1220;border-bottom:1px solid #1e2a3d}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .url{margin-left:8px;font-family:var(--mono);font-size:11px;color:#5f6d84;background:#0f1a2c;
+    border-radius:6px;padding:3px 10px;flex:1}
+  .body{padding:14px;color:var(--scr-text);font-size:13px}
+  .hero{display:flex;justify-content:space-between;align-items:center;background:var(--scr-panel);
+    border-radius:10px;padding:11px 14px;margin-bottom:12px}
+  .hero b{font-size:15px}.hero small{color:var(--scr-muted);display:block;font-size:11px;margin-top:2px}
+  .pill{font-size:11px;padding:3px 9px;border-radius:999px}
+  .pill.run{background:#12314e;color:#7db8ff}.pill.done{background:#0f3d2c;color:var(--scr-greensoft)}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);
+    padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:150px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted);line-height:1.55}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0}
+  .prev h4{margin:2px 0 4px;font-size:13px;color:var(--scr-text)}
+  .prev p,.prev li{color:var(--scr-muted);font-size:12px;margin:2px 0}
+  .dag{display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:6px}
+  .node{width:180px;text-align:center;border-radius:8px;padding:7px;font-size:12px;
+    background:var(--scr-panel);border:1px solid var(--scr-line);color:var(--scr-muted)}
+  .node.on{background:#123024;border-color:#1f6a49;color:var(--scr-greensoft)}
+  .node .badge{font-size:9px;background:#0f3d2c;color:var(--scr-greensoft);border-radius:4px;padding:1px 6px;margin:0 2px}
+  .node.wait{background:#2a2410;border-color:#7a6320;color:var(--scr-amber)}
+  .arrow{color:var(--scr-line);font-size:12px}
+  .foot{margin-top:3.5rem;padding-top:1.2rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  a{color:var(--blue)}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">The human-in-the-loop review journey in Cadora: monitor a run, read the documents it produced at a gate, ask, request a revision, or decide — and the run continues.</h2>
+
+  <p class="eyebrow">Cadora · human-in-the-loop</p>
+  <h1>Reviewing agent work, without leaving the room</h1>
+  <p class="lede">Cadora drives a coding agent through a gated workflow and pauses at the steps a human should sign off on. This is the journey a reviewer takes — from a run parked at a gate to a decision that moves it forward.</p>
+  <div class="meta"><span>Surface · local dashboard</span><span>Role · reviewer / operator</span><span>Captured · fixture run, aidlc-hitl</span></div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">01</span><h2>A run is in flight</h2></div>
+    <p>You start a gated run — <span style="font-family:var(--mono);font-size:.9em">cadora run … --hitl --review-file</span> — and open the dashboard. It's the operator's map: every node, its cost, and its state. Nothing asks for you yet; the agent is working.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8768/runs/pr1-verify</span></div>
+      <div class="body">
+        <div class="hero"><div><b>pr1-verify</b><small>fixture · aidlc-hitl</small></div><span class="pill run">running</span></div>
+        <div class="dag">
+          <div class="node wait">requirements · analyst</div>
+          <div class="arrow">↓</div>
+          <div class="node">design · architect</div>
+          <div class="arrow">↓</div>
+          <div class="node">construction · engineer</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">02</span><h2>A gate opens</h2></div>
+    <p>The first node finishes and the run <strong>parks</strong>. An amber callout rises to the top of the page: a node is waiting for your decision, and it hands you exactly the documents that node produced — as links, not a wall of raw JSON.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8768/runs/pr1-verify</span></div>
+      <div class="body">
+        <div class="callout">
+          <div class="rhead"><span class="flag">Review required</span><span><b>requirements</b> is waiting for your decision</span></div>
+          <div class="docrow"><a href="#">aidlc-docs/inception/requirements/requirements.md</a><span class="kind">NEW</span><span class="mini">preview</span></div>
+          <div class="docrow"><a href="#">aidlc-docs/inception/plans/execution-plan.md</a><span class="kind">NEW</span><span class="mini">preview</span></div>
+          <div class="ta">Comments — required to request changes</div>
+          <div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span><span class="btn no">Abort</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">The gate is fail-closed and patient. Started with <span style="font-family:var(--mono);font-size:.9em">--review-timeout 0</span>, it waits indefinitely — walk away, come back tomorrow, the work is preserved.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">03</span><h2>You read the work</h2></div>
+    <p>Click a document to open the rendered file, or <strong>preview</strong> it inline without leaving the panel. The reviewer sees exactly the diff this stage produced — scoped, not the whole tree.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8768/runs/pr1-verify</span></div>
+      <div class="body">
+        <div class="callout">
+          <div class="rhead"><span class="flag">Review required</span><span><b>requirements</b> is waiting for your decision</span></div>
+          <div class="docrow"><a href="#">aidlc-docs/inception/requirements/requirements.md</a><span class="kind">NEW</span><span class="mini">preview</span></div>
+          <div class="prev">
+            <h4>Requirements — Insurance Claims Adjudication Engine</h4>
+            <p>Four specialist agents (document, policy, medical, financial) + a supervisor synthesizing APPROVED / MANUAL_REVIEW / DENIED.</p>
+            <ul style="margin:4px 0 0;padding-left:16px"><li>FR-2 · benefit split identity holds to the cent</li><li>NFR-1 · deterministic, offline-testable (USE_MOCK)</li></ul>
+          </div>
+          <div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span><span class="btn no">Abort</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">04</span><h2>You interrogate the work</h2></div>
+    <p>Before deciding, <strong>talk to the work</strong>. Pick a document, then ask a question or describe a revision. The parked run drives the same agent that wrote the draft — scoped to that document — and answers in place: a question is answered, a revision rewrites the draft so you can see it before you accept it.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8768/runs/pr1-verify</span></div>
+      <div class="body">
+        <div class="callout">
+          <div class="rhead"><span class="flag">Review required</span><span><b>requirements</b> is waiting for your decision</span></div>
+          <div class="docrow"><a href="#">aidlc-docs/inception/plans/execution-plan.md</a><span class="kind">NEW</span><span class="mini">preview</span></div>
+          <div class="selrow"><span class="sel">execution-plan.md ▾</span><span class="inp">What does step 2 of this plan actually do?</span><span class="cbtn">Ask ↩</span><span class="cbtn">Revise ↩</span></div>
+          <div class="reply">Fixture answer to “What does step 2 of this plan actually do?”. Based on the document: it pauses for human review when the topology marks the node <span style="font-family:var(--mono)">review: true</span>. A real executor would reason over the full document and reply here.</div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Each ask or revision is a real turn on the agent — you're questioning the model that wrote the draft, not a summary of it. A revision rewrites the document in place, so approving keeps the version you just read.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">05</span><h2>You decide</h2></div>
+    <p>Three ways forward, each honest about what happens next. <strong>Approve</strong> releases the next node. <strong>Request changes</strong> re-runs this stage with your comments woven into its prompt. <strong>Abort</strong> stops the run. Your comment travels with the decision.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8768/runs/pr1-verify</span></div>
+      <div class="body">
+        <div class="callout">
+          <div class="rhead"><span class="flag">Review required</span><span><b>requirements</b> is waiting for your decision</span></div>
+          <div class="ta" style="color:var(--scr-text)">Looks good — proceed to design.</div>
+          <div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span><span class="btn no">Abort</span><span class="msg">submitting…</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">While you're deciding, the page stops auto-refreshing — it will never wipe a half-typed comment or move a button out from under your click.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">06</span><h2>The run continues</h2></div>
+    <p>Your decision reaches the live run. <strong>requirements</strong> turns green — clean, approved — and the panel advances to the next gate: <strong>design</strong>. The comment you left is already in the design node's prompt.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8768/runs/pr1-verify</span></div>
+      <div class="body">
+        <div class="callout" style="margin-bottom:12px">
+          <div class="rhead"><span class="flag">Review required</span><span><b>design</b> is waiting for your decision</span></div>
+          <div class="docrow"><a href="#">aidlc-docs/inception/application-design/design.md</a><span class="kind">NEW</span><span class="mini">preview</span></div>
+          <div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span><span class="btn no">Abort</span></div>
+        </div>
+        <div class="dag">
+          <div class="node on">requirements<div style="margin-top:3px"><span class="badge">clean</span><span class="badge">approve</span></div></div>
+          <div class="arrow">↓</div>
+          <div class="node wait">design · in review</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">07</span><h2>The pack is complete</h2></div>
+    <p>Every gate cleared, the run finishes and its evidence pack is sealed. The DAG reads at a glance — three green nodes, each stamped with its gate and review outcome. The audit trail records who decided what, and when.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">localhost:8768/runs/pr1-verify</span></div>
+      <div class="body">
+        <div class="hero"><div><b>pr1-verify</b><small>fixture · aidlc-hitl · 3 nodes</small></div><span class="pill done">completed</span></div>
+        <div class="dag">
+          <div class="node on">requirements<div style="margin-top:3px"><span class="badge">clean</span><span class="badge">approve</span></div></div>
+          <div class="arrow">↓</div>
+          <div class="node on">design<div style="margin-top:3px"><span class="badge">clean</span><span class="badge">approve</span></div></div>
+          <div class="arrow">↓</div>
+          <div class="node on">construction<div style="margin-top:3px"><span class="badge">gate passed</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <p>The screens above reproduce the live Cadora dashboard exactly — rendered as editable HTML rather than raster captures, so they can be lifted into Figma or iterated directly. Every gate is fail-closed, patient, and recorded: the human stays in the loop, and the evidence pack remembers who decided what.</p>
+  </div>
+</div>
+</body>
+</html>

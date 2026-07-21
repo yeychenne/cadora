@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The MCP server, by its surfaces · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;
+    --card:#fffefb;--amber:#b3760f;
+    --scr-bg:#0f172a;--scr-canvas:#111c2f;--scr-panel:#1e2937;--scr-panel2:#162237;--scr-line:#334158;
+    --scr-text:#f5f7fb;--scr-muted:#9aa8bc;--scr-blue:#6ba5f0;--scr-green:#16c784;--scr-greensoft:#75f0a8;
+    --scr-red:#fb7185;--scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;
+    --ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}}
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;--card:#fffefb;--amber:#b3760f}
+  *{box-sizing:border-box}
+  .wrap{max-width:840px;margin:0 auto;padding:2.6rem 1.5rem 4rem;color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0 0 .5rem}
+  h1{font-size:2.1rem;letter-spacing:-.02em;margin:.1rem 0 .4rem;font-weight:640}
+  .lede{color:var(--ink-soft);margin:0;max-width:64ch}
+  h2{font-size:1.15rem;margin:2.8rem 0 .3rem;font-weight:600;letter-spacing:-.01em}
+  .sub{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 1rem}
+  .rule{height:1px;background:var(--rule);border:0;margin:.4rem 0 0}
+  /* swatches */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:.6rem}
+  .sw{border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--card)}
+  .sw .chip{height:44px}
+  .sw .lab{padding:7px 9px}
+  .sw .lab b{font-size:12px;display:block}
+  .sw .lab code{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .sw .lab span{font-size:11px;color:var(--ink-soft);display:block;margin-top:1px}
+  /* type scale */
+  table{width:100%;border-collapse:collapse;margin-top:.5rem;font-size:13px}
+  th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ink-faint);font-weight:500;padding:6px 10px;border-bottom:1px solid var(--rule)}
+  td{padding:8px 10px;border-bottom:1px solid var(--rule);color:var(--ink-soft);vertical-align:top}
+  td b{color:var(--ink)}
+  td code,.mn{font-family:var(--mono);font-size:12px;color:var(--amber)}
+  /* dashboard component render */
+  .stage{background:var(--scr-bg);border:1px solid var(--rule);border-radius:12px;padding:16px;margin-top:.8rem}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px;position:relative}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .rhead span:last-child{color:var(--scr-text);font-size:13px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .msg.err{color:var(--scr-red)}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0;color:var(--scr-muted);font-size:12px}
+  .empty{color:var(--scr-muted);font-size:12px;font-style:italic;padding:4px 2px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:130px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted)}
+  /* anatomy pins */
+  .pin{position:absolute;font-family:var(--mono);font-size:10px;font-weight:600;width:18px;height:18px;
+    border-radius:50%;background:var(--scr-amber);color:#1a1205;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 3px var(--scr-panel2)}
+  .legend{margin-top:1rem;display:grid;gap:6px}
+  .legend div{display:flex;gap:9px;font-size:13px;color:var(--ink-soft)}
+  .legend .k{font-family:var(--mono);font-size:11px;font-weight:600;width:18px;height:18px;flex:none;
+    border-radius:50%;background:var(--amber);color:var(--paper);display:flex;align-items:center;justify-content:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:.8rem}
+  .state{background:var(--scr-bg);border:1px solid var(--rule);border-radius:10px;padding:12px}
+  .state .cap{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+  .foot{margin-top:3rem;padding-top:1.1rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+</style>
+
+<style>
+  /* mcp server — appended after the verbatim base, reusing the same --scr-* tokens (no new colors) */
+  /* JSON / signature frame — client config + tool signatures */
+  .code{background:var(--scr-bg);border:1px solid var(--scr-line);border-radius:10px;padding:14px 16px;
+    font-family:var(--mono);font-size:12.5px;line-height:1.8;color:var(--scr-muted);white-space:pre;overflow-x:auto}
+  .code .k{color:var(--scr-blue)}
+  .code .s{color:var(--scr-greensoft)}
+  .code .n{color:var(--scr-amber)}
+  .code .c{color:var(--scr-muted)}
+  .code .t{color:var(--scr-text)}
+  /* the tool-call trace, rendered as the anatomy component */
+  .trace{background:var(--scr-bg);border:1px solid var(--scr-line);border-radius:10px;padding:14px 16px;
+    font-family:var(--mono);font-size:12px;line-height:1.65;color:var(--scr-muted);position:relative}
+  .trace .step{padding:8px 0;border-bottom:1px solid var(--scr-line)}
+  .trace .step:last-child{border-bottom:0}
+  .trace .call{color:var(--scr-text)}
+  .trace .name{color:var(--scr-blue)}
+  .trace .ret{color:var(--scr-muted);display:block;padding-left:20px;margin-top:3px;white-space:pre-wrap;word-break:break-word}
+  .trace .ok{color:var(--scr-greensoft)}
+  .trace .amber{color:var(--scr-amber)}
+  .trace .s{color:var(--scr-text)}
+  /* state verdict mini-cards (returns + errors) */
+  .vstate{background:var(--scr-canvas);border:1px solid var(--rule);border-left:4px solid var(--scr-green);
+    border-radius:10px;padding:11px 13px;font-family:var(--mono);font-size:11.5px;line-height:1.7;
+    color:var(--scr-muted);white-space:pre-wrap;word-break:break-word;margin-top:8px}
+  .vstate.no{border-left-color:var(--scr-red)}
+  .vstate.warn{border-left-color:var(--scr-amber)}
+  .vstate.info{border-left-color:var(--scr-blue)}
+  .vstate .ok{color:var(--scr-greensoft)}
+  .vstate .bad{color:var(--scr-red)}
+  .vstate .amber{color:var(--scr-amber)}
+  .vstate .blue{color:var(--scr-blue)}
+  .vstate .id{color:var(--scr-text)}
+  /* posture rows inside the callout */
+  .post{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--scr-line)}
+  .post:first-child{border-top:0}
+  .post .mk{font-family:var(--mono);font-size:12px;flex:none;width:16px}
+  .post .mk.g{color:var(--scr-greensoft)}
+  .post .mk.r{color:var(--scr-red)}
+  .post .mk.a{color:var(--scr-amber)}
+  .post .tx{font-size:12px;color:var(--scr-muted);line-height:1.55}
+  .post .tx b{color:var(--scr-text);font-weight:600}
+  /* fail-mode tags reused in the tool table */
+  .fm{font-size:10px;letter-spacing:.03em;border-radius:6px;padding:2px 8px;white-space:nowrap;border:1px solid var(--rule);color:var(--ink-soft)}
+  .fm.closed{color:var(--red);border-color:var(--red)}
+  .fm.soft{color:var(--amber);border-color:var(--amber)}
+  .fm.read{color:var(--green);border-color:var(--green)}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Design specification for Cadora's MCP server: the color and type tokens, the five-tool component inventory with signatures and fail-modes, the anatomy of the tool-call trace, the security-posture callout, every return and error state the tools produce, the transport and auth table, and the voice.</h2>
+  <p class="eyebrow">Cadora · design spec</p>
+  <h1>The MCP server, by its surfaces</h1>
+  <p class="lede">Everything needed to render or extend the control plane — the exact tokens, the five tools with their signatures and fail-modes, the tool-call trace's anatomy, the security-posture callout, and every return and error state. The rendered components are live HTML; edit them here or lift the specs into Figma.</p>
+
+  <h2>Palette</h2>
+  <p class="sub">Semantic first · green proceeds, red is the closed guard, amber degrades soft</p>
+  <hr class="rule">
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#16c784"></div><div class="lab"><b>Green</b><code>--scr-green · #16c784</code><span>started · approved · safe read</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fb7185"></div><div class="lab"><b>Red</b><code>--scr-red · #fb7185</code><span>fail-closed · refused · 401</span></div></div>
+    <div class="sw"><div class="chip" style="background:#ffd08a"></div><div class="lab"><b>Amber</b><code>--scr-amber · #ffd08a</code><span>pending · fail-soft error</span></div></div>
+    <div class="sw"><div class="chip" style="background:#6ba5f0"></div><div class="lab"><b>Blue</b><code>--scr-blue · #6ba5f0</code><span>tool names · keys · paths</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0f172a"></div><div class="lab"><b>Ink</b><code>--scr-bg · #0f172a</code><span>Card ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#111c2f"></div><div class="lab"><b>Canvas</b><code>--scr-canvas · #111c2f</code><span>Inset · state cards</span></div></div>
+    <div class="sw"><div class="chip" style="background:#162237"></div><div class="lab"><b>Panel</b><code>--scr-panel2 · #162237</code><span>Callout surface</span></div></div>
+    <div class="sw"><div class="chip" style="background:#334158"></div><div class="lab"><b>Line</b><code>--scr-line · #334158</code><span>Borders</span></div></div>
+    <div class="sw"><div class="chip" style="background:#f5f7fb"></div><div class="lab"><b>Text</b><code>--scr-text · #f5f7fb</code><span>Primary · run id · values</span></div></div>
+    <div class="sw"><div class="chip" style="background:#9aa8bc"></div><div class="lab"><b>Muted</b><code>--scr-muted · #9aa8bc</code><span>Labels · captions · JSON structure</span></div></div>
+  </div>
+
+  <h2>Type &amp; metrics</h2>
+  <p class="sub">Monospace is the instrument voice — the control plane is read as calls and JSON</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Role</th><th>Family</th><th>Size / weight</th><th>Notes</th></tr>
+    <tr><td><b>Tool name</b></td><td class="mn">mono</td><td>12px / blue</td><td><code>start_run</code>, <code>review_gate</code> — the callable surface</td></tr>
+    <tr><td><b>Signature</b></td><td class="mn">mono</td><td>12px / 400</td><td>Args + defaults, e.g. <code>review_timeout=3600.0</code></td></tr>
+    <tr><td><b>Returned JSON</b></td><td class="mn">mono</td><td>11.5px</td><td>Keys blue, strings green, literals amber, braces muted</td></tr>
+    <tr><td><b>Error string</b></td><td class="mn">mono</td><td>red / amber</td><td><code>error: path '…' escapes the run workspace</code></td></tr>
+    <tr><td><b>Endpoint</b></td><td class="mn">mono</td><td>blue</td><td><code>http://127.0.0.1:8000/mcp</code></td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Metric</th><th>Value</th><th>Metric</th><th>Value</th></tr>
+    <tr><td>Card radius</td><td class="mn">10px</td><td>Semantic accent</td><td class="mn">4px left border</td></tr>
+    <tr><td>Trace line-height</td><td class="mn">1.65</td><td>Return indent</td><td class="mn">20px</td></tr>
+    <tr><td>Card padding</td><td class="mn">14px 16px</td><td>State padding</td><td class="mn">11px 13px</td></tr>
+    <tr><td>Default transport</td><td class="mn">stdio</td><td>Default bind</td><td class="mn">127.0.0.1</td></tr>
+  </table>
+
+  <h2>Component — the five tools</h2>
+  <p class="sub">The whole control plane · each tool, its signature, its return, its fail-mode</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Tool</th><th>Signature</th><th>Returns</th><th>Fail-mode</th></tr>
+    <tr>
+      <td><b><span class="mn">start_run</span></b></td>
+      <td class="mn" style="font-size:11px">(topology, run_id, cwd=".", executor="claude", archive_dir="runs", gate_cmd="ruff check . &amp;&amp; pytest -q", gate_setup="auto", review_timeout=3600.0)</td>
+      <td class="mn" style="font-size:11px">{run_id, status:"started"}</td>
+      <td><span class="fm closed">fail-closed timeout</span></td>
+    </tr>
+    <tr>
+      <td><b><span class="mn">review_gate</span></b></td>
+      <td class="mn" style="font-size:11px">(run_id)</td>
+      <td class="mn" style="font-size:11px">{pending, node_id, docs_dir, artifacts} · else {pending:false, running}</td>
+      <td><span class="fm read">read-only</span></td>
+    </tr>
+    <tr>
+      <td><b><span class="mn">submit_review</span></b></td>
+      <td class="mn" style="font-size:11px">(run_id, decision, comments="")</td>
+      <td class="mn" style="font-size:11px">{submitted:decision} · else {error}</td>
+      <td><span class="fm soft">fail-soft</span></td>
+    </tr>
+    <tr>
+      <td><b><span class="mn">get_artifact</span></b></td>
+      <td class="mn" style="font-size:11px">(run_id, path)</td>
+      <td class="mn" style="font-size:11px">&lt;text&gt; · else "error: …"</td>
+      <td><span class="fm closed">traversal-safe</span></td>
+    </tr>
+    <tr>
+      <td><b><span class="mn">run_status</span></b></td>
+      <td class="mn" style="font-size:11px">(run_id)</td>
+      <td class="mn" style="font-size:11px">{running, result_path, error}</td>
+      <td><span class="fm read">read-only</span></td>
+    </tr>
+  </table>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">Two tools drive the run (<span class="mn">start_run</span>, <span class="mn">run_status</span>), one reads its output (<span class="mn">get_artifact</span>), two service the human gate (<span class="mn">review_gate</span>, <span class="mn">submit_review</span>). <span class="mn">decision</span> is one of <span class="mn">approve</span> · <span class="mn">request_changes</span> · <span class="mn">abort</span>. Pass <span class="mn">review_timeout=0</span> to wait indefinitely.</p>
+
+  <h2>Anatomy — the tool-call trace</h2>
+  <p class="sub">One round trip: start, watch, read the gate, decide, finish</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="trace"><span class="pin" style="top:-9px;left:-9px">1</span><span class="pin" style="top:52px;left:-9px">2</span><span class="pin" style="top:96px;right:-9px">3</span><span class="pin" style="bottom:44px;left:-9px">4</span><span class="pin" style="bottom:6px;right:-9px">5</span>
+      <div class="step"><span class="call"><span class="name">start_run</span>(topology=<span class="s">"…/aidlc-hitl.topology.yaml"</span>, run_id=<span class="s">"checkout-api"</span>, review_timeout=<span class="amber">0</span>)</span><span class="ret">→ {"run_id":"checkout-api", "status":<span class="ok">"started"</span>}</span></div>
+      <div class="step"><span class="call"><span class="name">run_status</span>(run_id=<span class="s">"checkout-api"</span>)</span><span class="ret">→ {"running":<span class="amber">true</span>, "result_path":null, "error":null}</span></div>
+      <div class="step"><span class="call"><span class="name">review_gate</span>(run_id=<span class="s">"checkout-api"</span>)</span><span class="ret">→ {"pending":<span class="amber">true</span>, "node_id":<span class="amber">"requirements"</span>, "artifacts":[<span class="s">"aidlc-docs/inception/requirements/requirements.md"</span>]}</span></div>
+      <div class="step"><span class="call"><span class="name">submit_review</span>(run_id=<span class="s">"checkout-api"</span>, decision=<span class="s">"approve"</span>)</span><span class="ret">→ {"submitted":<span class="ok">"approve"</span>}</span></div>
+      <div class="step"><span class="call"><span class="name">run_status</span>(run_id=<span class="s">"checkout-api"</span>)</span><span class="ret">→ {"running":<span class="ok">false</span>, "result_path":<span class="s">"runs/checkout-api/manifest.json"</span>}</span></div>
+    </div>
+  </div>
+  <div class="legend">
+    <div><span class="k">1</span><span><b style="color:var(--ink)">Start</b> — <span class="mn">start_run</span> loads the topology, registers every gate it references with <span class="mn">gate_cmd</span>, and launches the run on a background thread. Returns <span class="mn">{run_id, status:"started"}</span>.</span></div>
+    <div><span class="k">2</span><span><b style="color:var(--ink)">Watch</b> — <span class="mn">run_status</span> reports <span class="mn">running</span> while the thread is alive; <span class="mn">result_path</span> and <span class="mn">error</span> stay null until it finishes.</span></div>
+    <div><span class="k">3</span><span><b style="color:var(--ink)">Gate</b> — <span class="mn">review_gate</span> returns the pending node's <span class="mn">node_id</span>, <span class="mn">docs_dir</span>, and the <span class="mn">artifacts</span> it produced (read each with <span class="mn">get_artifact</span>), or <span class="mn">{pending:false, running}</span>.</span></div>
+    <div><span class="k">4</span><span><b style="color:var(--ink)">Decide</b> — <span class="mn">submit_review</span> with <span class="mn">approve</span> (proceed), <span class="mn">request_changes</span> + comments (re-run the node), or <span class="mn">abort</span> (stop). Returns <span class="mn">{submitted:decision}</span>.</span></div>
+    <div><span class="k">5</span><span><b style="color:var(--ink)">Finish</b> — <span class="mn">run_status</span> flips <span class="mn">running</span> to false; <span class="mn">result_path</span> points at the run manifest.</span></div>
+  </div>
+
+  <h2>Security-posture callout</h2>
+  <p class="sub">The same audit guarantees, exposed over MCP</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="callout">
+      <div class="rhead"><span class="flag">fail-closed / fail-soft</span><span>the guarantees that ride the seam</span></div>
+      <div class="post"><span class="mk r">✗</span><span class="tx"><b>Review fails closed.</b> <span class="mn">review_timeout</span> seconds (default 3600) then aborts — a client that walks away can't pin the run thread forever. <span class="mn">0</span> waits indefinitely.</span></div>
+      <div class="post"><span class="mk a">!</span><span class="tx"><b>Submit fails soft.</b> Invalid decision, <span class="mn">request_changes</span> with no comments, or a submit with nothing pending returns <span class="mn">{error}</span> — never a raw traceback.</span></div>
+      <div class="post"><span class="mk g">✓</span><span class="tx"><b>Reads are traversal-safe.</b> A <span class="mn">../</span> path returns <span class="mn">error: path '…' escapes the run workspace</span> and never reads outside the run.</span></div>
+      <div class="post"><span class="mk g">✓</span><span class="tx"><b>HTTP is gated on auth.</b> Loopback + stdio default; a routable bind needs <span class="mn">--auth-token</span> (bearer) or explicit <span class="mn">--i-understand-no-auth</span>, TLS in front.</span></div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">The callout is one component: an amber-flagged header over four <span class="mn">.post</span> rows, each with a semantic mark — <span style="color:var(--green)">green</span> a guarantee that holds, <span style="color:var(--red)">red</span> a guard that closes, <span style="color:var(--amber)">amber</span> a soft degrade. Auth logic lives in <span class="mn">cadora/mcp/auth.py</span>; the review and traversal guards in <span class="mn">cadora/mcp/server.py</span>.</p>
+
+  <h2>States</h2>
+  <p class="sub">Every return and error the tools produce</p>
+  <hr class="rule">
+  <div class="grid2">
+    <div class="state"><p class="cap">start_run · run launched</p>
+      <div class="vstate">start_run → {<span class="ok">"status": "started"</span>,
+             "run_id": <span class="id">"checkout-api"</span>}</div>
+    </div>
+    <div class="state"><p class="cap">review_gate · gate pending</p>
+      <div class="vstate warn">review_gate → {<span class="amber">"pending": true</span>,
+   "node_id": <span class="id">"requirements"</span>,
+   "docs_dir": "aidlc-docs",
+   "artifacts": ["aidlc-docs/…/requirements.md"]}</div>
+    </div>
+    <div class="state"><p class="cap">review_gate · nothing pending</p>
+      <div class="vstate info">review_gate → {<span class="blue">"pending": false</span>,
+              "running": true}</div>
+    </div>
+    <div class="state"><p class="cap">submit_review · accepted</p>
+      <div class="vstate">submit_review → {<span class="ok">"submitted": "approve"</span>}</div>
+    </div>
+    <div class="state"><p class="cap">submit_review · fail-soft (bad input)</p>
+      <div class="vstate no">submit_review("yep") →
+  {<span class="bad">"error": "invalid review decision: 'yep'"</span>}
+submit_review("request_changes") →
+  {<span class="bad">"error": "request_changes requires reviewer comments"</span>}</div>
+    </div>
+    <div class="state"><p class="cap">submit_review · nothing pending</p>
+      <div class="vstate no">submit_review → {<span class="bad">"error": "no review is pending"</span>}</div>
+    </div>
+    <div class="state"><p class="cap">get_artifact · traversal refused</p>
+      <div class="vstate no">get_artifact("../secrets.env") →
+  <span class="bad">"error: path '../secrets.env' escapes the run workspace"</span></div>
+    </div>
+    <div class="state"><p class="cap">get_artifact · missing file</p>
+      <div class="vstate no">get_artifact("aidlc-docs/nope.md") →
+  <span class="bad">"error: no such artifact 'aidlc-docs/nope.md'"</span></div>
+    </div>
+    <div class="state"><p class="cap">run_status · finished</p>
+      <div class="vstate">run_status → {<span class="ok">"running": false</span>,
+   "result_path": "runs/checkout-api/manifest.json",
+   "error": null}</div>
+    </div>
+    <div class="state"><p class="cap">HTTP · missing / wrong bearer token</p>
+      <div class="vstate no">HTTP 401 <span class="bad">{"error": "unauthorized"}</span>
+WWW-Authenticate: Bearer</div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.8rem"><b style="color:var(--ink)">The tools never raise through the call.</b> Every failure is a value: <span class="mn">submit_review</span> and <span class="mn">review_gate</span>/<span class="mn">run_status</span> return an <span class="mn">{error}</span> dict; <span class="mn">get_artifact</span> returns a string that begins <span class="mn">error:</span>. An unknown <span class="mn">run_id</span> yields <span class="mn">unknown run '…'</span> on any tool. Auth is the one boundary that answers before the tool runs — a 401 at the HTTP layer.</p>
+
+  <h2>Transport &amp; auth</h2>
+  <p class="sub">stdio local · http remote · loopback until you prove auth</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Flag</th><th>Default</th><th>Effect</th></tr>
+    <tr><td><b><span class="mn">--transport</span></b></td><td class="mn">stdio</td><td><span class="mn">stdio</span> for a local client (Claude Desktop / Code, Codex CLI); <span class="mn">http</span> for remote — endpoint <span class="mn">http://&lt;host&gt;:&lt;port&gt;/mcp</span>.</td></tr>
+    <tr><td><b><span class="mn">--host</span></b></td><td class="mn">127.0.0.1</td><td>Bind host for HTTP. Loopback by default; a non-loopback host is refused unless authenticated or acknowledged.</td></tr>
+    <tr><td><b><span class="mn">--port</span></b></td><td class="mn">8000</td><td>Bind port for HTTP.</td></tr>
+    <tr><td><b><span class="mn">--auth-token</span></b></td><td class="mn">none</td><td>Requires <span class="mn">Authorization: Bearer &lt;token&gt;</span> on every HTTP request (or set <span class="mn">CADORA_MCP_TOKEN</span>); a present token also lifts the non-loopback refusal. Still front it with TLS.</td></tr>
+    <tr><td><b><span class="mn">--i-understand-no-auth</span></b></td><td class="mn">off</td><td>Allow binding this unauthenticated surface to a non-loopback host. The explicit escape hatch — trusted networks only.</td></tr>
+  </table>
+
+  <h2>Voice</h2>
+  <p class="sub">The control plane returns evidence, not exceptions</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Do</th><th>Not</th></tr>
+    <tr><td>Return the error as a value — <span class="mn">{"error": "no review is pending"}</span></td><td>Raise a traceback through the tool call</td></tr>
+    <tr><td>Name the refusal — <span class="mn">path '…' escapes the run workspace</span></td><td>“Access denied”</td></tr>
+    <tr><td>State the decision set — <span class="mn">approve | request_changes | abort</span></td><td>“yes / no”</td></tr>
+    <tr><td>Fail closed by default — timeout aborts; <span class="mn">0</span> is the opt-out</td><td>Wait forever silently</td></tr>
+  </table>
+
+  <div class="foot">Tokens and behavior are taken verbatim from <span class="mn">cadora/mcp/server.py</span> (the five <span class="mn">@app.tool()</span>s + <span class="mn">serve()</span>) and <span class="mn">cadora/mcp/auth.py</span> (the bearer guard). Edit the rendered components in place, or hand the palette and metrics tables to a Figma library.</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Journey-first builds, by their surfaces · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;
+    --card:#fffefb;--amber:#b3760f;
+    --scr-bg:#0f172a;--scr-canvas:#111c2f;--scr-panel:#1e2937;--scr-panel2:#162237;--scr-line:#334158;
+    --scr-text:#f5f7fb;--scr-muted:#9aa8bc;--scr-blue:#6ba5f0;--scr-green:#16c784;--scr-greensoft:#75f0a8;
+    --scr-red:#fb7185;--scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;
+    --ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}}
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;--card:#fffefb;--amber:#b3760f}
+  *{box-sizing:border-box}
+  .wrap{max-width:840px;margin:0 auto;padding:2.6rem 1.5rem 4rem;color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0 0 .5rem}
+  h1{font-size:2.1rem;letter-spacing:-.02em;margin:.1rem 0 .4rem;font-weight:640}
+  .lede{color:var(--ink-soft);margin:0;max-width:64ch}
+  h2{font-size:1.15rem;margin:2.8rem 0 .3rem;font-weight:600;letter-spacing:-.01em}
+  .sub{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 1rem}
+  .rule{height:1px;background:var(--rule);border:0;margin:.4rem 0 0}
+  /* swatches */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:.6rem}
+  .sw{border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--card)}
+  .sw .chip{height:44px}
+  .sw .lab{padding:7px 9px}
+  .sw .lab b{font-size:12px;display:block}
+  .sw .lab code{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .sw .lab span{font-size:11px;color:var(--ink-soft);display:block;margin-top:1px}
+  /* type scale */
+  table{width:100%;border-collapse:collapse;margin-top:.5rem;font-size:13px}
+  th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ink-faint);font-weight:500;padding:6px 10px;border-bottom:1px solid var(--rule)}
+  td{padding:8px 10px;border-bottom:1px solid var(--rule);color:var(--ink-soft);vertical-align:top}
+  td b{color:var(--ink)}
+  td code,.mn{font-family:var(--mono);font-size:12px;color:var(--amber)}
+  /* dashboard component render */
+  .stage{background:var(--scr-bg);border:1px solid var(--rule);border-radius:12px;padding:16px;margin-top:.8rem}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px;position:relative}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .rhead span:last-child{color:var(--scr-text);font-size:13px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .msg.err{color:var(--scr-red)}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0;color:var(--scr-muted);font-size:12px}
+  .empty{color:var(--scr-muted);font-size:12px;font-style:italic;padding:4px 2px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:130px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted)}
+  /* anatomy pins */
+  .pin{position:absolute;font-family:var(--mono);font-size:10px;font-weight:600;width:18px;height:18px;
+    border-radius:50%;background:var(--scr-amber);color:#1a1205;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 3px var(--scr-panel2)}
+  .legend{margin-top:1rem;display:grid;gap:6px}
+  .legend div{display:flex;gap:9px;font-size:13px;color:var(--ink-soft)}
+  .legend .k{font-family:var(--mono);font-size:11px;font-weight:600;width:18px;height:18px;flex:none;
+    border-radius:50%;background:var(--amber);color:var(--paper);display:flex;align-items:center;justify-content:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:.8rem}
+  .state{background:var(--scr-bg);border:1px solid var(--rule);border-radius:10px;padding:12px}
+  .state .cap{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+  .foot{margin-top:3rem;padding-top:1.1rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+</style>
+
+<style>
+  /* evidence pack — appended after the verbatim base, reusing the same --scr-* tokens */
+  /* the verify verdict, rendered as a card — semantic left accent */
+  .verdict{background:var(--scr-bg);border:1px solid var(--scr-line);border-left:4px solid var(--scr-green);
+    border-radius:10px;padding:14px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.85;
+    color:var(--scr-muted);white-space:pre-wrap;word-break:break-word;position:relative}
+  .verdict.bad{border-left-color:var(--scr-red)}
+  .verdict .id{color:var(--scr-text)}
+  .verdict .ok{color:var(--scr-greensoft)}
+  .verdict .no{color:var(--scr-red)}
+  .verdict .amber{color:var(--scr-amber)}
+  .verdict .final{font-weight:700}
+  .verdict .final.y{color:var(--scr-greensoft)}
+  .verdict .final.n{color:var(--scr-red)}
+  /* pack contents — a labeled tree */
+  .tree{background:var(--scr-bg);border:1px solid var(--scr-line);border-radius:10px;padding:14px 16px;
+    font-family:var(--mono);font-size:12.5px;line-height:1.85;color:var(--scr-muted);white-space:pre;overflow-x:auto}
+  .tree .dir{color:var(--scr-blue)}
+  .tree .f{color:var(--scr-text)}
+  .tree .sig{color:var(--scr-amber)}
+  .tree .c{color:var(--scr-muted)}
+  /* checksums.txt line anatomy */
+  .chkline{background:var(--scr-bg);border:1px solid var(--scr-line);border-radius:10px;padding:14px 16px;overflow-x:auto}
+  .chkline code{font-family:var(--mono);font-size:12.5px;white-space:pre;display:block}
+  .chkline .hash{color:var(--scr-green)}
+  .chkline .path{color:var(--scr-text)}
+  .chkline .gap{background:var(--scr-panel);border-radius:3px}
+  /* state verdict mini-cards */
+  .vstate{background:var(--scr-canvas);border:1px solid var(--rule);border-left:4px solid var(--scr-green);
+    border-radius:10px;padding:11px 13px;font-family:var(--mono);font-size:11.5px;line-height:1.7;
+    color:var(--scr-muted);white-space:pre-wrap;word-break:break-word;margin-top:8px}
+  .vstate.no{border-left-color:var(--scr-red)}
+  .vstate.warn{border-left-color:var(--scr-amber)}
+  .vstate .ok{color:var(--scr-greensoft)}
+  .vstate .bad{color:var(--scr-red)}
+  .vstate .amber{color:var(--scr-amber)}
+  .vstate .id{color:var(--scr-text)}
+  .vstate .final{font-weight:700}
+  .vstate .final.y{color:var(--scr-greensoft)}
+  .vstate .final.n{color:var(--scr-red)}
+</style>
+
+<style>
+  /* journey-first builds — appended after the verbatim blocks, reusing the same --scr-* tokens */
+  /* rendered markdown-document frame — the vision addendum and the journey document */
+  .mdd{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:12px 14px}
+  .mdd.vision{border-left:3px solid var(--scr-amber)}
+  .mdd .file{display:flex;justify-content:space-between;gap:10px;font-family:var(--mono);font-size:10px;
+    letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted);margin-bottom:9px;flex-wrap:wrap}
+  .mdd .file b{color:var(--scr-blue);font-weight:600}
+  .mdd h4{margin:0 0 6px;font-size:13px;color:var(--scr-text);font-weight:600}
+  .mdd h5{margin:12px 0 6px;font-size:12px;color:var(--scr-amber);font-weight:600;letter-spacing:.02em}
+  .mdd p,.mdd li{color:var(--scr-muted);font-size:12px;line-height:1.65;margin:5px 0}
+  .mdd code{font-family:var(--mono);font-size:11px;color:var(--scr-amber)}
+  .mdd strong{color:var(--scr-text);font-weight:600}
+  /* persona chip — blue like a link: people you follow through the app */
+  .persona{display:inline-block;font-size:10px;letter-spacing:.05em;color:var(--scr-blue);
+    border:1px solid var(--scr-line);border-radius:999px;padding:2px 9px;margin:2px 6px 2px 0}
+  /* the journey walk — one fate, step by step */
+  .walk{margin:8px 0 2px;display:flex;flex-direction:column;gap:6px}
+  .walk .st{display:flex;gap:9px;align-items:baseline;font-size:12px;color:var(--scr-muted);line-height:1.6}
+  .walk .st .n{font-family:var(--mono);font-size:10px;color:var(--scr-amber);flex:none;
+    border:1px solid var(--scr-line);border-radius:5px;padding:1px 6px}
+  .walk .st b{color:var(--scr-text);font-weight:600}
+  /* traceability check row — one journey step ↔ the design that serves it */
+  .trow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .trow .okm{font-family:var(--mono);font-size:12px;color:var(--scr-greensoft);flex:none}
+  .trow .fn{font-family:var(--mono);font-size:12px;color:var(--scr-text);flex:none;min-width:110px}
+  .trow .d{font-size:11px;color:var(--scr-muted);flex:1}
+  .trow .tag{font-family:var(--mono);font-size:10px;letter-spacing:.03em;color:var(--scr-blue);
+    border:1px solid var(--scr-line);border-radius:6px;padding:2px 8px;white-space:nowrap}
+  .trow.miss .okm{color:var(--scr-red)}
+  .trow.miss .tag{color:var(--scr-red);border-color:var(--scr-red)}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Design specification for Cadora's journey-first builds: the color and type tokens, the anatomy of the gate-review card, the vision-addendum block, the journey document with persona chips and the fate walk, the traceability check, the four gate decision states, and the voice.</h2>
+  <p class="eyebrow">Cadora · design spec</p>
+  <h1>Journey-first builds, by their surfaces</h1>
+  <p class="lede">Everything needed to render or extend the journey-first method's screens — the exact tokens, the gate-review card's anatomy, the vision-addendum block, the journey document, the traceability check, and every state the gate can be in. The rendered components are live HTML; edit them here or lift the specs into Figma.</p>
+
+  <h2>Palette</h2>
+  <p class="sub">Semantic first · amber holds the gate, green passes it, red names the dead end</p>
+  <hr class="rule">
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#ffd08a"></div><div class="lab"><b>Amber</b><code>--scr-amber · #ffd08a</code><span>Needs review · revision n/3 · addendum accent</span></div></div>
+    <div class="sw"><div class="chip" style="background:#16c784"></div><div class="lab"><b>Green</b><code>--scr-green · #16c784</code><span>Approve · traced · gate cleared</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fb7185"></div><div class="lab"><b>Red</b><code>--scr-red · #fb7185</code><span>Dead end · untraced · abort</span></div></div>
+    <div class="sw"><div class="chip" style="background:#6ba5f0"></div><div class="lab"><b>Blue</b><code>--scr-blue · #6ba5f0</code><span>Document links · personas · endpoints</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0f172a"></div><div class="lab"><b>Ink</b><code>--scr-bg · #0f172a</code><span>Card ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#111c2f"></div><div class="lab"><b>Canvas</b><code>--scr-canvas · #111c2f</code><span>Inset · documents · rows</span></div></div>
+    <div class="sw"><div class="chip" style="background:#162237"></div><div class="lab"><b>Panel</b><code>--scr-panel2 · #162237</code><span>The gate callout</span></div></div>
+    <div class="sw"><div class="chip" style="background:#334158"></div><div class="lab"><b>Line</b><code>--scr-line · #334158</code><span>Borders</span></div></div>
+    <div class="sw"><div class="chip" style="background:#f5f7fb"></div><div class="lab"><b>Text</b><code>--scr-text · #f5f7fb</code><span>Primary · node id · step verb</span></div></div>
+    <div class="sw"><div class="chip" style="background:#9aa8bc"></div><div class="lab"><b>Muted</b><code>--scr-muted · #9aa8bc</code><span>Doc body · kind labels · captions</span></div></div>
+  </div>
+
+  <h2>Type &amp; metrics</h2>
+  <p class="sub">Documents read in sans, evidence in mono — the journey is prose, the gate is an instrument</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Role</th><th>Family</th><th>Size / weight</th><th>Notes</th></tr>
+    <tr><td><b>Gate flag</b></td><td>sans</td><td>11px / 600</td><td><code>NEEDS REVIEW</code> on the amber pill — the gate's one loud element</td></tr>
+    <tr><td><b>Document link</b></td><td>sans</td><td>13px / 400</td><td>Blue, clickable; the journey listed first with kind <code>JOURNEY</code></td></tr>
+    <tr><td><b>Kind label</b></td><td>sans</td><td>10px / caps .05em</td><td><code>JOURNEY · REQUIREMENTS · AUDIT</code></td></tr>
+    <tr><td><b>Doc body</b></td><td>sans</td><td>12px / 1.65</td><td>Rendered markdown — prose stays sans; paths and values go mono-amber</td></tr>
+    <tr><td><b>Step number</b></td><td class="mn">mono</td><td>10px / amber</td><td>The fate walk's counter — bordered chip, one per step</td></tr>
+    <tr><td><b>Grep hit</b></td><td class="mn">mono</td><td>12px / 1.75</td><td>Matches amber; <code>(no matches …)</code> red — the dead end's one-line proof</td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Metric</th><th>Value</th><th>Metric</th><th>Value</th></tr>
+    <tr><td>Gate callout radius</td><td class="mn">11px</td><td>Gate accent</td><td class="mn">1px --scr-amber border</td></tr>
+    <tr><td>Document frame radius</td><td class="mn">8px</td><td>Addendum accent</td><td class="mn">3px amber left border</td></tr>
+    <tr><td>Doc / trace row padding</td><td class="mn">8px 10px</td><td>Revisions per gate</td><td class="mn">up to 3</td></tr>
+    <tr><td>Review nodes</td><td class="mn">requirements · design</td><td>Decision record</td><td class="mn">human-review.md</td></tr>
+  </table>
+
+  <h2>Anatomy — the gate-review card</h2>
+  <p class="sub">The one surface where the journey meets its human</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="callout"><span class="pin" style="top:-9px;left:-9px">1</span><span class="pin" style="top:44px;right:-9px">2</span><span class="pin" style="top:150px;left:-9px">3</span><span class="pin" style="bottom:44px;right:-9px">4</span>
+      <div class="rhead"><span class="flag">NEEDS REVIEW</span><span>requirements — decide before design starts</span></div>
+      <div class="docrow"><a href="#">aidlc-docs/inception/user-journey.md</a><span class="kind">JOURNEY · READ FIRST</span><span class="mini">open</span></div>
+      <div class="docrow"><a href="#">aidlc-docs/inception/requirements/requirements.md</a><span class="kind">REQUIREMENTS</span><span class="mini">open</span></div>
+      <div class="ta">Optional comment — prepended to the stage prompt if you request changes</div>
+      <div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span><span class="btn no">Abort</span><span class="msg">decision recorded in human-review.md</span></div>
+      <div class="selrow"><span class="sel">Ask ▾</span><span class="inp">Does fate 2 say what the submitter sees while the claim waits?</span><span class="cbtn">Send</span></div>
+    </div>
+  </div>
+  <div class="legend">
+    <div><span class="k">1</span><span><b style="color:var(--ink)">Gate flag</b> — the node id and the stakes: <span class="mn">requirements — decide before design starts</span>. One amber pill per gate; nothing else shouts.</span></div>
+    <div><span class="k">2</span><span><b style="color:var(--ink)">Document list</b> — the stage's artifacts, one click each. The journey is listed first with kind <span class="mn">JOURNEY · READ FIRST</span>: a reviewer who hasn't opened it can't have reviewed it.</span></div>
+    <div><span class="k">3</span><span><b style="color:var(--ink)">Comment</b> — optional on approve, the whole point on request-changes: it is prepended to the stage prompt and becomes the first thing the re-run stage reads.</span></div>
+    <div><span class="k">4</span><span><b style="color:var(--ink)">Decisions</b> — Approve (green) · Request changes (neutral) · Abort (red). Decision and comment are recorded in <span class="mn">human-review.md</span>. The conversational row beneath (Ask / Revise) is inherited unchanged from the human-review surface.</span></div>
+  </div>
+
+  <h2>The vision-addendum block</h2>
+  <p class="sub">Authority renders as a document, not UI — quoted, amber-accented</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="mdd vision">
+      <div class="file"><span>vision.md · addendum</span><b>reviewed at the requirements gate</b></div>
+      <h4>## User journey first (reviewed at the first gate)</h4>
+      <p>Before designing, write <code>aidlc-docs/inception/user-journey.md</code> describing the end-to-end journey for the two personas — the <strong>submitter</strong> (documents in → decision + rationale back) and the <strong>claims reviewer</strong> (queue → inspect audit trail → resolve). … This document is a first-class deliverable of the requirements stage — it will be human-reviewed at the requirements gate, and the design must trace to it.</p>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">The 3px amber left accent marks text that creates a gate obligation. Two properties make the section enforceable: it names the <b style="color:var(--ink)">exact file</b> (absence is a fact, not a taste) and it states the <b style="color:var(--ink)">review contract</b> (a change request cites the vision, not the reviewer's mood). Always quote it verbatim — paraphrase weakens the citation.</p>
+
+  <h2>The journey document</h2>
+  <p class="sub">Persona chips · one fate walked per section · see / record at every step</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="mdd">
+      <div class="file"><span>user-journey.md</span><b>written by the requirements stage</b></div>
+      <p><span class="persona">persona · claim submitter</span><span class="persona">persona · claims reviewer</span></p>
+      <h5>Fate 2 · MANUAL_REVIEW → human resolution</h5>
+      <div class="walk">
+        <div class="st"><span class="n">1</span><span><b>Routed.</b> The claim lands in the review queue; the submitter sees "in review"; the system records the routing reasons.</span></div>
+        <div class="st"><span class="n">2</span><span><b>Inspected.</b> The reviewer opens the queue and reads the audit trail — what each agent found, and why it routed here.</span></div>
+        <div class="st"><span class="n">3</span><span><b>Resolved.</b> <code>approve</code> or <code>deny</code> — with a mandatory reason.</span></div>
+        <div class="st"><span class="n">4</span><span><b>Recorded.</b> Who / when / why in the audit trail; a second attempt is a clean error.</span></div>
+      </div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">Persona chips are blue like links — people and documents are both things a reviewer follows. Every walk step is <b style="color:var(--ink)">verb + what the person sees + what the system records</b>; a step that only names what the system does is a feature list wearing a journey's clothes, and grounds for a change request.</p>
+
+  <h2>The traceability check</h2>
+  <p class="sub">One row per journey step · the tag names the design that serves it</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="trow"><span class="okm">✓</span><span class="fn">queue → list</span><span class="d">the reviewer opens the queue of waiting claims</span><span class="tag">GET /claims/review-queue</span></div>
+    <div class="trow"><span class="okm">✓</span><span class="fn">resolve</span><span class="d">approve | deny, with a mandatory reason</span><span class="tag">POST /claims/{id}/resolution</span></div>
+    <div class="trow miss"><span class="okm">✗</span><span class="fn">record</span><span class="d">resolution entry — who / when / why — in the audit trail</span><span class="tag">untraced — request changes</span></div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">The endpoints in the tags are the <b style="color:var(--ink)">claims app's design outcome</b>, not Cadora surface — the journey drew them out; Cadora only held the gate. A single <span class="mn">✗</span> row is a request-changes at the design gate, citing the vision's "the design must trace to it".</p>
+
+  <h2>States</h2>
+  <p class="sub">Every state the review gate can be in</p>
+  <hr class="rule">
+  <div class="grid2">
+    <div class="state"><p class="cap">Awaiting decision</p>
+      <div class="vstate warn">gate <span class="id">requirements</span> — <span class="amber">needs review</span>
+  journey + requirements one click away
+  design and construction idle until you decide</div>
+    </div>
+    <div class="state"><p class="cap">Approved</p>
+      <div class="vstate">gate <span class="id">requirements</span> — <span class="ok">approved</span>
+  decision + comment recorded in human-review.md
+  <span class="final y">design starts</span></div>
+    </div>
+    <div class="state"><p class="cap">Changes requested · revision 1 of 3</p>
+      <div class="vstate warn">gate <span class="id">requirements</span> — <span class="amber">changes requested · 1/3</span>
+  comment prepended · the same stage reruns
+  downstream still idle</div>
+    </div>
+    <div class="state"><p class="cap">Aborted</p>
+      <div class="vstate no">gate <span class="id">requirements</span> — <span class="bad">aborted</span>
+  decision recorded in human-review.md
+  <span class="final n">nothing downstream was built</span></div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.8rem"><b style="color:var(--ink)">Revisions are same-stage.</b> Request-changes never advances the run: the comment is prepended, the stage reruns, and the gate reopens — up to 3 times. Downstream work cannot start on an unapproved journey, which is the entire mechanism: the dead end is caught before design inherits it.</p>
+
+  <h2>What each decision does</h2>
+  <p class="sub">Three verbs · approve releases, request-changes repairs, abort refuses</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Decision</th><th>Effect</th><th>Recorded</th></tr>
+    <tr><td><b>Approve</b></td><td>The stage completes; downstream (design → construction) starts.</td><td class="mn">human-review.md</td></tr>
+    <tr><td><b>Request changes</b></td><td>Comment prepended to the stage prompt; the <b>same stage</b> reruns — up to 3 revisions — while downstream waits.</td><td class="mn">human-review.md</td></tr>
+    <tr><td><b>Abort</b></td><td>The run stops; nothing downstream is built.</td><td class="mn">human-review.md</td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Surface</th><th>How</th><th>Notes</th></tr>
+    <tr><td><b>Dashboard</b></td><td class="mn">cadora dashboard</td><td>Pending gate with clickable documents; Ask / Revise conversationally; decide in the browser.</td></tr>
+    <tr><td><b>Review files</b></td><td class="mn">cadora-review-decision.json</td><td>Drop it next to <code>cadora-review-request.json</code>; the run proceeds.</td></tr>
+    <tr><td><b>Headless / async</b></td><td class="mn">--review-file · --review-timeout 0</td><td><code>0</code> waits indefinitely — for reviewers who step away.</td></tr>
+  </table>
+
+  <h2>Voice</h2>
+  <p class="sub">A journey is walked, not summarized</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Do</th><th>Not</th></tr>
+    <tr><td>Name the persona and the step — "the reviewer resolves, with a reason"</td><td>"Users can manage reviews"</td></tr>
+    <tr><td>Walk each fate to its end — every decision value gets a human owner</td><td>"MANUAL_REVIEW: see routing rules"</td></tr>
+    <tr><td>Pair every step — what the person <b>sees</b>, what the system <b>records</b></td><td>A feature list in journey clothing</td></tr>
+    <tr><td>Cite the vision at the gate — "the design must trace to it"</td><td>"I'd prefer it differently"</td></tr>
+    <tr><td>Call a dead end a dead end</td><td>"Future work"</td></tr>
+  </table>
+
+  <div class="foot">Structure and mechanics are taken verbatim from <span class="mn">examples/aidlc-hitl.topology.yaml</span> and the claims rebuild's <span class="mn">vision.md</span>; the gate card mirrors the run dashboard's review surface. Edit the rendered components in place, or hand the palette and metrics tables to a Figma library.</div>
+</div>
+</body>
+</html>

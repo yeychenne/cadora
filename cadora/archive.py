@@ -15,6 +15,11 @@ from pathlib import Path
 from cadora.executors.base import ExecutionResult
 from cadora.gates import GateResult
 from cadora.integrity import IntegrityReport
+from cadora.provenance import (
+    conductor_fingerprint,
+    fingerprint_workspace,
+    write_workspace_manifest,
+)
 from cadora.remediation import RemediationOutcome
 from cadora.review import ReviewResult, format_review_history
 
@@ -27,8 +32,24 @@ class RunArchive:
             "run_id": run_id,
             "executor": executor,
             "topology": topology,
+            # Which Cadora produced this evidence (version + git state for editable installs) —
+            # without it, a conductor that changed mid-run is invisible in the pack.
+            "conductor": conductor_fingerprint(),
             "nodes": [],
         }
+        self._ws_cwd: str | Path | None = None
+        self._ws_archive_root: str | Path | None = None
+
+    def track_workspace(self, cwd: str | Path, archive_root: str | Path) -> None:
+        """Register the run's workspace so :meth:`finalize` snapshots its content fingerprint.
+
+        The snapshot is provenance (the pack records exactly what source the gates ran over) and
+        the baseline a future ``--resume-from`` verifies against. Because it happens in
+        ``finalize``, every terminal path is covered — success *and* the ``finalize(False)`` failure
+        exits, which matter most since the run you resume is usually a failed one.
+        """
+        self._ws_cwd = cwd
+        self._ws_archive_root = archive_root
 
     def record(
         self,
@@ -145,6 +166,14 @@ class RunArchive:
         self.manifest["nodes"].append(entry)
 
     def finalize(self, ok: bool) -> Path:
+        if self._ws_cwd is not None:
+            try:
+                write_workspace_manifest(
+                    self.dir,
+                    fingerprint_workspace(self._ws_cwd, archive_root=self._ws_archive_root),
+                )
+            except OSError:
+                pass
         self.manifest["ok"] = ok
         (self.dir / "manifest.json").write_text(json.dumps(self.manifest, indent=2))
         return self.dir

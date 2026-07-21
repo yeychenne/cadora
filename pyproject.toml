@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cadora"
-version = "0.10.1"
+version = "0.11.0"
 description = "Ship agent-built software you can prove — an audit-grade conductor for coding-agent CLIs (Claude Code, Codex): deterministic gates, tamper detection, run evidence, per-node cost attribution."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -16,7 +16,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-cov>=6.0", "ruff"]
+# `dev` is the full test+lint environment. It pulls `mcp` (via self-reference) ON PURPOSE: the
+# MCP/HITL test modules are importorskip-gated on that extra, so a dev env without it would let
+# `pytest` SILENTLY SKIP the whole MCP surface and still report green — the false-green trap this
+# project exists to fight. tests/conftest.py is the belt to this suspenders. End users who only want
+# the runtime server still install the lean `.[mcp]`; the version pin lives once, on `mcp` below.
+dev = ["pytest>=8.0", "pytest-cov>=6.0", "ruff", "cadora[mcp]"]
 mcp = ["mcp>=1.2"]
 deliverable = ["python-docx>=1.1"]
 

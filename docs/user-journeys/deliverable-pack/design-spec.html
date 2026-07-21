@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The delivery report, by its surfaces · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;
+    --card:#fffefb;--amber:#b3760f;
+    --scr-bg:#0f172a;--scr-canvas:#111c2f;--scr-panel:#1e2937;--scr-panel2:#162237;--scr-line:#334158;
+    --scr-text:#f5f7fb;--scr-muted:#9aa8bc;--scr-blue:#6ba5f0;--scr-green:#16c784;--scr-greensoft:#75f0a8;
+    --scr-red:#fb7185;--scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;
+    --ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}}
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;--card:#fffefb;--amber:#b3760f}
+  *{box-sizing:border-box}
+  .wrap{max-width:840px;margin:0 auto;padding:2.6rem 1.5rem 4rem;color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0 0 .5rem}
+  h1{font-size:2.1rem;letter-spacing:-.02em;margin:.1rem 0 .4rem;font-weight:640}
+  .lede{color:var(--ink-soft);margin:0;max-width:64ch}
+  h2{font-size:1.15rem;margin:2.8rem 0 .3rem;font-weight:600;letter-spacing:-.01em}
+  .sub{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 1rem}
+  .rule{height:1px;background:var(--rule);border:0;margin:.4rem 0 0}
+  /* swatches */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:.6rem}
+  .sw{border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--card)}
+  .sw .chip{height:44px}
+  .sw .lab{padding:7px 9px}
+  .sw .lab b{font-size:12px;display:block}
+  .sw .lab code{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .sw .lab span{font-size:11px;color:var(--ink-soft);display:block;margin-top:1px}
+  /* type scale */
+  table{width:100%;border-collapse:collapse;margin-top:.5rem;font-size:13px}
+  th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ink-faint);font-weight:500;padding:6px 10px;border-bottom:1px solid var(--rule)}
+  td{padding:8px 10px;border-bottom:1px solid var(--rule);color:var(--ink-soft);vertical-align:top}
+  td b{color:var(--ink)}
+  td code,.mn{font-family:var(--mono);font-size:12px;color:var(--amber)}
+  /* dashboard component render */
+  .stage{background:var(--scr-bg);border:1px solid var(--rule);border-radius:12px;padding:16px;margin-top:.8rem}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px;position:relative}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .rhead span:last-child{color:var(--scr-text);font-size:13px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .msg.err{color:var(--scr-red)}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0;color:var(--scr-muted);font-size:12px}
+  .empty{color:var(--scr-muted);font-size:12px;font-style:italic;padding:4px 2px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:130px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted)}
+  /* anatomy pins */
+  .pin{position:absolute;font-family:var(--mono);font-size:10px;font-weight:600;width:18px;height:18px;
+    border-radius:50%;background:var(--scr-amber);color:#1a1205;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 3px var(--scr-panel2)}
+  .legend{margin-top:1rem;display:grid;gap:6px}
+  .legend div{display:flex;gap:9px;font-size:13px;color:var(--ink-soft)}
+  .legend .k{font-family:var(--mono);font-size:11px;font-weight:600;width:18px;height:18px;flex:none;
+    border-radius:50%;background:var(--amber);color:var(--paper);display:flex;align-items:center;justify-content:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:.8rem}
+  .state{background:var(--scr-bg);border:1px solid var(--rule);border-radius:10px;padding:12px}
+  .state .cap{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+  .foot{margin-top:3rem;padding-top:1.1rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+</style>
+
+<style>
+  /* deliverable pack — appended after the verbatim base, reusing the same --scr-* tokens only */
+  /* the delivery report, rendered as a document — the component this spec is about */
+  .rdoc{color:var(--scr-text)}
+  .rdoc .t1{font-size:15px;font-weight:700;color:var(--scr-text);margin:0 0 3px;letter-spacing:-.01em}
+  .rdoc .rmeta{font-family:var(--mono);font-size:11px;color:var(--scr-muted);margin:0 0 12px}
+  .rdoc .h{font-size:12px;font-weight:700;color:var(--scr-text);margin:14px 0 6px;
+    padding-bottom:4px;border-bottom:1px solid var(--scr-line)}
+  .rdoc p{color:var(--scr-muted);font-size:12px;margin:0 0 7px;line-height:1.6}
+  .rdoc strong{color:var(--scr-text);font-weight:600}
+  .rdoc ul{margin:0 0 7px;padding-left:15px}
+  .rdoc li{color:var(--scr-muted);font-size:12px;line-height:1.6;margin:2px 0}
+  .rdoc .est{color:var(--scr-amber)}
+  .rdoc .ok{color:var(--scr-greensoft)}
+  .rtab{width:100%;border-collapse:collapse;margin:2px 0 5px;font-size:11px}
+  .rtab th{text-align:left;font-family:var(--mono);font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--scr-muted);font-weight:500;padding:4px 7px;border-bottom:1px solid var(--scr-line)}
+  .rtab td{padding:4px 7px;border-bottom:1px solid var(--scr-line);color:var(--scr-muted);vertical-align:top}
+  .rtab td.f{font-family:var(--mono);color:var(--scr-text)}
+  .rsub{font-size:10px;color:var(--scr-muted);font-style:italic;margin:2px 0 0}
+  /* section inventory — one card per ## heading, in order */
+  .secs{display:grid;gap:9px;margin-top:.6rem}
+  .sec{background:var(--scr-bg);border:1px solid var(--rule);border-left:3px solid var(--scr-line);border-radius:10px;padding:11px 14px}
+  .sec .hd{display:flex;align-items:baseline;gap:9px;margin-bottom:3px}
+  .sec .ix{font-family:var(--mono);font-size:11px;color:var(--scr-amber)}
+  .sec .nm{font-family:var(--mono);font-size:13px;color:var(--scr-text);font-weight:600}
+  .sec p{font-size:12.5px;color:var(--ink-soft);margin:2px 0 0;line-height:1.5}
+  .sec .src{font-family:var(--mono);font-size:11px;color:var(--ink-faint);margin-top:4px}
+  /* proof-underneath / story-on-top — the evidence-vs-story diagram */
+  .stack{display:flex;flex-direction:column;gap:7px}
+  .layer{border:1px solid var(--scr-line);border-radius:10px;padding:10px 13px;background:var(--scr-canvas)}
+  .layer.top{border-left:3px solid var(--scr-blue)}
+  .layer.base{border-left:3px solid var(--scr-green)}
+  .layer .lc{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted);margin-bottom:4px}
+  .layer b{font-size:13px;color:var(--scr-text);font-weight:600}
+  .layer .files{font-family:var(--mono);font-size:11px;color:var(--scr-muted);margin-top:3px}
+  .layer .aud{font-size:11px;color:var(--scr-muted);margin-top:4px}
+  .layer .aud em{color:var(--scr-amber);font-style:normal}
+  .midline{text-align:center;font-family:var(--mono);font-size:10.5px;color:var(--scr-muted);letter-spacing:.04em}
+  /* who-reads-what */
+  .col .who{font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--scr-amber);margin-bottom:5px}
+  .col b{font-size:13px;color:var(--scr-text);display:block;margin-bottom:3px}
+  .col p{font-size:12px;color:var(--scr-muted);margin:2px 0;line-height:1.5}
+  .col .cmdline{font-family:var(--mono);font-size:11px;color:var(--scr-blue);margin-top:5px}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Design specification for Cadora's deliverable pack: the color and type tokens, the anatomy of the rendered delivery report, its five sections in order (executive summary, what was delivered, quality and assurance, cost/FinOps, evidence appendix), the proof-underneath / story-on-top diagram, what cadora deliverable writes (deliverable.md always, deliverable.docx with the extra), who reads what, and the voice.</h2>
+  <p class="eyebrow">Cadora · design spec</p>
+  <h1>The delivery report, by its surfaces</h1>
+  <p class="lede">Everything needed to render or extend the client-facing delivery report — the exact tokens, the report's anatomy, its five sections in order, the proof-vs-story relationship, and what each flag writes. The rendered components are live HTML; edit them here or lift the specs into Figma. Same design system as the evidence pack — this is the readable surface over the same checksummed source.</p>
+
+  <h2>Palette</h2>
+  <p class="sub">Semantic first · green passes, red fails, amber flags an estimate</p>
+  <hr class="rule">
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#16c784"></div><div class="lab"><b>Green</b><code>--scr-green · #16c784</code><span>PASS · outcome ✓ · gate passed</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fb7185"></div><div class="lab"><b>Red</b><code>--scr-red · #fb7185</code><span>FAIL · outcome ✗ · gate failed</span></div></div>
+    <div class="sw"><div class="chip" style="background:#ffd08a"></div><div class="lab"><b>Amber</b><code>--scr-amber · #ffd08a</code><span>Estimated cost * · honesty flag</span></div></div>
+    <div class="sw"><div class="chip" style="background:#6ba5f0"></div><div class="lab"><b>Blue</b><code>--scr-blue · #6ba5f0</code><span>Story layer · paths · files</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0f172a"></div><div class="lab"><b>Ink</b><code>--scr-bg · #0f172a</code><span>Card ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#111c2f"></div><div class="lab"><b>Canvas</b><code>--scr-canvas · #111c2f</code><span>Inset · document body</span></div></div>
+    <div class="sw"><div class="chip" style="background:#162237"></div><div class="lab"><b>Panel</b><code>--scr-panel2 · #162237</code><span>Raised · callout</span></div></div>
+    <div class="sw"><div class="chip" style="background:#334158"></div><div class="lab"><b>Line</b><code>--scr-line · #334158</code><span>Borders · section rules</span></div></div>
+    <div class="sw"><div class="chip" style="background:#f5f7fb"></div><div class="lab"><b>Text</b><code>--scr-text · #f5f7fb</code><span>Headings · node id · figures</span></div></div>
+    <div class="sw"><div class="chip" style="background:#9aa8bc"></div><div class="lab"><b>Muted</b><code>--scr-muted · #9aa8bc</code><span>Body prose · captions</span></div></div>
+  </div>
+
+  <h2>Type &amp; metrics</h2>
+  <p class="sub">A document, not a dashboard — the delivery report is Markdown, read as prose</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Role</th><th>Family</th><th>Size / weight</th><th>Notes</th></tr>
+    <tr><td><b>Report title</b></td><td class="mn">sans</td><td>15px / 700</td><td><code>Solution Delivery Report — &lt;topology&gt;</code>, the <code>#</code> heading</td></tr>
+    <tr><td><b>Run meta line</b></td><td class="mn">mono</td><td>11px / 400</td><td>Run id · Cadora version · generated timestamp</td></tr>
+    <tr><td><b>Section heading</b></td><td class="mn">sans</td><td>12px / 700</td><td>The five <code>##</code> headings, ruled with a 1px line</td></tr>
+    <tr><td><b>Body prose</b></td><td class="mn">sans</td><td>12px muted</td><td><code>strong</code> lifts figures to <code>--scr-text</code></td></tr>
+    <tr><td><b>Delivery table</b></td><td class="mn">mono cells</td><td>11px</td><td>Node · Backend · Model · Outcome · Gate · Cost</td></tr>
+    <tr><td><b>Estimate flag</b></td><td class="mn">mono</td><td>amber</td><td><code>*</code> on estimated cost; footnoted under the table</td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Metric</th><th>Value</th><th>Metric</th><th>Value</th></tr>
+    <tr><td>Card radius</td><td class="mn">10px</td><td>Layer accent</td><td class="mn">3px left border</td></tr>
+    <tr><td>Section rule</td><td class="mn">1px solid line</td><td>Outcome glyphs</td><td class="mn">✓ green · ✗ red</td></tr>
+    <tr><td>Verdict glyphs</td><td class="mn">✅ PASS · ❌ FAIL</td><td>Estimate glyph</td><td class="mn">* amber</td></tr>
+    <tr><td>Output filename</td><td class="mn">deliverable.md</td><td>Optional</td><td class="mn">deliverable.docx</td></tr>
+  </table>
+
+  <h2>Anatomy — the delivery report</h2>
+  <p class="sub">Five sections, one order — the whole component a stakeholder reads</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="rdoc" style="position:relative">
+      <span class="pin" style="top:34px;left:-9px">1</span>
+      <span class="pin" style="top:96px;left:-9px">2</span>
+      <span class="pin" style="top:250px;left:-9px">3</span>
+      <span class="pin" style="top:360px;left:-9px">4</span>
+      <span class="pin" style="top:430px;left:-9px">5</span>
+      <div class="t1">Solution Delivery Report — aidlc-hitl</div>
+      <div class="rmeta">Run pr1-verify · generated by Cadora 0.10.0 · 2026-07-17T14:20:03+00:00</div>
+
+      <div class="h">Executive summary</div>
+      <p>Cadora conducted an AI-DLC pipeline (<strong>aidlc-hitl</strong>) across <strong>3 nodes</strong> on <strong>claude</strong>. Outcome: <strong class="ok">✅ PASS</strong>. Total metered cost <strong>$0.1873</strong> <span class="est">(1 node(s) priced from the public price table)</span>. Gate verdicts — passed: 1. Integrity findings: 0. Human-review decisions: 2.</p>
+
+      <div class="h">What was delivered</div>
+      <table class="rtab">
+        <tr><th>Node</th><th>Backend</th><th>Model</th><th>Outcome</th><th>Gate</th><th>Cost</th></tr>
+        <tr><td class="f">requirements</td><td>claude</td><td class="f">claude-opus-4-8</td><td class="ok">✓</td><td>—</td><td class="f">$0.0642</td></tr>
+        <tr><td class="f">design</td><td>claude</td><td class="f">claude-opus-4-8</td><td class="ok">✓</td><td>—</td><td class="f">$0.0511</td></tr>
+        <tr><td class="f">construction</td><td>claude</td><td class="f">claude-sonnet-4-5</td><td class="ok">✓</td><td>passed</td><td class="f">$0.0720<span class="est">*</span></td></tr>
+      </table>
+      <p class="rsub"><span class="est">*</span> = cost estimated from the public price table (backend reported tokens, not dollars).</p>
+
+      <div class="h">Quality &amp; assurance</div>
+      <ul>
+        <li><strong>Gate verdicts:</strong> passed: 1</li>
+        <li><strong>Integrity:</strong> 0 finding(s) across 0 node(s)</li>
+        <li><strong>Human review:</strong> 2 recorded decision(s)</li>
+        <li><strong>Verifiable evidence:</strong> checksummed — run <span class="mn" style="color:var(--scr-muted)">cadora report pr1-verify</span> for the pack.</li>
+      </ul>
+
+      <div class="h">Cost (FinOps)</div>
+      <p>Total: <strong>$0.1873</strong> across 3 nodes, 1 estimated from the price table.</p>
+
+      <div class="h">Evidence appendix</div>
+      <ul>
+        <li>23 archived file(s), each SHA-256 checksummed.</li>
+        <li>Honesty contract: exactly what the archive recorded; checksummed, not signed.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="legend">
+    <div><span class="k">1</span><span><b style="color:var(--ink)">Executive summary</b> — one paragraph: topology, node count, backends, outcome, total cost (estimates flagged), gate roll-up, integrity and human-review counts.</span></div>
+    <div><span class="k">2</span><span><b style="color:var(--ink)">What was delivered</b> — the per-node table across the AI-DLC phases. <span class="mn">Node · Backend · Model · Outcome · Gate · Cost</span>; a <span class="mn">*</span> marks an estimated cost, footnoted below.</span></div>
+    <div><span class="k">3</span><span><b style="color:var(--ink)">Quality &amp; assurance</b> — gate verdicts, integrity findings across N nodes, recorded human-review decisions, and the pointer to the checksummed evidence pack.</span></div>
+    <div><span class="k">4</span><span><b style="color:var(--ink)">Cost (FinOps)</b> — the total across all nodes, with the estimated count called out.</span></div>
+    <div><span class="k">5</span><span><b style="color:var(--ink)">Evidence appendix</b> — archived-file count, each SHA-256 checksummed, and the honesty contract restated: checksummed, not signed.</span></div>
+  </div>
+
+  <h2>The report's sections</h2>
+  <p class="sub">The exact <span class="mn" style="font-size:.85em">##</span> headings <span class="mn" style="font-size:.85em">render_deliverable</span> emits, in order</p>
+  <hr class="rule">
+  <div class="secs">
+    <div class="sec"><div class="hd"><span class="ix">01</span><span class="nm">## Executive summary</span></div><p>A single paragraph a stakeholder can read in ten seconds: what ran, on which backends, whether it passed, what it cost, and the assurance counts.</p><div class="src">figures ← summary.nodes · backends · run.ok · cost_usd · gates · integrity_findings · human_review_decisions</div></div>
+    <div class="sec"><div class="hd"><span class="ix">02</span><span class="nm">## What was delivered</span></div><p>The per-node delivery table across the AI-DLC phases (inception → construction → operations, whichever the run has). One row per node; estimated costs carry a <span class="mn" style="color:var(--scr-amber)">*</span>.</p><div class="src">rows ← report.nodes[] (node_id, executor, model, ok, gate, cost_usd, cost_estimated)</div></div>
+    <div class="sec"><div class="hd"><span class="ix">03</span><span class="nm">## Quality &amp; assurance</span></div><p>Gate verdicts, integrity findings across N nodes, human-review decisions — and the line that says every claim is checksummed, with the <span class="mn" style="color:var(--scr-muted)">cadora report</span> pointer.</p><div class="src">← summary.gates · integrity_findings · integrity_failed_nodes · human_review_decisions</div></div>
+    <div class="sec"><div class="hd"><span class="ix">04</span><span class="nm">## Cost (FinOps)</span></div><p>The total across all nodes, with the number of price-table estimates called out inline.</p><div class="src">← summary.cost_usd · summary.nodes · summary.estimated_cost_nodes</div></div>
+    <div class="sec"><div class="hd"><span class="ix">05</span><span class="nm">## Evidence appendix</span></div><p>Archived-file count (each SHA-256 checksummed) and the honesty contract restated — checksummed, not signed, no claim beyond what the gates verified.</p><div class="src">← len(report.artifacts) · the inherited honesty contract</div></div>
+  </div>
+
+  <h2>Proof underneath, story on top</h2>
+  <p class="sub">Same archived run · same <span class="mn" style="font-size:.85em">build_report()</span> · two surfaces, two readers</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="stack">
+      <div class="layer top">
+        <div class="lc">story on top — the deliverable</div>
+        <b>Delivery report</b>
+        <div class="files">deliverable.md · deliverable.docx</div>
+        <div class="aud">reader · <em>stakeholder</em> — reads the narrative, signs off</div>
+      </div>
+      <div class="midline">▲ &nbsp; both rendered from the same structured evidence &nbsp; ▼</div>
+      <div class="layer base">
+        <div class="lc">proof underneath — the evidence pack</div>
+        <b>Evidence pack</b>
+        <div class="files">report.html · report.json · checksums.txt · checksums.txt.sig · signature.json</div>
+        <div class="aud">reader · <em>verifier</em> — recomputes every hash, checks the signature, offline</div>
+      </div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">The deliverable <b style="color:var(--ink)">reuses</b> the evidence pack's structured report (<span class="mn">build_report</span>) rather than re-deriving anything. The pack is the checksummed proof; the deliverable is the readable story on top of it. One source of truth, so the two can never disagree.</p>
+
+  <h2>What each flag writes</h2>
+  <p class="sub">One verb · Markdown is the core, <span class="mn" style="font-size:.85em">.docx</span> is an optional extra</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Invocation</th><th>Writes</th><th>Needs</th></tr>
+    <tr><td><b><span class="mn">cadora deliverable &lt;run&gt;</span></b></td><td class="mn">deliverable.md</td><td>nothing — dependency-free core</td></tr>
+    <tr><td><b><span class="mn">… --docx</span></b></td><td class="mn">deliverable.md · deliverable.docx</td><td class="mn">pip install 'cadora[deliverable]'</td></tr>
+    <tr><td><b><span class="mn">… --out &lt;dir&gt;</span></b></td><td>same files, into <span class="mn">&lt;dir&gt;</span></td><td>default <span class="mn">&lt;archive-dir&gt;/&lt;run-id&gt;/</span></td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Flag</th><th>Default</th><th>Effect</th></tr>
+    <tr><td><b><span class="mn">--archive-dir</span></b></td><td class="mn">runs</td><td>Where the archived run is read from</td></tr>
+    <tr><td><b><span class="mn">--out</span></b></td><td class="mn">&lt;archive-dir&gt;/&lt;run-id&gt;/</td><td>Output directory for the report file(s)</td></tr>
+    <tr><td><b><span class="mn">--docx</span></b></td><td class="mn">off</td><td>Also render <span class="mn">.docx</span> (needs the <span class="mn">deliverable</span> extra)</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">Terminal receipt on success — <span class="mn">delivery pack for &lt;run&gt;:</span> then one <span class="mn">md</span> (and, with <span class="mn">--docx</span>, one <span class="mn">docx</span>) row per file written. The Markdown default lands <em>beside</em> the run, not inside the evidence pack's <span class="mn">report/</span> directory.</p>
+
+  <h2>Who reads what</h2>
+  <p class="sub">Two surfaces, two desks — don't make the stakeholder recompute hashes</p>
+  <hr class="rule">
+  <div class="grid2">
+    <div class="state"><p class="cap">Evidence pack · the verifier</p>
+      <div class="col"><div class="who">proof</div><b>Recomputes, doesn't read</b>
+        <p>Wants tamper-evidence: every SHA-256 hash re-checked, the signature confirmed — offline, no live Cadora.</p>
+        <div class="cmdline">$ cadora verify pr1-verify</div>
+      </div>
+    </div>
+    <div class="state"><p class="cap">Delivery report · the stakeholder</p>
+      <div class="col"><div class="who">story</div><b>Reads, doesn't recompute</b>
+        <p>Wants the outcome, the cost, the assurance — in prose. Follows the appendix to the pack only if they want to.</p>
+        <div class="cmdline">open deliverable.md / .docx</div>
+      </div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">The evidence pack — <span class="mn">cadora report / sign / verify</span> — is specified on its own. This deliverable <b style="color:var(--ink)">cross-references</b> it (the appendix names it) and never re-documents it.</p>
+
+  <h2>Voice</h2>
+  <p class="sub">A consulting report, not a sales deck — the archive is the only author</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Do</th><th>Not</th></tr>
+    <tr><td>State the recorded outcome — <span class="mn">Outcome: ✅ PASS</span></td><td>“Delivered flawlessly”</td></tr>
+    <tr><td>Flag every estimate — <span class="mn">$0.0720*</span> · <span class="mn">1 node(s) priced from the public price table</span></td><td>Round an estimate into a hard figure</td></tr>
+    <tr><td>Restate the contract — <span class="mn">checksummed, not signed</span></td><td>Imply a cryptographic signature the report doesn't carry</td></tr>
+    <tr><td>Point to the proof — <span class="mn">run cadora report … for the evidence pack</span></td><td>Ask the reader to take the numbers on faith</td></tr>
+  </table>
+
+  <div class="foot">Sections, filenames, and behavior are taken verbatim from <span class="mn">cadora/deliverable.py</span> (<span class="mn">render_deliverable</span>) and the shared evidence in <span class="mn">cadora/report.py</span> (<span class="mn">build_report</span>). Edit the rendered components in place, or hand the palette and metrics tables to a Figma library.</div>
+</div>
+</body>
+</html>

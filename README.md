@@ -71,6 +71,34 @@ flowchart LR
 Runnable topologies for each shape — sequential, parallel fan-out, fan-in, a prep phase, and a
 deploy target — live in [`examples/`](examples/).
 
+## Documentation — a guided tour of every capability
+
+Every capability ships with three companion documents: a narrated **user journey** (a screen-by-screen
+walkthrough), a **user manual** (the command reference), and a **design spec** (the design system, for
+Figma or a design tool). Browse the whole library in **[docs/user-journeys/](docs/user-journeys/)**, or
+jump straight into a walkthrough:
+
+**The audit-grade core** —
+[Run a gated workflow](docs/user-journeys/run-a-gated-workflow/user-journey.html) ·
+[Gates & integrity](docs/user-journeys/gates-and-integrity/user-journey.html) ·
+[Human review](docs/user-journeys/human-review/user-journey.html) ·
+[Evidence pack](docs/user-journeys/evidence-pack/user-journey.html) ·
+[Cost & FinOps](docs/user-journeys/cost-finops/user-journey.html)
+
+**Backends, recovery & evaluation** —
+[Multi-backend executors](docs/user-journeys/multi-backend/user-journey.html) ·
+[Resume & remediation](docs/user-journeys/resume-remediation/user-journey.html) ·
+[Compare & evaluate](docs/user-journeys/compare-evaluate/user-journey.html)
+
+**Method, delivery & integration** —
+[AI-DLC method pack](docs/user-journeys/aidlc-method/user-journey.html) ·
+[Deliverable pack](docs/user-journeys/deliverable-pack/user-journey.html) ·
+[MCP server](docs/user-journeys/mcp-server/user-journey.html) ·
+[Journey-first builds](docs/user-journeys/journey-first-builds/user-journey.html)
+
+The manuals render on GitHub; the journeys and design specs are self-contained HTML — open them in a
+browser.
+
 ## Backends
 
 Three backends are **verified** — live-smoke-checked against their CLI contract every release;
@@ -215,22 +243,23 @@ New to Cadora, or bringing it to a hackathon? Start with the
 
 ## Status
 
-**v0.10.1** — the capstone release (0.10.1 corrects per-node duration telemetry under
-`--max-parallel`; cost and tokens were always accurate). One conductor across **every frontier model** (claude / codex /
-kiro verified, plus experimental), running on **the subscriptions you already pay for** with one
-cross-vendor cost ledger, driving a **real method** (AWS AI-DLC, or your own), and leaving **proof
-you can ship**: evidence packs are now **signed** as well as checksummed — `cadora sign` /
-`cadora verify` add a detached signature over the SHA-256 manifest (OpenSSH by default, pluggable;
-`verify` exits non-zero on tamper or a bad signature), so a green run is tamper-evident **and
-attributable**. Backends carry explicit **support tiers** (`cadora doctor`), the MCP HTTP transport
-takes a **bearer token**, and a release **secrets scanner** guards every build. Ships a full
-**topology examples library** across all three lifecycle phases — a mission-prep prep phase (Senior
-PM ∥ DE), the three canonical DAG shapes, and a security-gated AgentCore deploy target — plus the
-[vision paper](docs/vision.md) and a [one-page overview](docs/index.html). On **v0.8.x**'s
-run-detail dashboard, headless HITL, run resumption (`--resume-from`), and the packaging
-false-green fix; **v0.7.x**'s per-gate commands, parallel waves, and drive-to-completion
-(`--remediate`); and v0.6.0's evidence pack, `eval` (+ judge), `compare`, `deliverable`, `doctor`.
-270+ tests, `ruff` clean, CI on Python 3.10–3.12.
+**v0.11.0** — the human-review release, validated by a live two-project campaign: two complex
+applications rebuilt end-to-end through **active human gates**, with the review experience rebuilt
+around what the reviewer actually needed. Review a pending gate **in the browser** — the stage's
+documents one click away, full-screen reading with **annotations** that flow into the
+request-changes comment, and a **conversation with the parked run** (ask why a document says what
+it says, or have it revised on the spot, before deciding). One dashboard now serves **several
+project archives**, tells the truth about time and liveness (zombie runs are labeled, human
+deliberation no longer inflates a node's signed duration), and prices token-only backends with the
+same flagged-`est.` normalization as `cadora usage`. Evidence gains provenance at both ends:
+`--resume-from` **verifies the workspace fingerprint** against the run being resumed (drift is
+refused, or recorded under `--allow-drift`), and every pack records **which conductor produced
+it** (version + git SHA). Integrity detects virtualenvs **structurally** (a gate venv is not
+hollow app code), and a new twelve-capability **documentation library** pairs a user journey, a
+manual, and a design spec for everything above (see the guided tour). On **v0.10.x**'s signed
+evidence packs, backend support tiers, and topology examples library; **v0.8.x**'s run-detail
+dashboard, headless HITL, and run resumption; and v0.6.0's evidence pack, `eval`, `compare`,
+`deliverable`, `doctor`. 327 tests, `ruff` clean, CI on Python 3.10–3.12.
 
 > **v0.9.0 is superseded and yanked** — it was published from an incomplete pre-release build (the
 > code was correct; the packaged docs were stale). Use **v0.10.0**.
