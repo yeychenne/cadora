@@ -92,6 +92,30 @@ def cmd_run(args) -> int:
             max_attempts=args.remediate,
             max_cost_usd=getattr(args, "remediate_max_cost", None),
         )
+    budget_policy = None
+    failover_executor = None
+    if getattr(args, "budget", None):
+        from cadora.budget import BudgetPolicy, parse_budgets
+
+        budget_policy = BudgetPolicy(
+            budgets=parse_budgets(args.budget),
+            warn_at=args.budget_warn_at,
+            action=args.on_budget,
+            failover_to=args.failover_to,
+        )
+        if budget_policy.failover_to:
+            # Built here, not in the runner: constructing a backend is the CLI's job, and the
+            # runner stays free of any knowledge of how executors are made.
+            failover_executor = get_executor(
+                budget_policy.failover_to,
+                funding=args.funding,
+                timeout=args.timeout,
+                model=None,
+            )
+    elif getattr(args, "on_budget", "warn") != "warn" or getattr(args, "failover_to", None):
+        raise SystemExit(
+            "--on-budget/--failover-to need at least one --budget BACKEND=USD to measure against"
+        )
     review_fn = None
     if getattr(args, "review_file", False):
         # Headless HITL: no TTY (Quick Desktop / CI). Write a request file, poll for a decision.
@@ -116,6 +140,8 @@ def cmd_run(args) -> int:
         resume_from=getattr(args, "resume_from", None),
         skip=_split_csv(getattr(args, "skip", None)),
         allow_drift=getattr(args, "allow_drift", False),
+        budget_policy=budget_policy,
+        failover_executor=failover_executor,
     )
     print(f"run complete: {out}")
     return 0
@@ -499,6 +525,35 @@ def _fmt_tokens(value: int) -> str:
     return str(value)
 
 
+def cmd_accounts(args) -> int:
+    from cadora.accounts import (
+        accounts_to_dict,
+        format_accounts,
+        gather_accounts,
+        parse_budgets,
+    )
+
+    archives = args.archive_dir or ["runs"]
+    try:
+        accounts = gather_accounts(
+            args.backend,
+            archive_roots=archives,
+            since=args.since,
+            budgets=parse_budgets(args.budget),
+            probe=args.probe,
+            warn_at=args.warn_at,
+        )
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    if args.json:
+        print(json.dumps(accounts_to_dict(accounts), indent=2))
+    else:
+        print(format_accounts(accounts, since=args.since, archives=[str(a) for a in archives]))
+    if args.check and any(not account.healthy for account in accounts):
+        return 1
+    return 0
+
+
 def cmd_usage(args) -> int:
     try:
         summary = summarize_usage(args.archive_dir, since=args.since)
@@ -780,6 +835,34 @@ def main(argv=None) -> int:
         "would exceed this ceiling",
     )
     r.add_argument(
+        "--budget",
+        action="append",
+        metavar="BACKEND=USD",
+        help="declared spend ceiling for a backend (repeatable, e.g. --budget claude=200). "
+        "Measured against Cadora's own recorded consumption — no CLI exposes remaining quota",
+    )
+    r.add_argument(
+        "--on-budget",
+        choices=["warn", "stop", "failover"],
+        default="warn",
+        help="what to do at a NODE BOUNDARY once a backend reaches --budget-warn-at: warn and "
+        "continue (default), stop cleanly with a --resume-from hint, or move the rest of the "
+        "run to --failover-to",
+    )
+    r.add_argument(
+        "--budget-warn-at",
+        type=float,
+        default=0.9,
+        metavar="FRACTION",
+        help="fraction of a backend's --budget that trips --on-budget (default: 0.9)",
+    )
+    r.add_argument(
+        "--failover-to",
+        metavar="BACKEND",
+        help="backend to move the run to for --on-budget failover; declines to a clean stop if "
+        "that backend is also at its ceiling",
+    )
+    r.add_argument(
         "--yes",
         "-y",
         action="store_true",
@@ -949,6 +1032,58 @@ def main(argv=None) -> int:
     )
     doc.add_argument("--json", action="store_true", help="emit the structured report")
     doc.set_defaults(func=cmd_doctor)
+
+    acc = sub.add_parser(
+        "accounts",
+        help="backend account health: CLI present · credentials stored · live probe · budget used",
+    )
+    acc.add_argument(
+        "--archive-dir",
+        action="append",
+        default=None,
+        help="run archive(s) whose recorded consumption counts against the budget; "
+        "repeatable (default: runs)",
+    )
+    acc.add_argument(
+        "--backend",
+        action="append",
+        default=None,
+        help="backend(s) to check; repeatable (default: claude, codex)",
+    )
+    acc.add_argument(
+        "--since",
+        default=None,
+        help="consumption window: ISO timestamp, Nd, or Nh — match your plan's reset window",
+    )
+    acc.add_argument(
+        "--budget",
+        action="append",
+        default=None,
+        metavar="BACKEND=USD",
+        help="declared budget for the window; repeatable (e.g. --budget claude=200). "
+        "No CLI exposes remaining quota, so %% used = Cadora's recorded spend / this number",
+    )
+    acc.add_argument(
+        "--probe",
+        action="store_true",
+        help="make one tiny live call per backend (costs a few tokens) — the only check that "
+        "catches an expired token; 'credentials stored' alone proves nothing",
+    )
+    acc.add_argument(
+        "--warn-at",
+        type=float,
+        default=0.9,
+        metavar="FRACTION",
+        help="flag a backend at this fraction of its budget (default: 0.9)",
+    )
+    acc.add_argument(
+        "--check",
+        action="store_true",
+        help="exit non-zero when any backend is flagged (missing CLI, failed probe, or at/over "
+        "--warn-at) — a pre-run guard for scripts",
+    )
+    acc.add_argument("--json", action="store_true", help="emit the structured report")
+    acc.set_defaults(func=cmd_accounts)
 
     usage = sub.add_parser("usage", help="summarize token and cost usage from run archives")
     usage.add_argument("--archive-dir", default="runs")

@@ -147,12 +147,10 @@ cadora verify pr7-claims --archive-dir runs
 `cadora verify` recomputes every file hash and checks the signature, so per-node cost and duration
 are **audit-grade** — provable after the pack leaves your machine.
 
-> **Honest duration (fix W5).** A reviewed node used to sign its wall-clock time, which included the
-> human's deliberation at the gate — a gate held open twenty minutes signed a twenty-minute node.
-> Telemetry now records that deliberation separately as `review_wait_seconds` and **subtracts** it
-> from the signed `duration_seconds`. A reviewed node signs only its real work time; non-review
-> nodes are unchanged. So a node that shows `41.2s` of duration with `18m 40s` of review wait is
-> being honest, not slow.
+> **Honest duration.** A reviewed node signs only its real work time: the human's deliberation at
+> the gate is recorded separately as `review_wait_seconds` and **excluded** from the signed
+> `duration_seconds`. So a node that shows `41.2s` of duration with `18m 40s` of review wait is
+> being honest, not slow. Non-review nodes carry their full span.
 
 ---
 
@@ -166,7 +164,7 @@ are **audit-grade** — provable after the pack leaves your machine.
 | Context tokens ≫ generation tokens | Context includes cache creation + cache read; a cached backend moves far more context than it generates | Not a bug — read the token split to see the cache share |
 | `by funding` shows `unknown` | The node's record carried no `funding_resolved` / `funding` tag | Cosmetic; newer runs resolve funding — the dollars are still correct |
 | Panel or `usage` is empty | Wrong archive directory, or no runs recorded | Point `--archive-dir` at the folder that contains `runs/`; confirm with `cadora archive ls` |
-| A reviewed node's duration looks too short | Human-review wait is excluded from the signed duration (fix W5) | Expected — see `review_wait_seconds` for the deliberation time |
+| A reviewed node's duration looks too short | Human-review wait is excluded from the signed duration | Expected — see `review_wait_seconds` for the deliberation time |
 
 ---
 

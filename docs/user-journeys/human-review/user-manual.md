@@ -125,7 +125,6 @@ next stage. A workspace-drift check verifies nothing changed underneath before i
 | “run workspace unknown” on submit | The run predates `cwd` recording, or the workspace moved | Start a fresh run; the dashboard needs the run's live workspace path |
 | Gate aborted while I was away | Finite `--review-timeout` expired | Recover with `--resume-from` (§6); relaunch with `--review-timeout 0` |
 | Decision submit does nothing | Non-JSON request blocked (CSRF guard) | Use the dashboard's own buttons; the endpoint requires `Content-Type: application/json` |
-| Comments got wiped | (Fixed) the auto-refresh no longer rebuilds an open review | Update to the current dashboard |
 
 ---
 

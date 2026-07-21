@@ -274,7 +274,7 @@ The common ones:
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Gate green, but the package doesn't ship | (Fixed) tooling-only fallback used to let tests import from `cwd` and green a non-building package | Current Cadora records `packaging_failed`; fix the `pyproject` packages config |
+| Gate reports `packaging_failed` | The workspace declares an installable package that does not build (flat-layout auto-discovery refused) | Fix the `pyproject` packages config — or let `--remediate` fix it; a non-building package is never greened |
 | `ruff check .` fails on code you didn't write | Gate venv was inside the workspace and got scanned | `--gate-setup auto` keeps the venv outside `cwd`; update Cadora |
 | A "missing module" that's right there in the tree | Bare `pytest` can't import your package (no install/`pythonpath`) | It's a remediable `failed`, not a prerequisite — add the package config or install editable |
 | `blocked_prerequisite` won't remediate | External tooling is genuinely missing — terminal by design | Provide the dependency/compiler (or a `--gate-wheelhouse`) yourself, then re-run |

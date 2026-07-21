@@ -20,6 +20,15 @@ from dataclasses import asdict
 from pathlib import Path
 
 from cadora.archive import RunArchive
+from cadora.budget import (
+    BUDGET_FAILOVER,
+    BUDGET_STOP,
+    BudgetLedger,
+    BudgetPolicy,
+    evaluate,
+    load_baseline,
+    resume_hint,
+)
 from cadora.executors.base import ExecutionResult, NodeExecutor
 from cadora.gates import GATE_BLOCKED_PREREQUISITE, GateResult, ShellGate
 from cadora.integrity import IntegrityReport, repair_prompt, scan_toolchain_integrity
@@ -97,6 +106,8 @@ def run_topology(
     resume_from: str | None = None,
     skip: list[str] | None = None,
     allow_drift: bool = False,
+    budget_policy: BudgetPolicy | None = None,
+    failover_executor: NodeExecutor | None = None,
 ) -> Path:
     if integrity_mode not in {"off", "audit", "enforce", "repair"}:
         raise ValueError(f"invalid integrity mode: {integrity_mode!r}")
@@ -143,6 +154,90 @@ def run_topology(
         + f" · run={run_id}"
     )
 
+    # Budget ledger: the archive's recorded spend, read ONCE, plus what this run burns. Reading it
+    # once is what lets a resumed run count its own earlier nodes (already archived) without also
+    # counting them as live spend.
+    ledger = BudgetLedger(baseline=load_baseline(archive_root)) if budget_policy else None
+    warned: set[str] = set()
+
+    def _budget_guard(node_id: str, node_executor: NodeExecutor) -> NodeExecutor:
+        """Decide, at a node boundary, whether ``node_executor`` may run the next node.
+
+        Returns the executor to use — possibly a different one, on failover. Raises SystemExit
+        to stop the run cleanly, with nothing in flight to lose.
+        """
+        if ledger is None or budget_policy is None:
+            return node_executor
+        verdict = evaluate(ledger, budget_policy, node_executor.name)
+        if not verdict.tripped:
+            return node_executor
+
+        if budget_policy.action == BUDGET_FAILOVER and failover_executor is not None:
+            alternate = evaluate(ledger, budget_policy, failover_executor.name)
+            if not alternate.tripped:
+                _log(
+                    f"⇄ budget: {verdict.summary} ≥ {budget_policy.warn_at:.0%} — moving "
+                    f"{node_id!r} and the rest of the run to {failover_executor.name!r} "
+                    f"({alternate.summary})"
+                )
+                telemetry.emit(
+                    "budget_failover",
+                    node_id=node_id,
+                    detail=f"{node_executor.name} -> {failover_executor.name}: {verdict.summary}",
+                )
+                return failover_executor
+            # Both backends are at the ceiling. Moving the run would just burn the second
+            # account, so stop instead of pretending failover helped.
+            _log(f"⚠ budget: failover target {failover_executor.name!r} is also at its ceiling")
+
+        if budget_policy.action in (BUDGET_STOP, BUDGET_FAILOVER):
+            out = archive.finalize(False)
+            reason = (
+                f"budget threshold reached before node {node_id!r}: {verdict.summary}, "
+                f"at or above the {budget_policy.warn_at:.0%} threshold"
+            )
+            telemetry.run_completed(False, error=reason)
+            _log(f"■ stopped at the {node_id!r} boundary — {verdict.summary}")
+            _log("  nothing was lost: every completed node is in the workspace and the archive.")
+            _log(
+                "  continue with: "
+                + resume_hint(
+                    node_id,
+                    topology=topology.name,
+                    run_id=run_id,
+                    failover_to=budget_policy.failover_to,
+                )
+            )
+            _log(f"  archive -> {out}")
+            raise SystemExit(reason)
+
+        if node_executor.name not in warned:  # BUDGET_WARN — say it once, then stay out of the way
+            warned.add(node_executor.name)
+            _log(
+                f"⚠ budget: {verdict.summary} — at or above the "
+                f"{budget_policy.warn_at:.0%} threshold (action=warn, continuing)"
+            )
+        return node_executor
+
+    def _under_budget_pressure(nodes: list[Node]) -> bool:
+        """True when any backend this wave would use has tripped and the policy would act.
+
+        Concurrent pre-execution launches every agent in the wave at once, which is not a node
+        boundary for the second and later nodes. Under pressure, fall back to the sequential
+        path so each node gets its own boundary check.
+        """
+        if ledger is None or budget_policy is None or budget_policy.action == "warn":
+            return False
+        for node in nodes:
+            candidate = (
+                construction_executor
+                if construction_executor and node.phase == "construction"
+                else executor
+            )
+            if evaluate(ledger, budget_policy, candidate.name).tripped:
+                return True
+        return False
+
     for wave in topo_sort(topology):
         # Independent nodes in a wave: pre-run their INITIAL agent execution concurrently — the
         # minutes-long part. Gates, integrity, remediation, review, and archiving stay sequential
@@ -154,7 +249,7 @@ def run_topology(
                 runnable, outputs, reviews, executor, construction_executor, cwd, hitl,
                 max_parallel, skip_ids,
             )
-            if max_parallel > 1 and len(runnable) > 1
+            if max_parallel > 1 and len(runnable) > 1 and not _under_budget_pressure(runnable)
             else {}
         )
         for node in wave:
@@ -172,6 +267,9 @@ def run_topology(
                 if construction_executor and node.phase == "construction"
                 else executor
             )
+            # The node boundary: nothing of this node has run yet, so a stop here loses nothing
+            # and a failover applies to the whole node rather than half of it.
+            node_executor = _budget_guard(node.id, node_executor)
             base_prompt = _render(node, outputs, reviews, skip_ids)
             revision_comments = ""
             review_history: list[ReviewResult] = []
@@ -268,6 +366,10 @@ def run_topology(
                 node_cost = result.cost_usd
                 if remediation_outcome is not None and remediation_outcome.cost_usd is not None:
                     node_cost = (node_cost or 0.0) + remediation_outcome.cost_usd
+                if ledger is not None:
+                    # Charged per attempt: a revision loop that re-runs this node spends again,
+                    # and the next boundary check must see that.
+                    ledger.record(node_executor.name, node_cost)
 
                 if failed:
                     archive.record(
