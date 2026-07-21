@@ -56,6 +56,10 @@ class RunTelemetry:
                 for node in topology.nodes
             },
         }
+        # Same reasoning as the manifest's node carry-forward: `--resume-from` reuses the run id,
+        # and a node it skips would otherwise be reported at cost 0 — under-reporting the run's
+        # real spend on the dashboard and in every reader of status.json.
+        self._prior_nodes = _prior_node_records(self.status_path)
         # W5: human review is not agent work. Record each review-wait interval so a node's
         # duration_seconds can exclude review time that overlapped its span — its own gates, and
         # under --max-parallel a sibling's review it sat idle through. review_wait_seconds keeps the
@@ -104,6 +108,13 @@ class RunTelemetry:
         already exist in the workspace.
         """
         node = self._node(node_id)
+        prior = self._prior_nodes.get(node_id, {})
+        # The node did not run *here*, but it did run — restore what that invocation recorded so
+        # the run's cost and duration stay whole.
+        for field in ("cost_usd", "credits", "duration_seconds", "review_wait_seconds",
+                      "generation_tokens", "context_tokens", "model", "gate", "integrity"):
+            if prior.get(field) is not None:
+                node[field] = prior[field]
         node["status"] = "skipped"
         node["skipped_reason"] = reason
         self.emit("node_skipped", node_id=node_id, reason=reason)
@@ -216,6 +227,18 @@ class RunTelemetry:
         tmp = self.status_path.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(self.status, indent=2))
         tmp.replace(self.status_path)
+
+
+def _prior_node_records(status_path: Path) -> dict[str, dict]:
+    """Node records already written for this run id, keyed by node id (empty when absent/corrupt)."""
+    if not status_path.is_file():
+        return {}
+    try:
+        prior = json.loads(status_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    nodes = prior.get("nodes")
+    return {k: v for k, v in nodes.items() if isinstance(v, dict)} if isinstance(nodes, dict) else {}
 
 
 def _token_totals(usage: dict) -> tuple[int, int]:

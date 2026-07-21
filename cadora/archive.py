@@ -35,7 +35,12 @@ class RunArchive:
             # Which Cadora produced this evidence (version + git state for editable installs) —
             # without it, a conductor that changed mid-run is invisible in the pack.
             "conductor": conductor_fingerprint(),
-            "nodes": [],
+            # A run id identifies the whole run, not one invocation of it. `--resume-from` opens a
+            # SECOND invocation against the same id and only records the nodes it actually runs, so
+            # starting from an empty list would write a manifest containing just those — deleting
+            # the earlier nodes' cost, usage, and gate records from the evidence. Carry them
+            # forward; `record` replaces by node_id, so a node that runs again updates in place.
+            "nodes": _carry_forward_nodes(self.dir),
         }
         self._ws_cwd: str | Path | None = None
         self._ws_archive_root: str | Path | None = None
@@ -163,7 +168,16 @@ class RunArchive:
             }
             if result.cost_usd is not None or remediation_cost is not None:
                 entry["cost_usd"] = (result.cost_usd or 0.0) + (remediation_cost or 0.0)
-        self.manifest["nodes"].append(entry)
+        # Replace, don't append: on a resume (or a re-run under the same id) this node may already
+        # be carried forward from an earlier invocation, and the manifest must hold one entry per
+        # node, showing its latest outcome — never a duplicate pair.
+        nodes = self.manifest["nodes"]
+        for index, existing in enumerate(nodes):
+            if existing.get("node_id") == entry.get("node_id"):
+                nodes[index] = entry
+                break
+        else:
+            nodes.append(entry)
 
     def finalize(self, ok: bool) -> Path:
         if self._ws_cwd is not None:
@@ -177,6 +191,23 @@ class RunArchive:
         self.manifest["ok"] = ok
         (self.dir / "manifest.json").write_text(json.dumps(self.manifest, indent=2))
         return self.dir
+
+
+def _carry_forward_nodes(run_dir: Path) -> list[dict]:
+    """Node entries already recorded for this run id, so a later invocation extends them.
+
+    A corrupt or unreadable manifest yields an empty list rather than aborting: refusing to start
+    a run because a *previous* one left bad JSON would be worse than losing the carry-forward.
+    """
+    manifest = run_dir / "manifest.json"
+    if not manifest.is_file():
+        return []
+    try:
+        prior = json.loads(manifest.read_text())
+    except (OSError, json.JSONDecodeError):
+        return []
+    nodes = prior.get("nodes")
+    return [n for n in nodes if isinstance(n, dict)] if isinstance(nodes, list) else []
 
 
 def list_runs(root: str | Path) -> list[dict]:

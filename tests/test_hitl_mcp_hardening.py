@@ -1,8 +1,7 @@
 """HITL MCP-surface hardening — fail-closed + fail-soft guarantees for the review tools.
 
-Phase 1 of the HITL test campaign (strategy/hitl-test-campaign-2026-07-15.md). The runner and the
-file/stdin review surfaces already degrade safely on bad or absent input; these tests lock the MCP
-tool path to the same bar, covering the three HIGH-risk seams the campaign identified:
+The runner and the file/stdin review surfaces already degrade safely on bad or absent input; these
+tests lock the MCP tool path to the same bar, covering its three highest-risk seams:
 
   W1  a gate with no timeout pins the run thread forever if a client starts a run and never submits
   W2  ``submit_review`` surfaced a raw ``ValueError`` on a bad decision / empty-comment request_changes

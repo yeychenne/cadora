@@ -1,8 +1,8 @@
 """HITL Phase-1 coverage — file-path robustness, gate/review ordering, telemetry, concurrency.
 
-Phase 1 of the HITL test campaign (strategy/hitl-test-campaign-2026-07-15.md), the non-MCP half:
-these pin behaviours that were correct-but-unverified, so a future refactor can't silently regress
-them. None of them needed a code change — they characterize guarantees the runner already makes.
+The non-MCP half of the HITL surface: these pin behaviours that were correct-but-unverified, so a
+future refactor can't silently regress them. None of them needed a code change — they characterize
+guarantees the runner already makes.
 
   T1.6  file reviewer survives a corrupt/partial decision file, and fails closed on a permanent one
   T1.7  the deterministic gate runs BEFORE the human review gate (a red gate is never reviewed)
