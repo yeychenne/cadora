@@ -244,16 +244,22 @@ New to Cadora, or bringing it to a hackathon? Start with the
 
 ## Status
 
-**v0.11.0** — review a pending gate **in the browser**: the stage's documents one click away,
-full-screen reading with **annotations** that flow into the request-changes comment, and a
-**conversation with the parked run** (ask why a document says what it says, or have it revised on
-the spot, before deciding). One dashboard serves **several project archives**, with honest time,
-cost, and liveness — token-only backends priced with the same flagged-`est.` normalization as
-`cadora usage`. Evidence carries provenance at both ends: `--resume-from` **verifies the workspace
-fingerprint** against the run being resumed (drift is refused, or recorded under `--allow-drift`),
-and every pack records **which conductor produced it** (version + git SHA). A twelve-capability
-**documentation library** pairs a user journey, a manual, and a design spec for everything above
-(see the guided tour). 327 tests, `ruff` clean, CI on Python 3.10–3.12.
+**v0.12.0** — review gates run on the reviewer's schedule, not the laptop's. A run **parks and
+exits** at its human gates (`--on-review park`, exit 75 — waiting is not failure), you **decide
+from a phone**
+on the dashboard's triage panel while no process is alive, and **`cadora resume`** applies the
+decision headless — the agents' completed work is never re-run or re-paid, downstream prompts
+render **byte-identical** to a never-parked run, and a stored decision is honored only if the
+**SHA-256 of the exact bytes reviewed** still matches. Every decision records **who** decided and
+**through which surface** (honestly self-asserted: `local-shell`, `dashboard`, `file-drop`,
+`mcp`), and `--reviewers` turns that into an **enforced allowlist** recorded in the manifest — an
+unlisted abort cannot kill a run. Spend is governed end to end: `cadora accounts` reads backend
+health in four layers (present / credentialed / live-probe / budget), `--budget` +
+`--on-budget stop|failover` holds a declared ceiling at node boundaries **and inside review
+conversations**, every spend path — resumed nodes, review turns, killed processes — reaches the
+ledger and the archive, and `--notify-url` pings your phone the moment a gate starts waiting.
+A thirteen-capability **documentation library** pairs a user journey, a manual, and a design spec
+for everything above (see the guided tour). 407 tests, `ruff` clean, CI on Python 3.10–3.12.
 
 **Roadmap:** dependency lockfile hardening, a
 backend contract matrix, a container sandbox wrapper, and additional backend/method packs as they

@@ -94,7 +94,7 @@ class ShellGate:
             # Substance, not presence: a gate that invoked a test runner but executed ZERO
             # tests (e.g. `go test` / `cargo test` / `jest --passWithNoTests` all exit 0 with
             # no tests) verified nothing — refuse to pass it.
-            if _invokes_test_runner(self.command) and _ran_zero_tests(detail):
+            if _invokes_test_runner(self.command) and _ran_zero_tests(detail, self.command):
                 passed, status = False, GATE_VACUOUS
             else:
                 passed, status = True, GATE_PASSED
@@ -272,7 +272,11 @@ _TESTS_RAN = re.compile(
     r"\b[1-9]\d*\s+(?:passed|passing|failed)\b"
     r"|^ok\s+\S+\s"
     r"|^---\s+(?:PASS|FAIL)\b"
-    r"|^test\s+.+\.\.\.\s+ok\b",
+    r"|^test\s+.+\.\.\.\s+ok\b"
+    # Swift: XCTest ("Executed 3 tests, with 0 failures") and swift-testing ("Test run with
+    # 3 tests passed"). The [1-9] guard keeps the zero-test forms out of the positive set.
+    r"|\bexecuted\s+[1-9]\d*\s+tests?\b"
+    r"|\bwith\s+[1-9]\d*\s+tests?\s+(?:passed|failed)\b",
     re.IGNORECASE | re.MULTILINE,
 )
 # Explicit "no tests executed" signals across runners.
@@ -284,7 +288,21 @@ _NO_TESTS = re.compile(
     r"|no tests found"
     r"|tests:\s+0 total"
     r"|\b0 passing\b"
-    r"|executed 0 of 0",
+    r"|executed 0 of 0"
+    r"|\bexecuted\s+0\s+tests?\b"
+    r"|\bwith\s+0\s+tests?\s+(?:passed|failed)\b",
+    re.IGNORECASE,
+)
+# Runners that print a test summary ONLY when tests exist. For these, silence IS the zero-test
+# signal: `swift test` over a target with no tests exits 0 having printed just "Build complete!"
+# — there is no "no tests" string to match, so the ABSENCE of positive evidence is the only
+# evidence there is. Verified live: such a package was certified `passed` before this rule.
+#
+# The failure mode is deliberately fail-closed. If a real Swift run's summary is ever missed by
+# `_TESTS_RAN`, the gate reports `vacuous` — loud, remediable, and visibly wrong — rather than
+# certifying a suite that proved nothing.
+_SILENT_WHEN_EMPTY = re.compile(
+    r"(?:^|[\s/&|=])swift\s+test(?:$|[\s/&|])",
     re.IGNORECASE,
 )
 
@@ -293,11 +311,18 @@ def _invokes_test_runner(command: str) -> bool:
     return bool(_TEST_RUNNER.search(command))
 
 
-def _ran_zero_tests(detail: str) -> bool:
-    """True when a passing test gate executed no tests at all (a vacuous pass)."""
+def _ran_zero_tests(detail: str, command: str = "") -> bool:
+    """True when a passing test gate executed no tests at all (a vacuous pass).
+
+    Positive evidence wins: a summary showing tests ran settles it. Otherwise an explicit
+    "no tests" signal settles it. What remains is silence — and for a runner that only prints
+    a summary when tests exist, silence means zero tests, not "probably fine".
+    """
     if _TESTS_RAN.search(detail):
         return False
-    return bool(_NO_TESTS.search(detail))
+    if _NO_TESTS.search(detail):
+        return True
+    return bool(command and _SILENT_WHEN_EMPTY.search(command))
 
 
 def _requirements_fingerprint(cwd: Path, requirements: Path, wheelhouse: str | None) -> str:

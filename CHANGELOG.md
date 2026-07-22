@@ -1,5 +1,95 @@
 # Changelog
 
+## v0.12.0 — 2026-07-22
+
+The walk-away release. A review gate no longer holds the conductor hostage to the reviewer's
+calendar: a run can **park and exit** at its gates, be **decided from a phone** while no process
+is alive, and **resume headless** — with the evidence recording who decided, through which
+surface, over exactly which bytes. Underneath it, the cost accounting was completed so that no
+recorded spend path — resumed nodes, review conversations, every node completed before a kill —
+escapes the ledger, the archive, or a declared budget ceiling. (The one honest exception: a node
+killed mid-execution reports no cost to record — backends price a turn only at completion.)
+
+### Added
+- **Park-and-exit** (`--on-review park`): at a `--hitl` review gate the wave drains (siblings
+  finish and record), ONE self-contained park record collects every pending gate — topology,
+  resolved gate specs, execution contract, per-document SHA-256s, workspace fingerprint — and the
+  run terminates cleanly with **exit code 75** (`EX_TEMPFAIL`): "waiting for a human" is not a
+  failure, and the laptop can sleep. Run status `parked` is distinct from failed and completed.
+- **`cadora resume runs/<run_id>`** continues a parked run from its record alone: the parked
+  nodes' agent work is **not re-run and not re-paid** — the serialized result is injected through
+  the same path a concurrent wave uses, the deterministic gate is **re-checked**, the workspace
+  fingerprint is verified (drift refused unless `--allow-drift`), and downstream prompts render
+  **byte-identical** to a never-parked run. Parked downtime lands in `review_wait_seconds`, never
+  in a node's signed `duration_seconds`. A finished run deletes its park record.
+- **Reviewer identity in the evidence.** Every review decision now records `reviewer`, `method`
+  (`local-shell` | `dashboard` | `file-drop` | `mcp` — honestly self-asserted, no fake
+  authentication), and the **SHA-256 of each document surfaced for the decision, hashed at
+  decision time**. `--reviewer NAME` / `$CADORA_REVIEWER` declare the operator's identity; the
+  dashboard gains a persisted name field; MCP `submit_review` gains a `reviewer` parameter.
+  Old packs and old decision files flow unchanged (`reviewer: null`, honestly).
+- **`--reviewers a,b` — an enforced authorization policy.** An unlisted or anonymous decision —
+  **including an abort** — is rejected at decision time, logged, and the gate re-asks without
+  re-running the agent or consuming a revision. The policy in force is recorded in the manifest
+  (`review_policy`), so "was this approver permitted at the time?" is answerable from the pack
+  alone. On a resume the allowlist is not overridable: the policy recorded at park time governs.
+- **Decide while parked (mobile triage).** A parked run's pending gates surface on the dashboard
+  as a phone-width triage panel; a decision POSTs to the archive (`parked-decisions.json`) bound
+  to one node, to the SHA-256 of the exact bytes reviewed, and to the declared identity — and is
+  honored at the next resume only if all three still hold (a drifted document discards it,
+  loudly; a stored impostor faces the same allowlist as a live one). Consume-once either way.
+  `cadora resume --on-review park` becomes a **triage sweep**: apply the phone's decisions,
+  re-park the rest, headless. Transport stays a tunnel to the loopback dashboard — no
+  authentication layer was added, and the non-loopback bind guard is unchanged.
+- **`--notify-url` / `$CADORA_NOTIFY_URL`** — one fire-and-forget webhook POST (ntfy-style: the
+  body is the message) when a gate starts waiting and when a run parks. Daemon thread, short
+  timeout, every failure swallowed: a dead endpoint never delays or fails a run.
+- **`cadora accounts`** — backend account health in four layers: **present** (CLI + version),
+  **credentialed** (stored, deliberately never called "valid"), **live** (`--probe`, the only
+  layer that catches an expired token), and **budget** (`--budget BACKEND=USD` measured against
+  Cadora's own recorded consumption — no CLI exposes remaining quota). `--check` turns a tripped
+  threshold into a non-zero exit for pre-run guards; `--json` for tooling.
+- **Budget enforcement** (`--budget BACKEND=USD --on-budget warn|stop|failover`): evaluated at
+  **node boundaries** — a stop never loses mid-node work and prints the exact resume command;
+  `failover` moves the remaining nodes to `--failover-to` only if that backend is itself under
+  threshold. The ceiling also holds **during** a parked review conversation: an over-ceiling
+  Ask/Revise is refused with the numbers, and the decision itself stays free.
+- **Run-level review cost.** `manifest.review_cost_usd`, `UsageSummary.review_cost_usd`, and a
+  `cadora usage` line answer "what did human review cost?" — present only when something spent.
+- **Walk-away review has its own capability trio** — the thirteenth in the library: a narrated
+  user journey (park → phone → headless resume), a user manual, and a design spec for the parked
+  triage surfaces.
+- **Docs site.** The guided tour and the capability library render on GitHub Pages; the
+  README links resolve to rendered pages; PyPI's sidebar gains Documentation and Changelog links.
+
+### Fixed
+- **A resume no longer deletes the earlier invocation's evidence.** A `--resume-from` under the
+  same run id used to rewrite `manifest.json` with only the nodes that ran that time — costs,
+  usage, and gate records of completed nodes were lost (observed: 59% of a run's recorded cost).
+  Node entries now carry forward and **accumulate across invocations** (`prior_invocations`
+  preserves the detail); `status.json` matches, so the dashboard and the evidence cannot disagree.
+- **Conversational review spend reaches the ledger and the archive.** Every Ask/Revise at a
+  parked gate is a real executor call and messages are unbounded; that spend was invisible to
+  `--budget` and absent from the manifest. It is charged at one seam, survives every exit path
+  (including a failed re-run after a costly conversation), and appears per node as
+  `review_conversation_cost_usd`.
+- **A killed run no longer loses its accounting.** The manifest is flushed atomically after
+  every node (`"ok": null` marks in-flight); each review turn journals to
+  `runs/<id>/review-spend.jsonl` the moment it completes, and a resume recovers, charges, and
+  clears the journal. Torn writes are skipped, never fatal.
+- **A Swift test gate cannot pass on zero tests.** `swift test` over a target with no tests
+  exits 0 having printed only `Build complete!` — no summary line, and therefore no "no tests"
+  string for the vacuous-pass detector to match, so such a suite was certified `passed`. Runners
+  that print a summary *only* when tests exist are now handled by their silence: absence of
+  positive evidence is the evidence. Both Swift frameworks' summaries (XCTest's `Executed N
+  tests`, swift-testing's `Test run with N tests`) count as proof a suite ran, and the rule is
+  fail-closed — a missed summary reports `vacuous`, never a false green.
+- **Dashboard error codes tell the truth**: `send_error` status lines containing an em-dash
+  (latin-1-only per HTTP) were converting honest 404s into 400s.
+- **Auto-polling pauses while any decision surface is open** — a rerender no longer wipes a
+  half-typed comment on a parked gate (the live-review panel had this fix; the park panel now
+  shares it).
+
 ## v0.11.0 — 2026-07-20
 
 The human-review release. HITL went through a full validation campaign — two complex applications

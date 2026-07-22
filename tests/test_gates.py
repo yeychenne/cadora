@@ -165,6 +165,52 @@ def test_test_runner_that_ran_zero_tests_is_vacuous(tmp_path):
     assert result.exit_code == 0
 
 
+def test_swift_test_that_printed_no_summary_is_vacuous(tmp_path):
+    """`swift test` over a target with no tests exits 0 having printed only "Build complete!".
+
+    There is no "no tests" string to match, so silence is the only signal there is — and this
+    exact output was certified `passed` before the silent-runner rule. Captured from a real
+    Swift 6.3 run, not invented.
+    """
+    command = "swift() { echo 'Building for debugging...'; echo 'Build complete! (0.42s)'; }; swift test"
+    result = ShellGate("test", command).check(str(tmp_path))
+
+    assert result.passed is False
+    assert result.status == GATE_VACUOUS
+    assert result.exit_code == 0
+
+
+def test_swift_test_with_real_tests_passes(tmp_path):
+    """The other side of the silent-runner rule: a genuine run must not be called vacuous.
+
+    Both Swift test frameworks' summary lines, so the strictness cannot misfire on real work.
+    """
+    xctest = (
+        "swift() { echo \"Test Suite 'All tests' passed\"; "
+        "echo 'Executed 3 tests, with 0 failures (0 unexpected) in 0.004 seconds'; }; swift test"
+    )
+    assert ShellGate("test", xctest).check(str(tmp_path)).status == GATE_PASSED
+
+    swift_testing = (
+        "swift() { echo 'Test run with 3 tests passed after 0.021 seconds.'; }; swift test"
+    )
+    assert ShellGate("test", swift_testing).check(str(tmp_path)).status == GATE_PASSED
+
+
+def test_swift_zero_test_summaries_are_vacuous(tmp_path):
+    """When either framework DOES print a zero summary, it is caught explicitly too."""
+    for output in ("Executed 0 tests, with 0 failures", "Test run with 0 tests passed"):
+        command = f"swift() {{ echo '{output}'; }}; swift test"
+        assert ShellGate("test", command).check(str(tmp_path)).status == GATE_VACUOUS
+
+
+def test_silent_runner_rule_does_not_leak_to_other_runners(tmp_path):
+    """pytest and friends print an explicit zero signal, so silence must stay benign for them —
+    a quiet non-test command must never be reclassified as a vacuous test run."""
+    quiet_pytest = "pytest() { echo 'some unrelated chatter'; }; pytest -q"
+    assert ShellGate("test", quiet_pytest).check(str(tmp_path)).status == GATE_PASSED
+
+
 def test_go_with_no_test_files_is_vacuous(tmp_path):
     command = "go() { echo '? ./x [no test files]'; }; go test ./..."
     result = ShellGate("test", command).check(str(tmp_path))
