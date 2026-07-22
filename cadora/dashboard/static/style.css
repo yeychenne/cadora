@@ -813,7 +813,8 @@ pre {
   padding: 8px 12px;
   margin-bottom: 12px;
 }
-#review-comments {
+#review-comments,
+#review-reviewer {
   width: 100%;
   box-sizing: border-box;
   background: var(--canvas);
@@ -825,6 +826,7 @@ pre {
   resize: vertical;
   margin-bottom: 10px;
 }
+#review-reviewer { resize: none; }
 .review-actions { display: flex; align-items: center; gap: 8px; }
 .review-btn {
   font-size: 13px;

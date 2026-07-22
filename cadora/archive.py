@@ -48,6 +48,11 @@ class RunArchive:
         self._ws_cwd: str | Path | None = None
         self._ws_archive_root: str | Path | None = None
 
+    def set_review_policy(self, reviewers: list[str]) -> None:
+        """Record the authorization policy in force — auditable next to the decisions it governed."""
+        self.manifest["review_policy"] = {"reviewers": list(reviewers)}
+        self._write_manifest()
+
     def track_workspace(self, cwd: str | Path, archive_root: str | Path) -> None:
         """Register the run's workspace so :meth:`finalize` snapshots its content fingerprint.
 

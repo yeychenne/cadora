@@ -20,6 +20,15 @@ class ReviewResult:
     decision: str
     comments: str = ""
     timestamp: str = ""
+    # Who decided, and through what. HONESTLY SELF-ASSERTED by design: a local decision's
+    # identity is whatever the operator declares — labelling it truthfully (`local-shell`,
+    # `file-drop`, `dashboard`, `mcp`) is what lets an auditor weigh a laptop approval
+    # differently from a stronger method later, without pretending authentication exists where
+    # it doesn't. All optional: packs written before these fields verify unchanged.
+    reviewer: str | None = None
+    method: str | None = None
+    # SHA-256 of each document surfaced for this decision — what the reviewer actually saw.
+    documents: list | None = None
 
     def __post_init__(self) -> None:
         if self.decision not in REVIEW_DECISIONS:
@@ -38,12 +47,20 @@ def format_review_history(reviews: list[ReviewResult]) -> str:
     sections = []
     for attempt, review in enumerate(reviews, start=1):
         body = review.comments.strip() or "(no comments)"
-        sections.append(
-            f"## Review {attempt}\n\n"
-            f"- Decision: `{review.decision}`\n"
-            f"- Timestamp: `{review.timestamp}`\n\n"
-            f"{body}\n"
-        )
+        lines = [
+            f"## Review {attempt}",
+            "",
+            f"- Decision: `{review.decision}`",
+            f"- Timestamp: `{review.timestamp}`",
+        ]
+        if review.reviewer or review.method:
+            who = review.reviewer or "(unattributed)"
+            lines.append(f"- Reviewer: `{who}` via `{review.method or 'unknown'}`")
+        if review.documents:
+            lines.append("- Documents reviewed:")
+            for doc in review.documents:
+                lines.append(f"  - `{doc.get('path')}` — sha256 `{doc.get('sha256')}`")
+        sections.append("\n".join(lines) + f"\n\n{body}\n")
     return "\n".join(sections)
 
 
@@ -177,7 +194,11 @@ def file_review_fn(timeout: float = 3600.0, interval: float = 2.0, executor=None
                     return ReviewResult(REVIEW_ABORT, f"invalid decision in {DECISION_FILE}: {choice!r}")
                 if choice == REVIEW_REQUEST_CHANGES and not comments:
                     return ReviewResult(REVIEW_ABORT, "request_changes requires reviewer comments")
-                return ReviewResult(choice, comments)
+                # Identity travels in the decision file: the dashboard stamps method=dashboard
+                # and the reviewer's declared name; a hand-dropped file is honestly `file-drop`.
+                reviewer = str(data.get("reviewer") or "").strip() or None
+                method = str(data.get("method") or "").strip() or "file-drop"
+                return ReviewResult(choice, comments, reviewer=reviewer, method=method)
             time.sleep(interval)
         request.unlink(missing_ok=True)
         return ReviewResult(REVIEW_ABORT, f"file review timed out after {int(timeout)}s")
@@ -393,7 +414,13 @@ def read_review_request(cwd: str | Path) -> dict | None:
         return None
 
 
-def write_review_decision(cwd: str | Path, decision: str, comments: str = "") -> dict:
+def write_review_decision(
+    cwd: str | Path,
+    decision: str,
+    comments: str = "",
+    reviewer: str | None = None,
+    method: str | None = None,
+) -> dict:
     """Deliver a review decision to a ``--review-file`` run by dropping its decision file.
 
     The cross-process counterpart to :func:`file_review_fn`. Fails **soft** the same way the MCP
@@ -409,5 +436,10 @@ def write_review_decision(cwd: str | Path, decision: str, comments: str = "") ->
         return {"error": "no review is pending for this run"}
     # Atomic for the same reason as the message file — the gate loop tolerates a partial read by
     # retrying, but there is no reason to open the window at all.
-    _write_json_atomic(Path(cwd) / DECISION_FILE, {"decision": decision, "comments": comments})
+    payload: dict = {"decision": decision, "comments": comments}
+    if reviewer:
+        payload["reviewer"] = str(reviewer).strip()
+    if method:
+        payload["method"] = str(method).strip()
+    _write_json_atomic(Path(cwd) / DECISION_FILE, payload)
     return {"submitted": decision}

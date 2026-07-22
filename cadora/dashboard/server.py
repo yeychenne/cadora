@@ -129,7 +129,14 @@ def make_handler(archive_dir: str | Path | list[str | Path]):
                 return
             body = self._read_json_body()
             result = write_review_decision(
-                cwd, str(body.get("decision", "")), str(body.get("comments", ""))
+                cwd,
+                str(body.get("decision", "")),
+                str(body.get("comments", "")),
+                # Self-asserted, like every local surface — but recorded, with the method that
+                # carried it, so the evidence can distinguish a dashboard approval from a
+                # hand-dropped file.
+                reviewer=str(body.get("reviewer", "")).strip() or None,
+                method="dashboard",
             )
             self._json(result, status=200 if "submitted" in result else 400)
 

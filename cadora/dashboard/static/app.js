@@ -773,6 +773,9 @@ const renderReviewPanel = (review) => {
       <div class="review-preview md-view" id="review-preview"></div>
       ${convo}
       <textarea id="review-comments" rows="2" placeholder="Comments — required to request changes"></textarea>
+      <input id="review-reviewer" type="text" maxlength="80"
+             placeholder="Your name — recorded in the evidence with this decision"
+             value="${escapeHtml(localStorage.getItem("cadora-reviewer") || "")}" />
       <div class="review-actions">
         <button class="review-btn approve" data-decision="approve">Approve</button>
         <button class="review-btn changes" data-decision="request_changes">Request changes</button>
@@ -918,6 +921,11 @@ const loadRunDetail = async (runId) => {
         body: JSON.stringify({
           decision: button.dataset.decision,
           comments: document.getElementById("review-comments").value,
+          reviewer: (() => {
+            const who = (document.getElementById("review-reviewer")?.value || "").trim();
+            if (who) localStorage.setItem("cadora-reviewer", who);
+            return who;
+          })(),
         }),
       });
       const result = await submitResponse.json().catch(() => ({}));

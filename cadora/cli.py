@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from dataclasses import asdict
@@ -136,6 +137,8 @@ def cmd_run(args) -> int:
         "on_budget": getattr(args, "on_budget", "warn"),
         "budget_warn_at": getattr(args, "budget_warn_at", 0.9),
         "failover_to": getattr(args, "failover_to", None),
+        "reviewer": _reviewer_identity(args),
+        "reviewers": _split_csv(getattr(args, "reviewers", None)),
     }
     run_id = args.run_id or _default_run_id()
     review_fn = None
@@ -172,9 +175,20 @@ def cmd_run(args) -> int:
         failover_executor=failover_executor,
         on_review=on_review,
         park_contract=park_contract,
+        default_reviewer=park_contract["reviewer"],
+        reviewers=park_contract["reviewers"],
     )
     print(f"run complete: {out}")
     return 0
+
+
+def _reviewer_identity(args) -> str | None:
+    """The operator's declared identity: --reviewer wins, CADORA_REVIEWER is the ambient default."""
+    explicit = getattr(args, "reviewer", None)
+    if explicit and explicit.strip():
+        return explicit.strip()
+    ambient = os.environ.get("CADORA_REVIEWER", "").strip()
+    return ambient or None
 
 
 def cmd_resume(args) -> int:
@@ -287,6 +301,11 @@ def cmd_resume(args) -> int:
         park_pending=pending,
         initial_outputs=initial_outputs,
         initial_reviews=record.get("reviews", {}),
+        # Identity: the resume operator's declaration wins; the parking invocation's is the
+        # fallback. The ALLOWLIST is not overridable from the resume command line — the policy
+        # that governed the run is the policy recorded when it started.
+        default_reviewer=_reviewer_identity(args) or contract.get("reviewer"),
+        reviewers=contract.get("reviewers"),
     )
     print(f"run complete: {out}")
     return 0
@@ -1029,6 +1048,21 @@ def main(argv=None) -> int:
         "gate, and exits cleanly with code 75 — the laptop can sleep; `cadora resume` "
         "continues later without re-running (or re-paying for) the agents' work",
     )
+    r.add_argument(
+        "--reviewer",
+        metavar="NAME",
+        help="your declared identity, recorded on every review decision you make "
+        "(default: $CADORA_REVIEWER). Honestly self-asserted — the evidence records who "
+        "claimed to decide and through which surface",
+    )
+    r.add_argument(
+        "--reviewers",
+        metavar="NAME[,NAME...]",
+        help="allowlist of identities permitted to decide review gates. Declared, it is "
+        "ENFORCED at decision time (an unlisted or anonymous decision — including abort — is "
+        "rejected and the gate re-asks) and recorded in the manifest as the policy in force. "
+        "Absent, anyone may decide and the identity is still recorded",
+    )
     r.set_defaults(func=cmd_run)
 
     res = sub.add_parser(
@@ -1060,6 +1094,13 @@ def main(argv=None) -> int:
         action="store_true",
         help="proceed even if the workspace changed while parked (default: refuse; the drift is "
         "recorded in the evidence pack either way)",
+    )
+    res.add_argument(
+        "--reviewer",
+        metavar="NAME",
+        help="your declared identity for the pending decisions (default: $CADORA_REVIEWER, then "
+        "the identity the run was parked with). The --reviewers allowlist is NOT overridable "
+        "here — the policy recorded at park time governs",
     )
     res.add_argument("--yes", "-y", action="store_true", help="skip the autonomous-run confirmation")
     res.set_defaults(func=cmd_resume)

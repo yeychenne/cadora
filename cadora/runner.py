@@ -124,6 +124,8 @@ def run_topology(
     park_pending: dict | None = None,
     initial_outputs: dict[str, str] | None = None,
     initial_reviews: dict[str, str] | None = None,
+    default_reviewer: str | None = None,
+    reviewers: list[str] | None = None,
 ) -> Path:
     if integrity_mode not in {"off", "audit", "enforce", "repair"}:
         raise ValueError(f"invalid integrity mode: {integrity_mode!r}")
@@ -144,6 +146,10 @@ def run_topology(
 
     archive = RunArchive(archive_root, run_id, executor.name, topology.name)
     archive.track_workspace(cwd, archive_root)
+    if reviewers is not None:
+        # The policy in force, recorded next to the decisions it governed — "was this approver
+        # permitted at the time?" must be answerable from the pack alone, years later.
+        archive.set_review_policy(sorted(reviewers))
     telemetry = RunTelemetry(archive_root, run_id, topology, executor.name)
     telemetry.run_started()
     _write_run_input(archive_root, run_id, topology, cwd)
@@ -331,7 +337,13 @@ def run_topology(
                 # and the review verdicts so MAX_REVIEW_REVISIONS cannot reset across a park.
                 attempt_results = [deserialize_result(a) for a in restore.get("prior_attempts", [])]
                 review_history = [
-                    ReviewResult(r["decision"], r.get("comments", ""))
+                    ReviewResult(
+                        r["decision"],
+                        r.get("comments", ""),
+                        reviewer=r.get("reviewer"),
+                        method=r.get("method"),
+                        documents=r.get("documents"),
+                    )
                     for r in restore.get("review_history", [])
                 ]
 
@@ -483,7 +495,13 @@ def run_topology(
                                     serialize_result(a) for a in attempt_results[:-1]
                                 ],
                                 "review_history": [
-                                    {"decision": r.decision, "comments": r.comments}
+                                    {
+                                        "decision": r.decision,
+                                        "comments": r.comments,
+                                        "reviewer": r.reviewer,
+                                        "method": r.method,
+                                        "documents": r.documents,
+                                    }
                                     for r in review_history
                                 ],
                                 # The free win from _doc_snapshot: these SHA-256s say exactly
@@ -517,12 +535,35 @@ def run_topology(
                             ledger, budget_policy, node_executor.name, journal_carried
                         )
                     try:
-                        review = _invoke_review(review_fn, node, node_cwd, documents)
+                        while True:
+                            review = _invoke_review(review_fn, node, node_cwd, documents)
+                            if not isinstance(review, ReviewResult):
+                                raise TypeError("review_fn must return ReviewResult")
+                            # Attribution: who decided, via what, over exactly which bytes.
+                            # Identity is honestly self-asserted; the doc SHAs are not.
+                            review = _enrich_review(
+                                review, default_reviewer, documents, node_cwd
+                            )
+                            if reviewers is not None and (review.reviewer or "") not in reviewers:
+                                # Declared policy: an unauthorized decision — INCLUDING an
+                                # abort — does not consume the gate. Re-ask; never re-run the
+                                # agent; never count a revision.
+                                _log(
+                                    f"✗ decision by {review.reviewer or '(unattributed)'} "
+                                    f"via {review.method or 'unknown'} rejected — not in the "
+                                    "--reviewers allowlist; the gate remains open"
+                                )
+                                telemetry.emit(
+                                    "review_rejected",
+                                    node_id=node.id,
+                                    reviewer=review.reviewer,
+                                    method=review.method,
+                                )
+                                continue
+                            break
                     finally:
                         if hasattr(review_fn, "budget_guard"):
                             del review_fn.budget_guard
-                    if not isinstance(review, ReviewResult):
-                        raise TypeError("review_fn must return ReviewResult")
                     # A parked gate answers questions and produces revisions on the node's
                     # executor — real spend, and unbounded, since a reviewer may send any number
                     # of messages. Charge it here, before any branch below exits, so no path can
@@ -1089,6 +1130,40 @@ def _make_review_guard(ledger, policy, backend: str, carried: float):
     return guard
 
 
+def _enrich_review(
+    review: ReviewResult,
+    default_reviewer: str | None,
+    documents: list[tuple[str, str]] | None,
+    node_cwd: str,
+) -> ReviewResult:
+    """Complete a decision's attribution before it enters the evidence.
+
+    The surface says what it knows (its method, a declared name); the runner fills the rest —
+    the ``--reviewer``/``CADORA_REVIEWER`` identity when the surface carried none, and the
+    SHA-256 of every document that was surfaced for this decision. The hashes are computed at
+    decision time: "what the reviewer saw" means these bytes, not whatever the file said later.
+    """
+    import dataclasses
+
+    docs = review.documents
+    if docs is None and documents:
+        docs = []
+        for path, kind in documents:
+            entry: dict = {"path": path, "kind": kind}
+            try:
+                entry["sha256"] = hashlib.sha256(
+                    (Path(node_cwd) / path).read_bytes()
+                ).hexdigest()
+            except OSError:
+                entry["sha256"] = None
+            docs.append(entry)
+    return dataclasses.replace(
+        review,
+        reviewer=review.reviewer or default_reviewer,
+        documents=docs,
+    )
+
+
 def _review_spend(review_fn) -> float:
     """Dollars the review surface has spent answering reviewers so far (0.0 if it doesn't track).
 
@@ -1153,19 +1228,22 @@ def _stdin_review(
             REVIEW_ABORT,
             "interactive review unavailable: stdin is not a TTY — use --review-file for headless "
             "review (poll a decision file), the MCP review surface, or --yes to auto-approve",
+            method="local-shell",
         )
 
     try:
         choice = input("Decision: [a]pprove, [r]equest changes, [x]abort: ").strip().lower()
     except EOFError:
-        return ReviewResult(REVIEW_ABORT, "interactive review input closed unexpectedly")
+        return ReviewResult(REVIEW_ABORT, "interactive review input closed unexpectedly", method="local-shell")
 
     if choice in {"a", "approve"}:
-        return ReviewResult(REVIEW_APPROVE)
+        return ReviewResult(REVIEW_APPROVE, method="local-shell")
     if choice in {"x", "abort"}:
-        return ReviewResult(REVIEW_ABORT, "operator aborted at human review gate")
+        return ReviewResult(REVIEW_ABORT, "operator aborted at human review gate", method="local-shell")
     if choice not in {"r", "request_changes", "request changes"}:
-        return ReviewResult(REVIEW_ABORT, f"invalid review decision: {choice or '(empty)'}")
+        return ReviewResult(
+            REVIEW_ABORT, f"invalid review decision: {choice or '(empty)'}", method="local-shell"
+        )
 
     _log("Enter required changes; finish with a line containing only EOF.")
     lines: list[str] = []
@@ -1176,11 +1254,11 @@ def _stdin_review(
                 break
             lines.append(line)
     except EOFError:
-        return ReviewResult(REVIEW_ABORT, "review comments input closed unexpectedly")
+        return ReviewResult(REVIEW_ABORT, "review comments input closed unexpectedly", method="local-shell")
     comments = "\n".join(lines).strip()
     if not comments:
-        return ReviewResult(REVIEW_ABORT, "request_changes requires reviewer comments")
-    return ReviewResult(REVIEW_REQUEST_CHANGES, comments)
+        return ReviewResult(REVIEW_ABORT, "request_changes requires reviewer comments", method="local-shell")
+    return ReviewResult(REVIEW_REQUEST_CHANGES, comments, method="local-shell")
 
 
 def _log(msg: str) -> None:

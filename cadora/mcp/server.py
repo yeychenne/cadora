@@ -97,7 +97,7 @@ def build_app(executor_factory=None, *, host="127.0.0.1", port=8000):
         }
 
     @app.tool()
-    def submit_review(run_id: str, decision: str, comments: str = "") -> dict:
+    def submit_review(run_id: str, decision: str, comments: str = "", reviewer: str = "") -> dict:
         """Submit the pending review decision: ``approve`` | ``request_changes`` | ``abort``.
 
         Fails soft: an invalid decision, a ``request_changes`` with no comments, or a submit when no
@@ -109,7 +109,11 @@ def build_app(executor_factory=None, *, host="127.0.0.1", port=8000):
         if session is None:
             return {"error": f"unknown run {run_id!r}"}
         try:
-            result = ReviewResult(decision, comments)
+            # The bearer token authenticates the CHANNEL, not a person — `reviewer` is the
+            # person's self-asserted name, recorded with method=mcp so the evidence says both.
+            result = ReviewResult(
+                decision, comments, reviewer=reviewer.strip() or None, method="mcp"
+            )
         except ValueError as exc:
             return {"error": str(exc)}
         try:
