@@ -41,6 +41,9 @@ class RunArchive:
             # the earlier nodes' cost, usage, and gate records from the evidence. Carry them
             # forward; `record` replaces by node_id, so a node that runs again updates in place.
             "nodes": _carry_forward_nodes(self.dir),
+            # None = in flight. Every reader already uses .get("ok"), and an explicit None lets
+            # them distinguish "still running / killed" from "finished" honestly.
+            "ok": None,
         }
         self._ws_cwd: str | Path | None = None
         self._ws_archive_root: str | Path | None = None
@@ -186,6 +189,10 @@ class RunArchive:
                 break
         else:
             nodes.append(entry)
+        # Durability: flush after EVERY node, not only at finalize. A manifest that exists only
+        # in memory means a SIGKILL loses every completed node's cost from the accounting chain
+        # (usage, accounts, the budget baseline all read this file). `ok` stays None — in flight.
+        self._write_manifest()
 
     def finalize(self, ok: bool) -> Path:
         if self._ws_cwd is not None:
@@ -197,8 +204,27 @@ class RunArchive:
             except OSError:
                 pass
         self.manifest["ok"] = ok
-        (self.dir / "manifest.json").write_text(json.dumps(self.manifest, indent=2))
+        self._write_manifest()
         return self.dir
+
+    def _write_manifest(self) -> None:
+        """Write the manifest atomically (tmp + replace), with the run-level review rollup.
+
+        Atomic for the same reason the review files are: readers (dashboard, usage, a resumed
+        run's carry-forward) poll this file, and a torn write would make the carry-forward see
+        "corrupt" and silently drop the whole prior history.
+        """
+        review_total = round(
+            sum(n.get("review_conversation_cost_usd") or 0.0 for n in self.manifest["nodes"]), 6
+        )
+        # Only surface the rollup once something spent — a permanent 0.0 on every non-HITL run
+        # would read as "reviewed, for free" rather than "no review happened".
+        if review_total:
+            self.manifest["review_cost_usd"] = review_total
+        target = self.dir / "manifest.json"
+        tmp = target.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(self.manifest, indent=2))
+        tmp.replace(target)
 
 
 def _sum_usage(prior: dict | None, current: dict | None) -> dict:

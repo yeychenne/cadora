@@ -116,14 +116,21 @@ def cmd_run(args) -> int:
         raise SystemExit(
             "--on-budget/--failover-to need at least one --budget BACKEND=USD to measure against"
         )
+    run_id = args.run_id or _default_run_id()
     review_fn = None
     if getattr(args, "review_file", False):
         # Headless HITL: no TTY (Quick Desktop / CI). Write a request file, poll for a decision.
+        from pathlib import Path as _Path
+
         from cadora.review import file_review_fn
 
-        # Pass the executor so the parked gate can also answer conversational review (ask / revise).
-        review_fn = file_review_fn(timeout=args.review_timeout, executor=executor)
-    run_id = args.run_id or _default_run_id()
+        # Pass the executor so the parked gate can also answer conversational review (ask / revise),
+        # and a journal in the run's archive so that spend survives a kill while parked.
+        review_fn = file_review_fn(
+            timeout=args.review_timeout,
+            executor=executor,
+            spend_journal=_Path(args.archive_dir) / run_id / "review-spend.jsonl",
+        )
     out = run_topology(
         topology,
         executor,
@@ -579,6 +586,11 @@ def cmd_usage(args) -> int:
     if summary.credits:
         totals += f"  credits={summary.credits:.2f}"
     print(totals)
+    if summary.review_cost_usd:
+        print(
+            f"  of which human-review conversation: ${summary.review_cost_usd:.4f} "
+            "(Ask/Revise at parked gates; included in cost)"
+        )
     if summary.estimated_cost_nodes:
         print(
             f"  ({summary.estimated_cost_nodes} node cost(s) estimated from the public "

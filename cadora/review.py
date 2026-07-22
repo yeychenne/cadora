@@ -58,7 +58,8 @@ REVIEW_REVISION = "revision"
 REVIEW_MESSAGE_KINDS = {REVIEW_QUESTION, REVIEW_REVISION}
 
 
-def file_review_fn(timeout: float = 3600.0, interval: float = 2.0, executor=None):
+def file_review_fn(timeout: float = 3600.0, interval: float = 2.0, executor=None,
+                   spend_journal: str | Path | None = None):
     """A headless HITL reviewer: write a request file, poll for a decision file.
 
     For non-interactive runs (Quick Desktop, CI, background) where there is no TTY. Cadora writes
@@ -78,6 +79,11 @@ def file_review_fn(timeout: float = 3600.0, interval: float = 2.0, executor=None
     "message": ..., "path": ...}``) and the run runs the executor scoped to that document, writing the
     answer to ``cadora-review-reply.json`` — a question is answered, a revision rewrites the document
     in place and re-surfaces it — all before any decision is made.
+
+    ``spend_journal`` (a path inside the run's archive) makes that conversational spend
+    **crash-durable**: every turn is appended to the journal the moment it completes, so a run
+    killed while parked loses no cost record — the next invocation reads the pending turns back
+    and charges them. In memory it would die with the process.
     """
 
     indefinite = timeout <= 0
@@ -87,16 +93,28 @@ def file_review_fn(timeout: float = 3600.0, interval: float = 2.0, executor=None
     # ceiling can see and no evidence records. Shared across review_fn calls; the runner reads the
     # delta around each gate.
     spend: dict = {"cost_usd": 0.0, "usage": {}}
+    current_node: dict = {"id": None}
 
     def _record_spend(result) -> None:
         cost = getattr(result, "cost_usd", None)
         if cost:
             spend["cost_usd"] += cost
-        for key, value in (getattr(result, "usage", None) or {}).items():
+        usage = getattr(result, "usage", None) or {}
+        for key, value in usage.items():
             if isinstance(value, (int, float)):
                 spend["usage"][key] = spend["usage"].get(key, 0) + value
+        # Durability before bookkeeping order: the turn hits disk the moment it happened. A run
+        # killed while parked then owes nothing to memory — the journal IS the record.
+        if spend_journal is not None:
+            append_review_turn(
+                spend_journal,
+                node_id=current_node["id"],
+                cost_usd=cost,
+                usage=usage,
+            )
 
     def review_fn(node, node_cwd: str, documents=None) -> ReviewResult:
+        current_node["id"] = node.id
         base = Path(node_cwd)
         request, decision = base / REQUEST_FILE, base / DECISION_FILE
         message, reply = base / MESSAGE_FILE, base / REPLY_FILE
@@ -123,6 +141,22 @@ def file_review_fn(timeout: float = 3600.0, interval: float = 2.0, executor=None
             if executor is not None
             else None
         )
+        if responder is not None:
+            # Enforce the budget ceiling DURING the conversation, not one node later. The runner
+            # attaches `budget_guard` when a stop/failover policy is active; called with what this
+            # gate's conversation has spent so far, it returns a refusal message once the ceiling
+            # is reached. The refusal replaces the executor call — the reviewer is told plainly,
+            # and the gate stays decidable: approve / request changes / abort cost nothing.
+            gate_start = spend["cost_usd"]
+            inner = responder
+            guard = getattr(review_fn, "budget_guard", None)
+
+            def responder(kind: str, text: str, path: str) -> str:  # noqa: F811
+                if guard is not None:
+                    refusal = guard(spend["cost_usd"] - gate_start)
+                    if refusal:
+                        return refusal
+                return inner(kind, text, path)
         deadline = time.monotonic() + timeout
         while indefinite or time.monotonic() < deadline:
             if responder is not None and message.is_file():
@@ -151,7 +185,90 @@ def file_review_fn(timeout: float = 3600.0, interval: float = 2.0, executor=None
     # Published so the runner can charge what the conversation cost. An attribute rather than a
     # changed return type keeps every other review_fn (stdin, MCP, test doubles) working untouched.
     review_fn.review_spend = spend
+    review_fn.spend_journal = spend_journal
     return review_fn
+
+
+def append_review_turn(journal: str | Path, *, node_id: str | None, cost_usd, usage: dict) -> None:
+    """Append one conversational turn to the crash-durability journal (one JSON line per turn).
+
+    Appends are line-granular: a crash mid-write costs at most the line being written, and the
+    reader skips anything unparsable rather than losing the rest.
+    """
+    path = Path(journal)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        line = json.dumps(
+            {
+                "node_id": node_id,
+                "cost_usd": cost_usd,
+                "usage": {k: v for k, v in (usage or {}).items() if isinstance(v, (int, float))},
+                "ts": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        with path.open("a") as handle:
+            handle.write(line + "\n")
+            handle.flush()
+    except OSError:
+        # Journaling is belt-and-braces on top of in-memory accounting — refusing to answer a
+        # reviewer because the journal disk write failed would be the worse trade.
+        pass
+
+
+def read_pending_review_spend(journal: str | Path | None, node_id: str) -> dict:
+    """Total uncommitted conversational spend for one node: ``{"cost_usd": float, "usage": {}}``.
+
+    "Uncommitted" means still in the journal — turns are cleared by :func:`clear_review_spend`
+    once the node's archive record has absorbed them. After a kill while parked, everything the
+    conversation spent is still here.
+    """
+    totals: dict = {"cost_usd": 0.0, "usage": {}}
+    if journal is None:
+        return totals
+    path = Path(journal)
+    if not path.is_file():
+        return totals
+    for line in path.read_text().splitlines():
+        try:
+            turn = json.loads(line)
+        except (ValueError, TypeError):
+            continue  # a torn final line from a crash — skip it, keep the rest
+        if not isinstance(turn, dict) or turn.get("node_id") != node_id:
+            continue
+        totals["cost_usd"] += turn.get("cost_usd") or 0.0
+        for key, value in (turn.get("usage") or {}).items():
+            if isinstance(value, (int, float)):
+                totals["usage"][key] = totals["usage"].get(key, 0) + value
+    return totals
+
+
+def clear_review_spend(journal: str | Path | None, node_id: str) -> None:
+    """Drop one node's turns from the journal — called only after the archive recorded them.
+
+    Rewrites atomically (tmp + replace), keeping other nodes' pending turns intact.
+    """
+    if journal is None:
+        return
+    path = Path(journal)
+    if not path.is_file():
+        return
+    kept = []
+    for line in path.read_text().splitlines():
+        try:
+            turn = json.loads(line)
+        except (ValueError, TypeError):
+            continue
+        if isinstance(turn, dict) and turn.get("node_id") != node_id:
+            kept.append(line)
+    try:
+        if kept:
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text("\n".join(kept) + "\n")
+            tmp.replace(path)
+        else:
+            path.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def _write_json_atomic(path: Path, payload: dict, *, indent: int | None = None) -> None:

@@ -50,6 +50,8 @@ from cadora.review import (
     REVIEW_APPROVE,
     REVIEW_REQUEST_CHANGES,
     ReviewResult,
+    clear_review_spend,
+    read_pending_review_spend,
 )
 from cadora.telemetry import RunTelemetry, _now
 from cadora.topology import Node, Topology, topo_sort
@@ -275,6 +277,9 @@ def run_topology(
             review_history: list[ReviewResult] = []
             attempt_results: list[ExecutionResult] = []
             review_cost = 0.0  # what this node's review conversation spent, across revisions
+            # Conversation spend a KILLED earlier invocation journaled but never got to commit.
+            # Read once per node (None = not yet read), charged with the first review round.
+            journal_carried: float | None = None
 
             while True:
                 prompt = base_prompt
@@ -382,7 +387,12 @@ def run_topology(
                         reviews=review_history,
                         attempts=attempt_results,
                         remediation=remediation_outcome,
+                        # A failed RE-RUN after a costly review round must not lose the
+                        # conversation: review_cost accumulated in the earlier rounds of this
+                        # same node's revision loop.
+                        review_cost_usd=review_cost,
                     )
+                    _commit_review_journal(review_fn, node.id)
                     out = archive.finalize(False)
                     reason = _failure_reason(
                         node, result, gate_result, integrity_blocked, repair_failed,
@@ -407,15 +417,36 @@ def run_topology(
                 if hitl and node.review:
                     telemetry.review_waiting(node.id)
                     documents = _changed_docs(node_cwd, pre_review_docs or {})
+                    if journal_carried is None:
+                        # A killed earlier invocation may have journaled conversation turns it
+                        # never committed — recover them now so the money is not lost. Once per
+                        # node: later revision rounds must not re-charge the same turns.
+                        journal_carried = _pending_review_cost(review_fn, node.id)
                     spent_before = _review_spend(review_fn)
-                    review = _invoke_review(review_fn, node, node_cwd, documents)
+                    # Under a stop/failover policy the ceiling must hold DURING the conversation,
+                    # not one node later: the review surface asks this guard before every executor
+                    # call and relays the refusal to the reviewer instead of spending.
+                    if (
+                        ledger is not None
+                        and budget_policy is not None
+                        and budget_policy.action in (BUDGET_STOP, BUDGET_FAILOVER)
+                    ):
+                        review_fn.budget_guard = _make_review_guard(
+                            ledger, budget_policy, node_executor.name, journal_carried
+                        )
+                    try:
+                        review = _invoke_review(review_fn, node, node_cwd, documents)
+                    finally:
+                        if hasattr(review_fn, "budget_guard"):
+                            del review_fn.budget_guard
                     if not isinstance(review, ReviewResult):
                         raise TypeError("review_fn must return ReviewResult")
                     # A parked gate answers questions and produces revisions on the node's
                     # executor — real spend, and unbounded, since a reviewer may send any number
                     # of messages. Charge it here, before any branch below exits, so no path can
                     # record a node without it.
-                    conversation_cost = _review_spend(review_fn) - spent_before
+                    conversation_cost = _review_spend(review_fn) - spent_before + journal_carried
+                    journal_carried = 0.0  # charged; never again for this node
                     if conversation_cost:
                         review_cost += conversation_cost
                         node_cost = (node_cost or 0.0) + conversation_cost
@@ -440,6 +471,7 @@ def run_topology(
                                 remediation=remediation_outcome,
                                 review_cost_usd=review_cost,
                             )
+                            _commit_review_journal(review_fn, node.id)
                             out = archive.finalize(False)
                             telemetry.node_recorded(
                                 node.id,
@@ -474,6 +506,7 @@ def run_topology(
                             remediation=remediation_outcome,
                             review_cost_usd=review_cost,
                         )
+                        _commit_review_journal(review_fn, node.id)
                         out = archive.finalize(False)
                         telemetry.node_recorded(
                             node.id,
@@ -507,6 +540,7 @@ def run_topology(
                     remediation=remediation_outcome,
                     review_cost_usd=review_cost,
                 )
+                _commit_review_journal(review_fn, node.id)
                 telemetry.node_recorded(
                     node.id,
                     ok=True,
@@ -860,6 +894,45 @@ def _changed_docs(node_cwd: str, before: dict[str, str]) -> list[tuple[str, str]
         elif after[relpath] != before[relpath]:
             changed.append((relpath, "modified"))
     return changed
+
+
+def _pending_review_cost(review_fn, node_id: str) -> float:
+    """Uncommitted conversation spend a previous (killed) invocation journaled for this node."""
+    journal = getattr(review_fn, "spend_journal", None)
+    if not journal:
+        return 0.0
+    return float(read_pending_review_spend(journal, node_id).get("cost_usd") or 0.0)
+
+
+def _commit_review_journal(review_fn, node_id: str) -> None:
+    """Drop this node's journaled turns — its archive record has just absorbed them."""
+    clear_review_spend(getattr(review_fn, "spend_journal", None), node_id)
+
+
+def _make_review_guard(ledger, policy, backend: str, carried: float):
+    """The ceiling check the review surface consults before spending on an Ask/Revise.
+
+    Returns a refusal message once the backend is at threshold, else ``None``. The refusal is
+    what the reviewer sees instead of an answer — it names the numbers and says plainly that the
+    decision itself still costs nothing, so a paused conversation never bricks the gate.
+    """
+
+    def guard(conversation_extra: float) -> str | None:
+        budget = policy.budget_for(backend)
+        if not budget:
+            return None
+        spent = ledger.spent(backend) + carried + conversation_extra
+        fraction = spent / budget
+        if fraction < policy.warn_at:
+            return None
+        return (
+            f"budget ceiling: {backend} has used ${spent:.2f} of its ${budget:.2f} budget "
+            f"({fraction:.0%}, threshold {policy.warn_at:.0%}) — conversational review is paused "
+            "and this message was NOT executed. Deciding the gate costs nothing: approve, "
+            "request changes, or abort now; raise the --budget to keep asking."
+        )
+
+    return guard
 
 
 def _review_spend(review_fn) -> float:

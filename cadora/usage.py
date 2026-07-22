@@ -83,6 +83,10 @@ class NodeUsage:
     cost_usd: float | None = None
     cost_estimated: bool = False  # True when cost_usd came from the price table, not the backend
     credits: float | None = None  # Kiro subscription credits (Kiro reports no tokens/dollars)
+    # Portion of cost_usd spent answering a reviewer's Ask/Revise at this node's parked gate —
+    # already INCLUDED in cost_usd, surfaced separately so "what did human review cost?" has an
+    # answer.
+    review_cost_usd: float | None = None
     raw_usage: dict | None = None
 
 
@@ -98,6 +102,7 @@ class UsageSummary:
     generation_tokens: int
     context_tokens: int
     cost_usd: float
+    review_cost_usd: float  # conversational-review portion of cost_usd (already included in it)
     credits: float  # Kiro subscription credits across all nodes
     estimated_cost_nodes: int  # nodes whose cost was computed from the price table
     by_model: list[dict]
@@ -150,6 +155,7 @@ def summarize_usage(
         generation_tokens=sum(n.generation_tokens for n in nodes),
         context_tokens=sum(n.context_tokens for n in nodes),
         cost_usd=sum(n.cost_usd or 0.0 for n in nodes),
+        review_cost_usd=round(sum(n.review_cost_usd or 0.0 for n in nodes), 6),
         credits=sum(n.credits or 0.0 for n in nodes),
         estimated_cost_nodes=sum(1 for n in nodes if n.cost_estimated),
         by_model=_group(nodes, "model"),
@@ -235,6 +241,7 @@ def normalize_manifest_usage(manifest: dict) -> list[NodeUsage]:
                 cost_usd=cost_usd,
                 cost_estimated=cost_estimated,
                 credits=credits,
+                review_cost_usd=node.get("review_conversation_cost_usd"),
                 raw_usage=usage or None,
             )
         )
