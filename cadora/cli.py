@@ -139,6 +139,7 @@ def cmd_run(args) -> int:
         "failover_to": getattr(args, "failover_to", None),
         "reviewer": _reviewer_identity(args),
         "reviewers": _split_csv(getattr(args, "reviewers", None)),
+        "notify_url": _notify_url(args),
     }
     run_id = args.run_id or _default_run_id()
     review_fn = None
@@ -177,9 +178,19 @@ def cmd_run(args) -> int:
         park_contract=park_contract,
         default_reviewer=park_contract["reviewer"],
         reviewers=park_contract["reviewers"],
+        notify_url=park_contract["notify_url"],
     )
     print(f"run complete: {out}")
     return 0
+
+
+def _notify_url(args) -> str | None:
+    """Webhook for away-from-keyboard moments (--notify-url, or $CADORA_NOTIFY_URL)."""
+    explicit = getattr(args, "notify_url", None)
+    if explicit and explicit.strip():
+        return explicit.strip()
+    ambient = os.environ.get("CADORA_NOTIFY_URL", "").strip()
+    return ambient or None
 
 
 def _reviewer_identity(args) -> str | None:
@@ -306,6 +317,7 @@ def cmd_resume(args) -> int:
         # that governed the run is the policy recorded when it started.
         default_reviewer=_reviewer_identity(args) or contract.get("reviewer"),
         reviewers=contract.get("reviewers"),
+        notify_url=_notify_url(args) or contract.get("notify_url"),
     )
     print(f"run complete: {out}")
     return 0
@@ -1063,6 +1075,13 @@ def main(argv=None) -> int:
         "rejected and the gate re-asks) and recorded in the manifest as the policy in force. "
         "Absent, anyone may decide and the identity is still recorded",
     )
+    r.add_argument(
+        "--notify-url",
+        metavar="URL",
+        help="webhook POSTed (ntfy-style: body = message) when a gate starts waiting for review "
+        "and when the run parks — the away-from-keyboard signal (default: $CADORA_NOTIFY_URL). "
+        "Fire-and-forget: a dead endpoint never delays or fails the run",
+    )
     r.set_defaults(func=cmd_run)
 
     res = sub.add_parser(
@@ -1101,6 +1120,12 @@ def main(argv=None) -> int:
         help="your declared identity for the pending decisions (default: $CADORA_REVIEWER, then "
         "the identity the run was parked with). The --reviewers allowlist is NOT overridable "
         "here — the policy recorded at park time governs",
+    )
+    res.add_argument(
+        "--notify-url",
+        metavar="URL",
+        help="webhook for review-waiting / re-park notifications (default: $CADORA_NOTIFY_URL, "
+        "then the URL the run was parked with)",
     )
     res.add_argument("--yes", "-y", action="store_true", help="skip the autonomous-run confirmation")
     res.set_defaults(func=cmd_resume)

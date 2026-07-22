@@ -738,6 +738,79 @@ const nodeFailure = (node) => {
 };
 
 // --- HITL review: the interactive gate. Docs as links, a decision + comments back to the run. ---
+const renderParkPanel = (park, runId) => {
+  // Triage, not review: on a phone you decide gates you already understand — the full
+  // reading/annotation experience stays on desktop. Decisions made here are stored in the
+  // archive, bound to the documents' current SHA-256, and applied at `cadora resume`.
+  if (!park || !park.pending || !park.pending.length) return "";
+  const gates = park.pending
+    .map((p) => {
+      const docs = (p.documents || [])
+        .map(
+          (d) =>
+            `<a href="/api/runs/${encodeURIComponent(runId)}/review/doc?path=${encodeURIComponent(d.path)}" target="_blank">${escapeHtml(d.path)}</a> <span class="park-kind">${escapeHtml(d.kind || "")}</span>`
+        )
+        .join("<br>");
+      if (p.decided) {
+        return `<div class="park-gate decided"><div class="park-head"><strong>${escapeHtml(p.node_id)}</strong><span class="park-done">✓ ${escapeHtml(p.decided)}${p.decided_by ? ` by ${escapeHtml(p.decided_by)}` : ""} — applies at resume</span></div></div>`;
+      }
+      return `
+      <div class="park-gate" data-park-node="${escapeHtml(p.node_id)}">
+        <div class="park-head"><strong>${escapeHtml(p.node_id)}</strong>
+          <span>${p.cost_so_far != null ? `$${Number(p.cost_so_far).toFixed(4)} so far` : ""}</span></div>
+        <div class="park-docs">${docs || '<span class="empty">no changed documents</span>'}</div>
+        <textarea rows="2" class="park-comments" placeholder="Comments — required to request changes"></textarea>
+        <div class="review-actions">
+          <button class="review-btn approve" data-park-decision="approve">Approve</button>
+          <button class="review-btn changes" data-park-decision="request_changes">Request changes</button>
+          <button class="review-btn abort" data-park-decision="abort">Abort</button>
+          <span class="review-msg park-msg"></span>
+        </div>
+      </div>`;
+    })
+    .join("");
+  return `
+    <div class="review-callout parked">
+      <div class="review-head"><span class="review-flag">⏸ Parked</span><span>${park.pending.length} gate(s) await review — the run is not running; decisions apply at <code>cadora resume</code></span></div>
+      <input id="park-reviewer" type="text" maxlength="80"
+             placeholder="Your name — recorded in the evidence with this decision"
+             value="${escapeHtml(localStorage.getItem("cadora-reviewer") || "")}" />
+      ${gates}
+    </div>`;
+};
+
+const wireParkPanel = (runId) => {
+  document.querySelectorAll("[data-park-decision]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const gate = button.closest(".park-gate");
+      const msg = gate.querySelector(".park-msg");
+      const who = (document.getElementById("park-reviewer")?.value || "").trim();
+      if (who) localStorage.setItem("cadora-reviewer", who);
+      msg.textContent = "storing…";
+      const response = await fetch(
+        `/api/runs/${encodeURIComponent(runId)}/park/decision`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            node_id: gate.dataset.parkNode,
+            decision: button.dataset.parkDecision,
+            comments: gate.querySelector(".park-comments").value,
+            reviewer: who,
+          }),
+        }
+      );
+      const result = await response.json().catch(() => ({}));
+      if (result.stored) {
+        msg.textContent = `✓ stored: ${result.stored} — applies at resume`;
+        setTimeout(() => loadRunDetail(runId), 900);
+      } else {
+        msg.textContent = result.error || "failed to store the decision";
+      }
+    });
+  });
+};
+
 const renderReviewPanel = (review) => {
   if (!review || !review.pending) return "";
   const docs = (review.documents || [])
@@ -792,7 +865,11 @@ const loadRunDetail = async (runId) => {
   const runInput = inputResponse.ok ? await inputResponse.json() : null;
   const reviewResponse = await fetch(`/api/runs/${encodeURIComponent(runId)}/review`);
   const review = reviewResponse.ok ? await reviewResponse.json() : null;
-  reviewPending = !!(review && review.pending);
+  // Pause auto-polling while ANY decision surface is open — the live review panel or a parked
+  // gate awaiting triage. A rerender mid-thought wipes the reviewer's half-typed comment (the
+  // exact bug #93 fixed for the live panel; the park panel earns the same protection).
+  const parkUndecided = !!(data.park && (data.park.pending || []).some((p) => !p.decided));
+  reviewPending = !!(review && review.pending) || parkUndecided;
   const nodes = nodesOf(data);
   const failedNode = nodes.find((n) => String(n.status || "").toLowerCase() === "failed");
   const runError =
@@ -826,6 +903,7 @@ const loadRunDetail = async (runId) => {
         </div>
       </div>
       ${renderReviewPanel(review)}
+      ${renderParkPanel(data.park, runId)}
       ${runError && (runStatus === "failed" || failedNode) ? `<div class="failure-banner">✗ <strong>${escapeHtml((failedNode && nodeIdOf(failedNode)) || "run")}</strong> — ${escapeHtml(runError)}</div>` : ""}
       ${renderRunInput(runInput)}
       <div class="run-workspace">
@@ -911,6 +989,7 @@ const loadRunDetail = async (runId) => {
   document.querySelectorAll(".doc-open").forEach((button) => {
     button.addEventListener("click", () => openDocModal(button.dataset.doc, button.dataset.path));
   });
+  wireParkPanel(runId);
   document.querySelectorAll("[data-decision]").forEach((button) => {
     button.addEventListener("click", async () => {
       const msg = document.getElementById("review-msg");

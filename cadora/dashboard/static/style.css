@@ -827,6 +827,49 @@ pre {
   margin-bottom: 10px;
 }
 #review-reviewer { resize: none; }
+#park-reviewer {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--canvas);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  margin-bottom: 10px;
+}
+.park-gate {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: var(--canvas);
+}
+.park-gate.decided { opacity: 0.75; }
+.park-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.park-done { color: var(--ok, #16c784); font-size: 13px; }
+.park-docs { font-size: 13px; margin-bottom: 8px; word-break: break-all; }
+.park-kind { color: var(--muted); font-size: 11px; margin-left: 6px; }
+.park-comments {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+  margin-bottom: 8px;
+}
+.pill.parked { background: rgba(240, 180, 41, 0.15); color: #e8a13a; }
+/* Mobile = triage + decide: at phone width the triage card stacks and the tap targets grow.
+   The full review/annotation experience deliberately stays desktop. */
+@media (max-width: 480px) {
+  .review-actions { flex-wrap: wrap; }
+  .review-btn { padding: 10px 18px; font-size: 14px; }
+  .park-head { flex-direction: column; align-items: flex-start; }
+  .run-workspace { display: block; }
+}
 .review-actions { display: flex; align-items: center; gap: 8px; }
 .review-btn {
   font-size: 13px;

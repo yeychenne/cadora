@@ -81,6 +81,67 @@ def write_park_record(run_dir: str | Path, record: dict) -> Path:
     return target
 
 
+PARKED_DECISIONS_FILE = "parked-decisions.json"
+
+
+def store_parked_decision(run_dir: str | Path, node_id: str, payload: dict) -> None:
+    """Record a decision made WHILE the run is parked (no live process to receive it).
+
+    Lives in the ARCHIVE, not the workspace — deliberately unlike the live decision file. The
+    workspace file is cleared as stale when a gate opens, and rightly: a loose file with no
+    binding could approve tomorrow's gate with yesterday's verdict. This record is the safe
+    form of the same idea: bound to one node, to the SHA-256 of the exact bytes the reviewer
+    saw, and to a declared identity that the resume re-checks against the recorded allowlist.
+    """
+    path = Path(run_dir) / PARKED_DECISIONS_FILE
+    decisions: dict = {}
+    if path.is_file():
+        try:
+            decisions = json.loads(path.read_text())
+        except (OSError, ValueError):
+            decisions = {}
+    if not isinstance(decisions, dict):
+        decisions = {}
+    decisions[node_id] = payload
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(decisions, indent=2))
+    tmp.replace(path)
+
+
+def read_parked_decisions(run_dir: str | Path) -> dict:
+    path = Path(run_dir) / PARKED_DECISIONS_FILE
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def take_parked_decision(run_dir: str | Path, node_id: str) -> dict | None:
+    """Consume one node's parked decision — read it and remove it, atomically.
+
+    Consume-once regardless of what the caller then decides (honor, or reject on drift or
+    allowlist): a stored decision that failed its checks must not lurk and retry forever.
+    """
+    path = Path(run_dir) / PARKED_DECISIONS_FILE
+    decisions = read_parked_decisions(run_dir)
+    stored = decisions.pop(node_id, None)
+    if stored is None:
+        return None
+    try:
+        if decisions:
+            tmp = path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(decisions, indent=2))
+            tmp.replace(path)
+        else:
+            path.unlink(missing_ok=True)
+    except OSError:
+        pass
+    return stored if isinstance(stored, dict) else None
+
+
 def load_park_record(run_dir: str | Path) -> dict:
     """Load and sanity-check a park record; loud, actionable errors — this is a CLI entry path."""
     run_dir = Path(run_dir)

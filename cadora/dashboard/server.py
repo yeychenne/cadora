@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import mimetypes
 import time
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from cadora.archive import list_runs, read_manifest
+from cadora.park import read_parked_decisions, store_parked_decision
 from cadora.review import (
+    ReviewResult,
     read_review_reply,
     read_review_request,
     write_review_decision,
@@ -112,6 +116,15 @@ def make_handler(archive_dir: str | Path | list[str | Path]):
                     if len(parts) == 5 and parts[4] == "message":
                         self._submit_message(run_id)
                         return
+                if (
+                    len(parts) == 5
+                    and parts[0] == "api"
+                    and parts[1] == "runs"
+                    and parts[3] == "park"
+                    and parts[4] == "decision"
+                ):
+                    self._submit_parked_decision(_safe_segment(parts[2]))
+                    return
                 self.send_error(404, "not found")
             except ValueError as exc:
                 self.send_error(400, str(exc))
@@ -125,7 +138,7 @@ def make_handler(archive_dir: str | Path | list[str | Path]):
                 return
             cwd = _run_cwd(_root_for(run_id), run_id)
             if cwd is None:
-                self.send_error(404, "run workspace unknown — decisions need a --review-file run")
+                self.send_error(404, "run workspace unknown - decisions need a --review-file run")
                 return
             body = self._read_json_body()
             result = write_review_decision(
@@ -140,13 +153,68 @@ def make_handler(archive_dir: str | Path | list[str | Path]):
             )
             self._json(result, status=200 if "submitted" in result else 400)
 
+        def _submit_parked_decision(self, run_id: str) -> None:
+            """Store a decision for a PARKED run — no live process; it applies at resume.
+
+            The binding is the point: the decision is stored with the SHA-256 of the exact
+            bytes being reviewed, computed HERE, at decision time. The resume refuses to honor
+            it if those bytes changed. That binding (plus the identity + the allowlist check at
+            resume) is what makes this safe where a loose workspace decision file was not.
+            """
+            if "application/json" not in self.headers.get("Content-Type", ""):
+                self.send_error(415, "content-type must be application/json")
+                return
+            root = _root_for(run_id)
+            run_dir = root / run_id
+            park = _maybe_json(run_dir / "park.json")
+            if not park:
+                self.send_error(404, "run is not parked - use the live review endpoint")
+                return
+            body = self._read_json_body()
+            node_id = str(body.get("node_id", "")).strip()
+            pending_ids = {p.get("node_id") for p in park.get("pending", [])}
+            if node_id not in pending_ids:
+                self._json({"error": f"node {node_id!r} is not pending in this park"}, status=400)
+                return
+            if node_id in read_parked_decisions(run_dir):
+                self._json(
+                    {"error": f"node {node_id!r} already has a parked decision"}, status=409
+                )
+                return
+            decision = str(body.get("decision", "")).strip()
+            comments = str(body.get("comments", "")).strip()
+            try:
+                ReviewResult(decision, comments)  # same validity rules as every other surface
+            except ValueError as exc:
+                self._json({"error": str(exc)}, status=400)
+                return
+            cwd = _run_cwd(root, run_id)
+            if cwd is None:
+                self.send_error(404, "run workspace unknown or gone - cannot bind the decision")
+                return
+            entry = next(p for p in park["pending"] if p.get("node_id") == node_id)
+            documents = _parked_documents(cwd, entry)
+            store_parked_decision(
+                run_dir,
+                node_id,
+                {
+                    "decision": decision,
+                    "comments": comments,
+                    "reviewer": str(body.get("reviewer", "")).strip() or None,
+                    "method": "dashboard",
+                    "decided_at": datetime.now(timezone.utc).isoformat(),
+                    "documents": documents,
+                },
+            )
+            self._json({"stored": decision, "node_id": node_id, "applies": "at resume"})
+
         def _submit_message(self, run_id: str) -> None:
             if "application/json" not in self.headers.get("Content-Type", ""):
                 self.send_error(415, "content-type must be application/json")
                 return
             cwd = _run_cwd(_root_for(run_id), run_id)
             if cwd is None:
-                self.send_error(404, "run workspace unknown — needs a --review-file run")
+                self.send_error(404, "run workspace unknown - needs a --review-file run")
                 return
             body = self._read_json_body()
             result = write_review_message(
@@ -282,6 +350,7 @@ def _runs_payload(roots: Path | list[Path]) -> dict:
                 "manifest": manifests.get(run_id),
                 "node_costs": _node_costs(manifests.get(run_id)),
                 "status": status,
+                "park": _park_payload(root, str(run_id)),
                 "active": bool(status and status.get("status") in {"created", "running"}),
                 # How long since the run last wrote its status. A killed conductor (SIGKILL,
                 # power loss) leaves status "running" forever; age lets the UI label such
@@ -305,6 +374,7 @@ def _run_payload(root: Path, run_id: str) -> dict:
         "manifest": manifest,
         "node_costs": _node_costs(manifest),
         "status": status,
+        "park": _park_payload(root, run_id),
         "events": _read_jsonl(root / run_id / "run-events.jsonl"),
     }
 
@@ -341,6 +411,58 @@ def _safe_segment(name: str) -> str:
     if not name or name in {".", ".."} or "/" in name:
         raise ValueError(f"invalid path segment: {name!r}")
     return name
+
+
+def _parked_documents(cwd: str, pending_entry: dict) -> list[dict]:
+    """The documents a parked gate is asking about, with the SHA-256 of their CURRENT bytes.
+
+    Same semantics as the runner's changed-docs scoping: everything under the review-doc dir
+    that is new or modified relative to the pending node's pre-execution snapshot. The current
+    hash is what a stored decision binds to — the bytes the reviewer is looking at right now.
+    """
+    before = pending_entry.get("pre_review_docs") or {}
+    root = Path(cwd) / "aidlc-docs"
+    documents: list[dict] = []
+    if not root.is_dir():
+        return documents
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = str(path.relative_to(cwd))
+        try:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            continue
+        if before.get(rel) == digest:
+            continue  # unchanged by this node — not part of the review
+        documents.append(
+            {"path": rel, "kind": "modified" if rel in before else "new", "sha256": digest}
+        )
+    return documents
+
+
+def _park_payload(root: Path, run_id: str) -> dict | None:
+    """A parked run's triage view: each pending gate with its documents and any stored decision."""
+    run_dir = root / run_id
+    park = _maybe_json(run_dir / "park.json")
+    if not park:
+        return None
+    cwd = _run_cwd(root, run_id)
+    decided = read_parked_decisions(run_dir)
+    pending = []
+    for entry in park.get("pending", []):
+        node_id = entry.get("node_id")
+        pending.append(
+            {
+                "node_id": node_id,
+                "cost_so_far": entry.get("cost_so_far"),
+                "gate": (entry.get("gate") or {}).get("status"),
+                "documents": _parked_documents(cwd, entry) if cwd else [],
+                "decided": (decided.get(node_id) or {}).get("decision"),
+                "decided_by": (decided.get(node_id) or {}).get("reviewer"),
+            }
+        )
+    return {"parked_at": park.get("parked_at"), "pending": pending}
 
 
 def _run_cwd(root: Path, run_id: str) -> str | None:

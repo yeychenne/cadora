@@ -3,20 +3,51 @@
 from __future__ import annotations
 
 import json
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
 from cadora.provenance import conductor_fingerprint
 from cadora.topology import Topology
 
+# The two moments a reviewer who is AWAY needs to hear about: a gate started waiting, and the
+# run parked. Everything else is dashboard material, not a pocket buzz.
+_NOTIFY_EVENTS = {"review_waiting", "run_parked"}
+
+
+def _post_notification(url: str, text: str) -> None:
+    """One fire-and-forget webhook POST (ntfy-style: the body is the message).
+
+    Runs on a daemon thread with a short timeout, and swallows every failure: a notification
+    endpoint being down must never delay a node, corrupt telemetry, or fail a run. The webhook
+    is a courtesy; the archive is the record.
+    """
+    import urllib.request
+
+    try:
+        request = urllib.request.Request(
+            url, data=text.encode("utf-8"), headers={"Title": "cadora"}, method="POST"
+        )
+        urllib.request.urlopen(request, timeout=3)  # noqa: S310 — operator-supplied URL
+    except Exception:
+        pass
+
 
 class RunTelemetry:
     """Write a small event stream and latest-status snapshot for one run."""
 
-    def __init__(self, archive_root: str | Path, run_id: str, topology: Topology, executor: str):
+    def __init__(
+        self,
+        archive_root: str | Path,
+        run_id: str,
+        topology: Topology,
+        executor: str,
+        notify_url: str | None = None,
+    ):
         self.dir = Path(archive_root) / run_id
         self.dir.mkdir(parents=True, exist_ok=True)
         self.run_id = run_id
+        self.notify_url = notify_url
         self.status_path = self.dir / "status.json"
         self.events_path = self.dir / "run-events.jsonl"
         self.status: dict = {
@@ -78,6 +109,15 @@ class RunTelemetry:
         }
         with self.events_path.open("a") as f:
             f.write(json.dumps(event) + "\n")
+        if self.notify_url and event_type in _NOTIFY_EVENTS:
+            if event_type == "run_parked":
+                pending = ", ".join(payload.get("pending") or []) or "gates"
+                text = f"{self.run_id} parked — awaiting review: {pending}"
+            else:
+                text = f"{self.run_id} — {node_id} awaits your review"
+            threading.Thread(
+                target=_post_notification, args=(self.notify_url, text), daemon=True
+            ).start()
 
     def run_started(self) -> None:
         ts = _now()

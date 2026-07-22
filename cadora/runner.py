@@ -37,6 +37,7 @@ from cadora.park import (
     deserialize_result,
     gates_to_dict,
     serialize_result,
+    take_parked_decision,
     topology_to_dict,
     write_park_record,
 )
@@ -126,6 +127,7 @@ def run_topology(
     initial_reviews: dict[str, str] | None = None,
     default_reviewer: str | None = None,
     reviewers: list[str] | None = None,
+    notify_url: str | None = None,
 ) -> Path:
     if integrity_mode not in {"off", "audit", "enforce", "repair"}:
         raise ValueError(f"invalid integrity mode: {integrity_mode!r}")
@@ -150,7 +152,7 @@ def run_topology(
         # The policy in force, recorded next to the decisions it governed — "was this approver
         # permitted at the time?" must be answerable from the pack alone, years later.
         archive.set_review_policy(sorted(reviewers))
-    telemetry = RunTelemetry(archive_root, run_id, topology, executor.name)
+    telemetry = RunTelemetry(archive_root, run_id, topology, executor.name, notify_url=notify_url)
     telemetry.run_started()
     _write_run_input(archive_root, run_id, topology, cwd)
     if resume_from or skip_ids:
@@ -481,7 +483,28 @@ def run_topology(
                     raise SystemExit(f"node {node.id!r}: {reason}")
 
                 if hitl and node.review:
-                    if on_review == "park":
+                    # A decision may have been made WHILE the run was parked (dashboard triage,
+                    # possibly from a phone). Consume it once; it is honored only if the bytes
+                    # the reviewer saw are still the bytes on disk, and it still faces the same
+                    # allowlist check as any live decision below.
+                    stored_decision = None
+                    if restore is not None:
+                        stored_decision = take_parked_decision(Path(archive_root) / run_id, node.id)
+                        if stored_decision is not None:
+                            drifted = _parked_decision_drifted(stored_decision, node_cwd)
+                            if drifted:
+                                _log(
+                                    f"✗ discarding the decision made while parked for {node.id!r}: "
+                                    f"{drifted} — the gate re-asks"
+                                )
+                                telemetry.emit(
+                                    "parked_decision_discarded",
+                                    node_id=node.id,
+                                    reason=drifted,
+                                    reviewer=stored_decision.get("reviewer"),
+                                )
+                                stored_decision = None
+                    if on_review == "park" and stored_decision is None:
                         # Do not wait — collect everything a resume needs to continue this node
                         # from EXACTLY here (the agent already ran and is already accounted), let
                         # the wave drain, and park after it. The gate itself is decided at resume.
@@ -536,9 +559,26 @@ def run_topology(
                         )
                     try:
                         while True:
-                            review = _invoke_review(review_fn, node, node_cwd, documents)
-                            if not isinstance(review, ReviewResult):
-                                raise TypeError("review_fn must return ReviewResult")
+                            review = None
+                            if stored_decision is not None:
+                                review = _review_from_stored(stored_decision)
+                                if review is not None:
+                                    _log(
+                                        f"▸ applying the decision made while parked: "
+                                        f"{review.decision} by "
+                                        f"{review.reviewer or '(unattributed)'} via "
+                                        f"{review.method or 'unknown'}"
+                                    )
+                                else:
+                                    _log(
+                                        f"✗ stored decision for {node.id!r} is invalid — "
+                                        "the gate re-asks"
+                                    )
+                                stored_decision = None  # one shot; any rejection falls to live review
+                            if review is None:
+                                review = _invoke_review(review_fn, node, node_cwd, documents)
+                                if not isinstance(review, ReviewResult):
+                                    raise TypeError("review_fn must return ReviewResult")
                             # Attribution: who decided, via what, over exactly which bytes.
                             # Identity is honestly self-asserted; the doc SHAs are not.
                             review = _enrich_review(
@@ -747,6 +787,7 @@ def _park_and_exit(
     names = ", ".join(p["node_id"] for p in pending)
     _log(f"⏸ parked — {len(pending)} gate(s) awaiting review: {names}")
     _log("  the agents' completed work is archived; nothing re-runs on resume.")
+    _log("  decide from the dashboard while parked (it applies at resume), or live at resume.")
     _log(f"  continue with: cadora resume {Path(archive_root) / run_id}")
     raise SystemExit(PARK_EXIT_CODE)
 
@@ -1128,6 +1169,47 @@ def _make_review_guard(ledger, policy, backend: str, carried: float):
         )
 
     return guard
+
+
+def _parked_decision_drifted(stored: dict, node_cwd: str) -> str | None:
+    """Why a parked decision must NOT be honored, or ``None`` when it may.
+
+    The decision binds to the SHA-256 of the bytes the reviewer saw. If any of those files
+    changed — or vanished — between the decision and the resume, honoring it would certify
+    documents nobody reviewed.
+    """
+    for doc in stored.get("documents") or []:
+        expected = doc.get("sha256")
+        path = doc.get("path")
+        if not expected or not path:
+            continue
+        target = Path(node_cwd) / path
+        try:
+            actual = hashlib.sha256(target.read_bytes()).hexdigest()
+        except OSError:
+            return f"document {path!r} is gone from the workspace"
+        if actual != expected:
+            return f"document {path!r} changed after the decision was made"
+    return None
+
+
+def _review_from_stored(stored: dict) -> ReviewResult | None:
+    """A parked decision as a ReviewResult — ``None`` if the stored payload is not a valid one.
+
+    The stored ``decided_at`` is preserved as the timestamp: the decision happened when the
+    human made it, not when the resume got around to applying it.
+    """
+    try:
+        return ReviewResult(
+            str(stored.get("decision", "")),
+            str(stored.get("comments", "")),
+            timestamp=str(stored.get("decided_at") or ""),
+            reviewer=stored.get("reviewer"),
+            method=stored.get("method") or "dashboard",
+            documents=stored.get("documents"),
+        )
+    except ValueError:
+        return None
 
 
 def _enrich_review(
