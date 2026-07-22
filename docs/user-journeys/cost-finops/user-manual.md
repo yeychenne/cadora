@@ -104,7 +104,50 @@ usage since 2026-07-10T09:00:00+00:00: 7 run(s), 12 node(s)
 When any node's cost was estimated, each such line is marked `est.` and a note counts the estimated
 nodes — so billed and computed dollars stay legible. `--json` emits every group
 (`by_model`, `by_executor`, `by_funding`, `by_day`) plus per-node rows, each with a `cost_estimated`
-flag.
+flag. When human reviewers asked questions or requested inline revisions at parked gates, a
+dedicated line answers what that cost — `of which human-review conversation: $…` — already
+included in the total, never double-counted (per node it appears as
+`review_conversation_cost_usd`).
+
+### `cadora accounts` — is a backend actually usable, and how close to its budget?
+
+Four layers per backend, cheapest first — each one exists because the layer below it can lie:
+
+```bash
+cadora accounts --archive-dir runs \
+  --budget claude=200 --budget codex=80 --probe
+```
+
+```text
+  backend      present        credentials          probe      spent          budget     used
+  claude       ok 2.1.215     stored (max)         ok         $12.4024       $200.00    6%
+  codex        ok 0.142.5     stored (chatgpt)     ok         $8.9154 est.   $80.00     11%
+```
+
+| Layer | What it proves | What it cannot prove |
+|---|---|---|
+| **present** | the CLI exists, version in the tested range | that it can make a call |
+| **credentialed** | credentials are *stored* (never reported as "valid") | that the token still works |
+| **live** (`--probe`, a few tokens) | the backend answers a real call — the only layer that catches an expired token | anything about quota |
+| **budget** | your declared ceiling vs Cadora's own recorded spend | a vendor's remaining allowance — no CLI exposes one |
+
+`--warn-at 0.9` sets the flag threshold; `--check` exits non-zero when any account is unhealthy
+(the pre-run guard for scripts); `--json` for tooling; `--since` scopes the spend window.
+
+### `--budget` — a ceiling the run enforces on itself
+
+```bash
+cadora run pipeline.yaml --budget claude=200 --budget codex=80 \
+  --on-budget failover --failover-to codex --budget-warn-at 0.9 …
+```
+
+Evaluated at **node boundaries** — a stop never loses mid-node work, and the exact
+`--resume-from` continuation is printed. `warn` (default) logs once per backend and never changes
+what a run does; `stop` halts cleanly, recorded incomplete; `failover` moves the remaining nodes
+to `--failover-to`, but only if that backend is itself under threshold — otherwise it declines to
+a stop rather than draining a second account. The ceiling also holds **inside a parked review
+conversation**: an over-ceiling Ask/Revise is refused with the numbers, and deciding the gate
+stays free.
 
 ---
 
@@ -173,7 +216,7 @@ are **audit-grade** — provable after the pack leaves your machine.
 **Usage CLI:** `cadora usage [--archive-dir <dir>] [--since <when>] [--json]` — `--since` accepts an
 ISO timestamp, `Nd` (days), or `Nh` (hours).
 
-**Dashboard:** `cadora dashboard --archive-dir <dir> --host 127.0.0.1 --port 8765` — read-only cost
+**Dashboard:** `cadora dashboard --archive-dir <dir> --host 127.0.0.1 --port 8765` — cost
 and run visibility; keep it on loopback (it is unauthenticated).
 
 **Two token totals:** `generation_tokens = input + output` · `context_tokens = input + output +

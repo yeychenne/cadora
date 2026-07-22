@@ -39,7 +39,7 @@ def _nodes(run_dir):
 
 def test_hitl_duration_excludes_human_review_wait(tmp_path):
     """A slow human review must NOT inflate the node's work duration; it lands in review_wait_seconds."""
-    wait = 0.4
+    wait = 1.2
 
     def slow_review(node, cwd, documents=None):
         time.sleep(wait)
@@ -58,7 +58,7 @@ def test_hitl_duration_excludes_human_review_wait(tmp_path):
 
 def test_hitl_duration_excludes_wait_across_revisions(tmp_path):
     """request_changes reruns: every review wait accumulates, and all are excluded from duration."""
-    wait = 0.2
+    wait = 1.0
     calls = []
 
     def slow_review(node, cwd, documents=None):
@@ -93,7 +93,7 @@ def test_concurrent_wave_excludes_a_siblings_review_from_duration(tmp_path):
     """The concurrent-wave edge: node B's agent ran in parallel with A's, but B is recorded only
     after B's own review — which is after A's review (reviews are serialized). So B's span covers
     A's review too. The overlap correction must debit B for BOTH reviews, not just its own."""
-    wait = 0.3
+    wait = 1.5
 
     def slow_review(node, cwd, documents=None):
         time.sleep(wait)

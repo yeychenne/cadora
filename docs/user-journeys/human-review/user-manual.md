@@ -97,6 +97,12 @@ With a finite timeout (e.g. `--review-timeout 3600`), an unanswered gate **fails
 after that many seconds. That's the right default for an unattended pipeline, the wrong one for a
 human who walks away. When in doubt for interactive review, use `0`.
 
+There is a third posture beyond *wait* and *abort*: **park**. With `--on-review park` the run
+exits cleanly at its gates (code 75), decisions can be made while no process is alive — including
+from a phone — and `cadora resume` applies them with identity and document SHAs in the evidence.
+That whole flow has its own capability guide:
+[Walk-away review](../walk-away-review/user-manual.md).
+
 ---
 
 ## 6. If a gate timed out (recovery)

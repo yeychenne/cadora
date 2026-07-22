@@ -82,6 +82,7 @@ jump straight into a walkthrough:
 [Run a gated workflow](https://yeychenne.github.io/cadora/docs/user-journeys/run-a-gated-workflow/user-journey.html) ·
 [Gates & integrity](https://yeychenne.github.io/cadora/docs/user-journeys/gates-and-integrity/user-journey.html) ·
 [Human review](https://yeychenne.github.io/cadora/docs/user-journeys/human-review/user-journey.html) ·
+[Walk-away review](https://yeychenne.github.io/cadora/docs/user-journeys/walk-away-review/user-journey.html) ·
 [Evidence pack](https://yeychenne.github.io/cadora/docs/user-journeys/evidence-pack/user-journey.html) ·
 [Cost & FinOps](https://yeychenne.github.io/cadora/docs/user-journeys/cost-finops/user-journey.html)
 

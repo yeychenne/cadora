@@ -192,7 +192,9 @@ Open **http://127.0.0.1:8765/**, then click your run. The run detail page is the
   node output, produced artifacts, and raw metadata.
 - a **FinOps** panel: a token split and cost broken down by day, model, executor, and funding.
 
-The dashboard is a read-only cockpit over the archive: no login, no database, loopback by default.
+The dashboard is a cockpit over the archive — no login, no database, loopback by default. It reads
+everything and writes exactly one kind of thing: review decisions (a live gate's decision file, a
+conversational Ask/Revise, or a stored decision for a parked run).
 If you bind it off `127.0.0.1`, front it with TLS and auth first — it serves run metadata and
 artifacts unauthenticated.
 

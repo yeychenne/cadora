@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The parked run, by its surfaces · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;
+    --card:#fffefb;--amber:#b3760f;
+    --scr-bg:#0f172a;--scr-canvas:#111c2f;--scr-panel:#1e2937;--scr-panel2:#162237;--scr-line:#334158;
+    --scr-text:#f5f7fb;--scr-muted:#9aa8bc;--scr-blue:#6ba5f0;--scr-green:#16c784;--scr-greensoft:#75f0a8;
+    --scr-red:#fb7185;--scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;
+    --ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}}
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;--rule:#232c3c;--card:#121926;--amber:#e8a13a}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;--rule:#e0dccf;--card:#fffefb;--amber:#b3760f}
+  *{box-sizing:border-box}
+  .wrap{max-width:840px;margin:0 auto;padding:2.6rem 1.5rem 4rem;color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0 0 .5rem}
+  h1{font-size:2.1rem;letter-spacing:-.02em;margin:.1rem 0 .4rem;font-weight:640}
+  .lede{color:var(--ink-soft);margin:0;max-width:64ch}
+  h2{font-size:1.15rem;margin:2.8rem 0 .3rem;font-weight:600;letter-spacing:-.01em}
+  .sub{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 1rem}
+  .rule{height:1px;background:var(--rule);border:0;margin:.4rem 0 0}
+  /* swatches */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:.6rem}
+  .sw{border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--card)}
+  .sw .chip{height:44px}
+  .sw .lab{padding:7px 9px}
+  .sw .lab b{font-size:12px;display:block}
+  .sw .lab code{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .sw .lab span{font-size:11px;color:var(--ink-soft);display:block;margin-top:1px}
+  /* type scale */
+  table{width:100%;border-collapse:collapse;margin-top:.5rem;font-size:13px}
+  th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ink-faint);font-weight:500;padding:6px 10px;border-bottom:1px solid var(--rule)}
+  td{padding:8px 10px;border-bottom:1px solid var(--rule);color:var(--ink-soft);vertical-align:top}
+  td b{color:var(--ink)}
+  td code,.mn{font-family:var(--mono);font-size:12px;color:var(--amber)}
+  /* dashboard component render */
+  .stage{background:var(--scr-bg);border:1px solid var(--rule);border-radius:12px;padding:16px;margin-top:.8rem}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px;position:relative}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .rhead span:last-child{color:var(--scr-text);font-size:13px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .msg.err{color:var(--scr-red)}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0;color:var(--scr-muted);font-size:12px}
+  .empty{color:var(--scr-muted);font-size:12px;font-style:italic;padding:4px 2px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:130px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted)}
+  /* anatomy pins */
+  .pin{position:absolute;font-family:var(--mono);font-size:10px;font-weight:600;width:18px;height:18px;
+    border-radius:50%;background:var(--scr-amber);color:#1a1205;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 3px var(--scr-panel2)}
+  .legend{margin-top:1rem;display:grid;gap:6px}
+  .legend div{display:flex;gap:9px;font-size:13px;color:var(--ink-soft)}
+  .legend .k{font-family:var(--mono);font-size:11px;font-weight:600;width:18px;height:18px;flex:none;
+    border-radius:50%;background:var(--amber);color:var(--paper);display:flex;align-items:center;justify-content:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:.8rem}
+  .state{background:var(--scr-bg);border:1px solid var(--rule);border-radius:10px;padding:12px}
+  .state .cap{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+  .foot{margin-top:3rem;padding-top:1.1rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+</style>
+
+<style>
+  /* walk-away review — appended after the verbatim base, reusing the same --scr-* tokens */
+  /* run-state pills, exactly as the dashboard paints them */
+  .pillrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .pl{border-radius:999px;font-size:12px;line-height:1;padding:5px 8px}
+  .pl.running{background:#173765;color:#3b82f6}
+  .pl.completed{background:#c9ffd8;color:#08783d}
+  .pl.failed{background:#4b1520;color:var(--scr-red)}
+  .pl.waiting{background:#3b2f15;color:var(--scr-amber)}
+  .pl.stale{background:#3b2f15;color:var(--scr-amber)}
+  .pl.parked{background:rgba(240,180,41,.15);color:#e8a13a}
+  /* the triage callout's parts */
+  .pinput{width:100%;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);
+    border-radius:8px;padding:8px 10px;font-size:12px;margin-bottom:10px}
+  .pgate{border:1px solid var(--scr-line);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:var(--scr-canvas)}
+  .pgate.decided{opacity:.75}
+  .phead{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+  .phead b{color:var(--scr-text);font-size:13px}
+  .pcost{color:var(--scr-muted);font-size:12px}
+  .pdocs{font-size:13px;margin-bottom:8px;word-break:break-all}
+  .pdocs a{color:var(--scr-blue);text-decoration:none}
+  .pkind{color:var(--scr-muted);font-size:11px;margin-left:6px}
+  .pta{background:var(--scr-bg);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);
+    padding:6px 8px;font-size:12px;margin-bottom:8px}
+  .pdone{color:var(--scr-green);font-size:13px}
+  /* narrow state cards let the actions row wrap, exactly as ≤480px does live */
+  .state .acts{flex-wrap:wrap}
+  .state .msg{margin-left:0}
+  /* the ≤480px triage frame */
+  .mob{max-width:340px}
+  .mob .acts{flex-wrap:wrap}
+  .mob .btn{padding:10px 18px;font-size:14px}
+  .mob .phead{flex-direction:column;align-items:flex-start}
+  /* terminal moments */
+  .term{background:var(--scr-bg);border:1px solid var(--scr-line);border-radius:10px;padding:14px 16px;
+    font-family:var(--mono);font-size:12.5px;line-height:1.85;color:var(--scr-muted);
+    white-space:pre-wrap;word-break:break-word}
+  .term .amber{color:var(--scr-amber)}
+  .term .ok{color:var(--scr-greensoft)}
+  .term .no{color:var(--scr-red)}
+  .term .id{color:var(--scr-text)}
+  .term .cmd{color:var(--scr-blue)}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Design specification for Cadora's walk-away review: the parked run-state pill, the parked triage callout with its per-gate cards, the decided state, mobile behavior, the interaction contract, and the terminal moments on either side of the park.</h2>
+  <p class="eyebrow">Cadora · design spec</p>
+  <h1>The parked run, by its surfaces</h1>
+  <p class="lede">Everything needed to rebuild or extend the walk-away review surface — the exact tokens, the <span class="mn">parked</span> pill, the triage callout's anatomy, its states, the mobile rules, and the terminal lines on either side of the park. The rendered components are live HTML; edit them here or lift the specs into Figma.</p>
+
+  <h2>Palette</h2>
+  <p class="sub">Amber family, two voices — the flag asks, the pill waits</p>
+  <hr class="rule">
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#e8a13a"></div><div class="lab"><b>Parked amber</b><code>#e8a13a</code><span>Pill text · on rgba(240,180,41,.15)</span></div></div>
+    <div class="sw"><div class="chip" style="background:#ffd08a"></div><div class="lab"><b>Flag amber</b><code>--amber · #ffd08a</code><span>⏸ Parked flag · callout border</span></div></div>
+    <div class="sw"><div class="chip" style="background:#16c784"></div><div class="lab"><b>Green</b><code>--green · #16c784</code><span>Approve · stored · decided ✓</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fb7185"></div><div class="lab"><b>Red</b><code>--red · #fb7185</code><span>Abort outline</span></div></div>
+    <div class="sw"><div class="chip" style="background:#3b82f6"></div><div class="lab"><b>Blue</b><code>--blue · #3b82f6</code><span>Document links</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0f172a"></div><div class="lab"><b>Ink</b><code>--bg · #0f172a</code><span>Page ground · comments field</span></div></div>
+    <div class="sw"><div class="chip" style="background:#111c2f"></div><div class="lab"><b>Canvas</b><code>--canvas · #111c2f</code><span>Gate card · reviewer input</span></div></div>
+    <div class="sw"><div class="chip" style="background:#162237"></div><div class="lab"><b>Panel</b><code>--panel-2 · #162237</code><span>Callout surface</span></div></div>
+    <div class="sw"><div class="chip" style="background:#334158"></div><div class="lab"><b>Line</b><code>--line · #334158</code><span>Borders</span></div></div>
+    <div class="sw"><div class="chip" style="background:#9aa8bc"></div><div class="lab"><b>Muted</b><code>--muted · #9aa8bc</code><span>Cost · kind chip · status msg</span></div></div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.8rem">Three depths carry the hierarchy: the callout sits on <span class="mn">--panel-2</span>, each gate card insets to <span class="mn">--canvas</span>, and the comments field insets again to <span class="mn">--bg</span> — the darker the surface, the closer to the reviewer's own words.</p>
+
+  <h2>Type &amp; metrics</h2>
+  <p class="sub">System sans for triage · monospace where the run speaks</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Role</th><th>Family</th><th>Size / weight</th><th>Notes</th></tr>
+    <tr><td><b>Node id</b></td><td class="mn">system-ui</td><td>inherit / 700</td><td><code>&lt;strong&gt;</code> in <code>.park-head</code>, left cell</td></tr>
+    <tr><td><b>Cost so far</b></td><td class="mn">system-ui</td><td>inherit</td><td><code>$1.2874 so far</code> — four decimals, right cell; omitted when unknown</td></tr>
+    <tr><td><b>Doc link</b></td><td class="mn">system-ui</td><td>13px</td><td><code>--blue</code>, <code>word-break: break-all</code> for long paths</td></tr>
+    <tr><td><b>Kind chip</b></td><td class="mn">system-ui</td><td>11px</td><td><code>.park-kind</code> — <code>new</code> / <code>modified</code>, muted, 6px left margin</td></tr>
+    <tr><td><b>Decided line · status msg</b></td><td class="mn">system-ui</td><td>13px</td><td><code>.park-done</code> green · <code>.park-msg</code> muted</td></tr>
+    <tr><td><b>Run-state pill</b></td><td class="mn">system-ui</td><td>12px / line-height 1</td><td>Lowercase status word, e.g. <code>parked</code></td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Metric</th><th>Value</th><th>Metric</th><th>Value</th></tr>
+    <tr><td>Callout radius · padding</td><td class="mn">12px · 14px 16px</td><td>Gate card radius · padding</td><td class="mn">10px · 10px 12px</td></tr>
+    <tr><td>Pill radius · padding</td><td class="mn">999px · 5px 8px</td><td>Comments padding</td><td class="mn">6px 8px · 2 rows</td></tr>
+    <tr><td>Button padding</td><td class="mn">7px 16px</td><td>Button padding ≤480px</td><td class="mn">10px 18px · 14px</td></tr>
+    <tr><td>Decided opacity</td><td class="mn">0.75</td><td>Reviewer maxlength</td><td class="mn">80</td></tr>
+    <tr><td>Poll interval</td><td class="mn">5s</td><td>Re-render after store</td><td class="mn">900ms</td></tr>
+  </table>
+
+  <h2>The <span class="mn" style="font-size:.8em">parked</span> pill</h2>
+  <p class="sub">One state where silence is healthy</p>
+  <hr class="rule">
+  <div class="stage"><div class="pillrow">
+    <span class="pl running">running</span>
+    <span class="pl completed">completed</span>
+    <span class="pl failed">failed</span>
+    <span class="pl waiting">review_waiting</span>
+    <span class="pl stale">stale?</span>
+    <span class="pl parked">parked</span>
+  </div></div>
+  <table>
+    <tr><th>Pill</th><th>Fill / text</th><th>Meaning</th></tr>
+    <tr><td><b>running · created</b></td><td class="mn">#173765 / #3b82f6</td><td>A conductor process is alive and working.</td></tr>
+    <tr><td><b>completed</b></td><td class="mn">#c9ffd8 / #08783d</td><td>Finalized, <code>ok: true</code>.</td></tr>
+    <tr><td><b>failed · error</b></td><td class="mn">#4b1520 / #fb7185</td><td>Finalized, something broke.</td></tr>
+    <tr><td><b>review_waiting</b></td><td class="mn">#3b2f15 / #ffd08a</td><td>Live gate — a process is blocked on a human right now.</td></tr>
+    <tr><td><b>stale?</b></td><td class="mn">#3b2f15 / #ffd08a</td><td>Badge on an "active" run whose <code>status.json</code> went quiet — the conductor may be dead.</td></tr>
+    <tr><td><b>parked</b></td><td class="mn">rgba(240,180,41,.15) / #e8a13a</td><td>No process, on purpose. Gates await review; <code>cadora resume</code> continues.</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem"><span class="mn">parked</span> shares the amber family with <span class="mn">review_waiting</span> and <span class="mn">stale?</span> but is the only translucent fill — a run that is deliberately not running, not one that went quiet. The staleness check exempts it: parked is the one state where untouched-for-days is healthy. While parked, <span class="mn">status.json</span> reads <span class="mn">"status": "parked"</span> with the pending node list, and the manifest stays <span class="mn">"ok": null</span> — in flight is the truth.</p>
+
+  <h2>Anatomy — the parked triage callout</h2>
+  <p class="sub">One card per pending gate · decisions stored now, applied at resume</p>
+  <hr class="rule">
+  <div class="stage">
+    <div class="callout">
+      <span class="pin" style="top:-9px;left:-9px">1</span>
+      <div class="rhead"><span class="flag">⏸ Parked</span><span><b>2</b> gate(s) await review — the run is not running; decisions apply at <span class="mn" style="color:var(--scr-amber)">cadora resume</span></span></div>
+      <span class="pin" style="top:44px;right:-9px">2</span>
+      <div class="pinput">Your name — recorded in the evidence with this decision</div>
+      <div class="pgate" style="margin-bottom:0">
+        <span class="pin" style="top:96px;left:-9px">3</span>
+        <div class="phead"><b>design</b><span class="pcost">$1.2874 so far</span></div>
+        <span class="pin" style="top:128px;right:-9px">4</span>
+        <div class="pdocs"><a href="#">aidlc-docs/design/architecture.md</a><span class="pkind">new</span><br><a href="#">aidlc-docs/design/data-model.md</a><span class="pkind">modified</span></div>
+        <span class="pin" style="top:186px;left:-9px">5</span>
+        <div class="pta">Comments — required to request changes</div>
+        <span class="pin" style="bottom:4px;right:-9px">6</span>
+        <div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span><span class="btn no">Abort</span><span class="msg"></span></div>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <div><span class="k">1</span><span><b style="color:var(--ink)">Header row</b> — the <span class="mn">.review-flag</span> reads <span class="mn">⏸ Parked</span>, then the count sentence: <i>N gate(s) await review — the run is not running; decisions apply at <span class="mn">cadora resume</span></i>. The callout is the same amber-bordered <span class="mn">.review-callout</span> as the live panel, with the <span class="mn">parked</span> modifier.</span></div>
+    <div><span class="k">2</span><span><b style="color:var(--ink)">Reviewer name</b> — <span class="mn">#park-reviewer</span>, one input above all gates (max 80 chars). Prefilled from the browser's <span class="mn">cadora-reviewer</span> key; whatever is typed is recorded on every decision below it.</span></div>
+    <div><span class="k">3</span><span><b style="color:var(--ink)">Gate head</b> — <span class="mn">.park-head</span>: the node id in bold, and the node's spend to date on the right (<span class="mn">$1.2874 so far</span>) so the decision is priced.</span></div>
+    <div><span class="k">4</span><span><b style="color:var(--ink)">Documents</b> — <span class="mn">.park-docs</span>: each changed file as a link (opens the rendered doc in a new tab) with a <span class="mn">.park-kind</span> chip, <span class="mn">new</span> or <span class="mn">modified</span>. Empty gates say <i>no changed documents</i>.</span></div>
+    <div><span class="k">5</span><span><b style="color:var(--ink)">Comments</b> — <span class="mn">.park-comments</span>, two rows; required before Request changes, optional otherwise. Travels with the stored decision into the resumed run.</span></div>
+    <div><span class="k">6</span><span><b style="color:var(--ink)">Decision row</b> — the same <span class="mn">.review-btn</span> classes as the live review panel: Approve (<span class="mn">approve</span>, green outline), Request changes (<span class="mn">changes</span>, neutral), Abort (<span class="mn">abort</span>, red outline), then the inline <span class="mn">.park-msg</span> status.</span></div>
+  </div>
+
+  <h2>States</h2>
+  <p class="sub">Every condition a gate card must render</p>
+  <hr class="rule">
+  <div class="grid2">
+    <div class="state"><p class="cap">Open · undecided</p>
+      <div class="pgate"><div class="phead"><b>design</b><span class="pcost">$1.2874 so far</span></div>
+        <div class="pdocs"><a href="#">aidlc-docs/design/architecture.md</a><span class="pkind">new</span></div>
+        <div class="pta">Comments — required to request changes</div>
+        <div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span><span class="btn no">Abort</span></div></div>
+    </div>
+    <div class="state"><p class="cap">Storing</p>
+      <div class="pgate"><div class="phead"><b>design</b></div>
+        <div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span><span class="btn no">Abort</span><span class="msg">storing…</span></div></div>
+    </div>
+    <div class="state"><p class="cap">Stored · confirms, then re-renders</p>
+      <div class="pgate"><div class="phead"><b>design</b></div>
+        <div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span><span class="btn no">Abort</span><span class="msg" style="color:var(--scr-greensoft)">✓ stored: approve — applies at resume</span></div></div>
+    </div>
+    <div class="state"><p class="cap">Decided · reduced opacity</p>
+      <div class="pgate decided"><div class="phead"><b>design</b><span class="pdone">✓ approve by Yves — applies at resume</span></div></div>
+    </div>
+    <div class="state"><p class="cap">Refused · the server's words</p>
+      <div class="pgate"><div class="phead"><b>design</b></div>
+        <div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span><span class="msg err">node 'design' already has a parked decision</span></div></div>
+    </div>
+    <div class="state"><p class="cap">No changed documents</p>
+      <div class="pgate"><div class="phead"><b>ops-readiness</b><span class="pcost">$0.4310 so far</span></div>
+        <div class="pdocs"><span class="empty">no changed documents</span></div>
+        <div class="acts"><span class="btn ok">Approve</span><span class="btn no">Abort</span></div></div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">A decided gate collapses to its head line at <span class="mn">opacity 0.75</span>: <span class="mn">✓ &lt;decision&gt; by &lt;name&gt; — applies at resume</span> (the <i>by</i> clause appears only when a reviewer was named). One decision per gate — a second attempt is refused with <span class="mn">409</span> and the refusal is printed in place. The callout renders as long as gates are pending; once every gate is decided the run simply waits, decided cards intact, for <span class="mn">cadora resume</span>.</p>
+
+  <h2>Mobile — triage and decide</h2>
+  <p class="sub">≤480px · the card stacks, the tap targets grow</p>
+  <hr class="rule">
+  <div class="stage" style="display:flex;justify-content:center"><div class="mob" style="width:100%">
+    <div class="pgate" style="margin-bottom:0"><div class="phead"><b>design</b><span class="pcost">$1.2874 so far</span></div>
+      <div class="pdocs"><a href="#">aidlc-docs/design/architecture.md</a><span class="pkind">new</span></div>
+      <div class="pta">Comments — required to request changes</div>
+      <div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span><span class="btn no">Abort</span></div></div>
+  </div></div>
+  <table>
+    <tr><th>Rule at ≤480px</th><th>Value</th></tr>
+    <tr><td><b>Actions wrap</b></td><td><code>.review-actions</code> gains <code>flex-wrap: wrap</code> — three buttons never shrink to fit one line.</td></tr>
+    <tr><td><b>Tap targets grow</b></td><td><code>.review-btn</code> padding <code>10px 18px</code>, font <code>14px</code>.</td></tr>
+    <tr><td><b>Head stacks</b></td><td><code>.park-head</code> goes <code>column</code>, aligned to the start — node id above cost.</td></tr>
+    <tr><td><b>Workspace single-column</b></td><td><code>.run-workspace</code> drops its two-column grid to <code>display: block</code>.</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem"><b style="color:var(--ink)">The product rule:</b> mobile is for triage and deciding — on a phone you decide gates you already understand. The full reading and annotation experience deliberately stays on desktop; the phone gets the verdicts, the desk gets the documents.</p>
+
+  <h2>Interaction &amp; behavior</h2>
+  <p class="sub">What each control does, and the contract that protects the reviewer</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Control</th><th>Action</th><th>Result</th></tr>
+    <tr><td><b>Approve</b></td><td>POST <code>approve</code></td><td>Stored in the archive; the node passes when the run resumes.</td></tr>
+    <tr><td><b>Request changes</b></td><td>POST <code>request_changes</code> + comments</td><td>Stored; at resume the stage re-runs with the comments in its prompt.</td></tr>
+    <tr><td><b>Abort</b></td><td>POST <code>abort</code></td><td>Stored; the resumed run stops at this gate, recorded in the evidence.</td></tr>
+    <tr><td><b>Document link</b></td><td>Open the rendered file</td><td>Serves the doc's current bytes from the run workspace, new tab.</td></tr>
+    <tr><td><b>Reviewer input</b></td><td>Saved on submit</td><td>Name recorded on the decision and remembered as <code>cadora-reviewer</code>.</td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Rule</th><th>Why</th></tr>
+    <tr><td><b>Polling pauses while any gate is undecided</b></td><td>The 5s auto-poll skips its refresh until every pending gate has a decision — a re-render must never wipe a half-typed comment. After a store, the panel re-renders once (900ms) to show the decided card.</td></tr>
+    <tr><td><b><span class="mn">cadora-reviewer</span> persists</b></td><td>Typed once, the name prefills every later gate on every run from that browser — the live review panel reads the same key, so the identity follows the reviewer between surfaces. Each device's browser keeps its own copy.</td></tr>
+    <tr><td><b>JSON-only POST</b></td><td><code>POST /api/runs/&lt;id&gt;/park/decision</code> with <code>Content-Type: application/json</code> — body <code>{node_id, decision, comments, reviewer}</code>. Any other content type is refused (415).</td></tr>
+    <tr><td><b>Decisions bind to bytes</b></td><td>The store records the SHA-256 of each document's bytes at decision time — what the reviewer actually saw. A resume refuses to honor the decision if those bytes changed.</td></tr>
+    <tr><td><b>Same validity rules as every surface</b></td><td>Only <code>approve</code> / <code>request_changes</code> / <code>abort</code>; <code>request_changes</code> requires comments. The recorded method is <code>dashboard</code>.</td></tr>
+  </table>
+  <table style="margin-top:1rem">
+    <tr><th>Refusal</th><th>Server response</th><th>The panel shows</th></tr>
+    <tr><td><b>409</b> already decided</td><td class="mn">node 'design' already has a parked decision</td><td>The server's error, verbatim, in <code>.park-msg</code>.</td></tr>
+    <tr><td><b>400</b> not pending</td><td class="mn">node 'design' is not pending in this park</td><td>Verbatim.</td></tr>
+    <tr><td><b>400</b> invalid decision</td><td class="mn">request_changes requires reviewer comments · invalid review decision: '…'</td><td>Verbatim — the gate stays open to retry.</td></tr>
+    <tr><td><b>404</b> not parked</td><td class="mn">run is not parked - use the live review endpoint</td><td>No JSON body, so the fallback: <span class="mn">failed to store the decision</span>.</td></tr>
+  </table>
+
+  <h2>Terminal moments</h2>
+  <p class="sub">The park banner · the resume line — the surface's bookends</p>
+  <hr class="rule">
+  <div class="term"><span class="amber">⏸ parked — 2 gate(s) awaiting review: requirements, design</span>
+  the agents' completed work is archived; nothing re-runs on resume.
+  decide from the dashboard while parked (it applies at resume), or live at resume.
+  continue with: <span class="cmd">cadora resume runs/pr1-park</span></div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">The process then exits with <b style="color:var(--ink)">code 75</b> — <span class="mn">EX_TEMPFAIL</span>, the sysexits convention for a temporary condition where the caller is invited to retry. Wrappers and schedulers must never read a waiting human as a failure. Parking is opted into per run with <span class="mn">--on-review park</span>; the default (<span class="mn">wait</span>) blocks in place.</p>
+  <div class="term" style="margin-top:1rem"><span class="id">▸ applying the decision made while parked: approve by Yves via dashboard</span>
+<span class="no">✗ stored decision for 'design' is invalid — the gate re-asks</span></div>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:.6rem">At resume, each stored decision announces itself before it acts: <span class="mn">&lt;decision&gt; by &lt;reviewer&gt; via &lt;method&gt;</span> (an unnamed reviewer prints as <span class="mn">(unattributed)</span>). A stored decision that fails validation is discarded with the red line — one shot, then the gate falls back to live review. Nothing re-runs and nothing is re-paid: completed nodes reload verbatim from the archive.</p>
+
+  <h2>Voice</h2>
+  <p class="sub">Words are part of the design</p>
+  <hr class="rule">
+  <table>
+    <tr><th>Do</th><th>Not</th></tr>
+    <tr><td>Name the state and the consequence — “the run is not running; decisions apply at <span class="mn">cadora resume</span>”</td><td>“Paused”</td></tr>
+    <tr><td>Name when it lands — “✓ stored: approve — applies at resume”</td><td>“Saved!”</td></tr>
+    <tr><td>Relay the refusal verbatim — “node 'design' already has a parked decision”</td><td>“Error 409”</td></tr>
+    <tr><td>Price the decision — <span class="mn">$1.2874 so far</span></td><td>Hiding spend until the run ends</td></tr>
+    <tr><td>Sentence case — “Request changes”</td><td>Title Case — “Request Changes”</td></tr>
+  </table>
+
+  <div class="foot">Tokens and behavior are taken verbatim from <span class="mn">cadora/dashboard/static/style.css</span>, <span class="mn">cadora/dashboard/static/app.js</span>, and <span class="mn">cadora/runner.py</span>. Companion reading: the <a href="https://github.com/yeychenne/cadora/blob/main/docs/user-journeys/walk-away-review/user-manual.md" style="color:var(--amber)">walk-away review manual</a>, the <a href="https://yeychenne.github.io/cadora/docs/user-journeys/walk-away-review/user-journey.html" style="color:var(--amber)">user journey</a>, and the <a href="https://yeychenne.github.io/cadora/docs/user-journeys/human-review/design-spec.html" style="color:var(--amber)">live review panel's design spec</a> — the parked surface reuses its decision row on purpose.</div>
+</div>
+</body>
+</html>

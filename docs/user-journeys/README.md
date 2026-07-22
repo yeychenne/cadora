@@ -31,6 +31,10 @@ How a gate re-runs the real build and tests (a suite that ran zero tests is bloc
 Fail-closed human-in-the-loop gates — approve, request a same-stage revision, or abort — on three surfaces (stdin, file-drop, MCP), with a conversational review dashboard.
 [Journey](https://yeychenne.github.io/cadora/docs/user-journeys/human-review/user-journey.html) · [Manual](human-review/user-manual.md) · [Design](https://yeychenne.github.io/cadora/docs/user-journeys/human-review/design-spec.html)
 
+### ⏸️ Walk-away review
+Park a run at its gates (exit 75 — waiting is not failure), decide from a phone while no process is alive, resume headless: decisions are SHA-bound to the bytes reviewed, identity-checked, and consume-once.
+[Journey](https://yeychenne.github.io/cadora/docs/user-journeys/walk-away-review/user-journey.html) · [Manual](walk-away-review/user-manual.md) · [Design](https://yeychenne.github.io/cadora/docs/user-journeys/walk-away-review/design-spec.html)
+
 ### 🔏 Evidence pack
 Turn a run into a portable, tamper-evident bundle — report + SHA-256 checksums + an optional signature — that anyone can verify offline, with no Cadora installed.
 [Journey](https://yeychenne.github.io/cadora/docs/user-journeys/evidence-pack/user-journey.html) · [Manual](evidence-pack/user-manual.md) · [Design](https://yeychenne.github.io/cadora/docs/user-journeys/evidence-pack/design-spec.html)

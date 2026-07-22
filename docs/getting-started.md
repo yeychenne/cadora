@@ -75,7 +75,8 @@ cadora eval <run-id>
 ```
 
 The report command writes a portable evidence pack: `report.html`, `report.json`, and
-`checksums.txt`. The pack is checksummed, not signed.
+`checksums.txt`. The pack is checksummed; signing it is an optional second step (`cadora sign`,
+verified offline by `cadora verify`).
 
 ## 5. Compare two backends
 

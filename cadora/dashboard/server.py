@@ -105,7 +105,9 @@ def make_handler(archive_dir: str | Path | list[str | Path]):
                 self.send_error(400, str(exc))
 
         def do_POST(self) -> None:  # noqa: N802 - stdlib handler API
-            # The one write path: deliver a human review decision to a live --review-file run.
+            # The dashboard's ONLY write paths, all of them review-scoped: a decision to a live
+            # --review-file run, a conversational Ask/Revise message to a parked-in-process gate,
+            # and a stored decision for a parked (process-exited) run. Everything else is read-only.
             parts = [unquote(p) for p in urlparse(self.path).path.split("/") if p]
             try:
                 if len(parts) >= 4 and parts[0] == "api" and parts[1] == "runs" and parts[3] == "review":

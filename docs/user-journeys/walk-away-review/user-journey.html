@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A review gate on your schedule, not the laptop's · Cadora</title>
+<style>html,body{margin:0;padding:0;background:var(--paper);min-height:100vh}</style>
+</head>
+<body>
+<style>
+  :root{
+    --paper:#f4f2ec; --ink:#1b2130; --ink-soft:#4a5265; --ink-faint:#7b8496;
+    --rule:#e0dccf; --card:#fffefb; --amber:#b3760f; --amber-bg:#f6ecd6;
+    --green:#0f7a54; --red:#b23a4b; --blue:#245bb5;
+    --scr-bg:#0f172a; --scr-canvas:#111c2f; --scr-panel:#1e2937; --scr-panel2:#162237;
+    --scr-line:#334158; --scr-text:#f5f7fb; --scr-muted:#9aa8bc; --scr-blue:#6ba5f0;
+    --scr-green:#16c784; --scr-greensoft:#75f0a8; --scr-red:#fb7185; --scr-amber:#ffd08a;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+      --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;
+      --green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  }
+  :root[data-theme="dark"]{--paper:#0c1119;--ink:#e9edf4;--ink-soft:#a2acbe;--ink-faint:#6b7488;
+    --rule:#232c3c;--card:#121926;--amber:#e8a13a;--amber-bg:#241d10;--green:#5fd6a0;--red:#f2818f;--blue:#7db0f2;}
+  :root[data-theme="light"]{--paper:#f4f2ec;--ink:#1b2130;--ink-soft:#4a5265;--ink-faint:#7b8496;
+    --rule:#e0dccf;--card:#fffefb;--amber:#b3760f;--amber-bg:#f6ecd6;--green:#0f7a54;--red:#b23a4b;--blue:#245bb5;}
+  *{box-sizing:border-box}
+  .wrap{max-width:760px;margin:0 auto;padding:3rem 1.5rem 4rem;color:var(--ink);
+    font-family:var(--sans);line-height:1.65;font-size:16px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--amber);margin:0 0 .6rem}
+  h1{font-size:2.5rem;line-height:1.05;letter-spacing:-.02em;margin:.2rem 0 .5rem;text-wrap:balance;font-weight:640}
+  .lede{font-size:1.15rem;color:var(--ink-soft);margin:0;max-width:60ch}
+  .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:1.4rem;
+    padding-top:1rem;border-top:1px solid var(--rule);display:flex;gap:1.5rem;flex-wrap:wrap}
+  .step{margin-top:3.4rem}
+  .step-head{display:flex;align-items:baseline;gap:.9rem;margin-bottom:.5rem}
+  .num{font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:600;
+    border:1px solid var(--rule);border-radius:6px;padding:2px 8px;flex:none}
+  h2{font-size:1.5rem;letter-spacing:-.01em;margin:0;font-weight:600;text-wrap:balance}
+  .step p{color:var(--ink-soft);margin:.5rem 0 0}
+  .step p strong{color:var(--ink);font-weight:600}
+  .note{font-size:.95rem;color:var(--ink-faint);border-left:2px solid var(--amber);
+    padding:.1rem 0 .1rem .9rem;margin:1.1rem 0 0}
+  /* faux browser frame holding a faithful dark-dashboard screen */
+  .screen{margin:1.4rem 0 .3rem;border-radius:12px;overflow:hidden;border:1px solid var(--rule);
+    background:var(--scr-bg);box-shadow:0 1px 0 var(--rule)}
+  .chrome{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#0b1220;border-bottom:1px solid #1e2a3d}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .url{margin-left:8px;font-family:var(--mono);font-size:11px;color:#5f6d84;background:#0f1a2c;
+    border-radius:6px;padding:3px 10px;flex:1}
+  .body{padding:14px;color:var(--scr-text);font-size:13px}
+  .hero{display:flex;justify-content:space-between;align-items:center;background:var(--scr-panel);
+    border-radius:10px;padding:11px 14px;margin-bottom:12px}
+  .hero b{font-size:15px}.hero small{color:var(--scr-muted);display:block;font-size:11px;margin-top:2px}
+  .pill{font-size:11px;padding:3px 9px;border-radius:999px}
+  .pill.run{background:#12314e;color:#7db8ff}.pill.done{background:#0f3d2c;color:var(--scr-greensoft)}
+  .callout{border:1px solid var(--scr-amber);background:var(--scr-panel2);border-radius:11px;padding:12px 14px}
+  .rhead{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .flag{font-size:11px;font-weight:600;color:#1a1205;background:var(--scr-amber);padding:3px 10px;border-radius:999px}
+  .docrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--scr-canvas);
+    border:1px solid var(--scr-line);border-radius:8px;margin-bottom:6px}
+  .docrow a{color:var(--scr-blue);text-decoration:none;flex:1;font-size:13px}
+  .kind{font-size:10px;color:var(--scr-muted);letter-spacing:.05em}
+  .mini{font-size:11px;color:var(--scr-muted);border:1px solid var(--scr-line);border-radius:6px;padding:2px 9px}
+  .ta{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;color:var(--scr-muted);
+    padding:8px 10px;font-size:12px;margin:10px 0}
+  .acts{display:flex;gap:8px;align-items:center}
+  .btn{font-size:12px;font-weight:500;padding:7px 15px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-text)}
+  .btn.ok{border-color:var(--scr-green);color:var(--scr-greensoft)}
+  .btn.no{border-color:var(--scr-red);color:var(--scr-red)}
+  .msg{font-size:12px;color:var(--scr-muted);margin-left:4px}
+  .selrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .sel{background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-text);border-radius:8px;padding:6px 9px;font-size:12px}
+  .inp{flex:1;min-width:150px;background:var(--scr-canvas);border:1px solid var(--scr-line);color:var(--scr-muted);border-radius:8px;padding:6px 10px;font-size:12px}
+  .cbtn{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid var(--scr-line);color:var(--scr-muted);white-space:nowrap}
+  .reply{margin-top:10px;background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--scr-muted);line-height:1.55}
+  .prev{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:8px 12px;margin:10px 0}
+  .prev h4{margin:2px 0 4px;font-size:13px;color:var(--scr-text)}
+  .prev p,.prev li{color:var(--scr-muted);font-size:12px;margin:2px 0}
+  .dag{display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:6px}
+  .node{width:180px;text-align:center;border-radius:8px;padding:7px;font-size:12px;
+    background:var(--scr-panel);border:1px solid var(--scr-line);color:var(--scr-muted)}
+  .node.on{background:#123024;border-color:#1f6a49;color:var(--scr-greensoft)}
+  .node .badge{font-size:9px;background:#0f3d2c;color:var(--scr-greensoft);border-radius:4px;padding:1px 6px;margin:0 2px}
+  .node.wait{background:#2a2410;border-color:#7a6320;color:var(--scr-amber)}
+  .arrow{color:var(--scr-line);font-size:12px}
+  .foot{margin-top:3.5rem;padding-top:1.2rem;border-top:1px solid var(--rule);font-size:.9rem;color:var(--ink-faint)}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  a{color:var(--blue)}
+</style>
+
+<style>
+  /* walk-away review — appended after the verbatim base, reusing the same --scr-* tokens */
+  .mn{font-family:var(--mono);font-size:.9em}
+  /* terminal recreation — same dark palette, monospace, one pre-wrap region per screen */
+  .term{font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--scr-muted);
+    white-space:pre-wrap;word-break:break-word}
+  .term .p{color:var(--scr-greensoft)}          /* the $ prompt */
+  .term .cmd{color:var(--scr-text)}             /* the command you type */
+  .term .cmt{color:var(--scr-muted)}            /* # inline comment */
+  .term .path{color:var(--scr-blue)}
+  .term .ok{color:var(--scr-greensoft)}
+  .term .amber{color:var(--scr-amber)}
+  .term .bad{color:var(--scr-red)}
+  .term .verdict{color:var(--scr-greensoft);font-weight:700}
+  .term .verdict.no{color:var(--scr-red)}
+  /* JSON tints inside a .term region */
+  .term .jk{color:var(--scr-blue)}              /* keys */
+  .term .js{color:var(--scr-greensoft)}         /* string values */
+  /* the parked state, on the run pill and the triage panel */
+  .pill.park{background:#2a2410;color:var(--scr-amber)}
+  .screen.phone .flag{white-space:nowrap;flex:none}
+  /* a phone-sized frame — same chrome, narrower body */
+  .screen.phone{max-width:330px;margin-left:auto;margin-right:auto}
+  .notif{display:flex;gap:10px;align-items:flex-start;background:var(--scr-panel);
+    border:1px solid var(--scr-line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+  .notif .app{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--scr-muted)}
+  .notif .txt{font-size:12.5px;color:var(--scr-text);margin-top:2px;line-height:1.45}
+  .notif .when{font-size:10px;color:var(--scr-muted);margin-left:auto;flex:none}
+  /* one pending-gate card in the parked triage panel */
+  .gate{background:var(--scr-canvas);border:1px solid var(--scr-line);border-radius:8px;padding:9px 10px;margin-top:10px}
+  .gate .ghead{display:flex;align-items:baseline;gap:8px;margin-bottom:7px}
+  .gate .ghead b{font-size:13px}
+  .gate .cost{font-family:var(--mono);font-size:11px;color:var(--scr-muted);margin-left:auto}
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Cadora's walk-away review, step by step: a gated run parks with exit code 75 and the laptop closes, the phone gets an ntfy notification, the reviewer triages from the dashboard through a tunnel, the decision is stored in parked-decisions.json bound to document SHA-256s and a declared identity, cadora resume applies it headlessly without re-running or re-paying the agent, drifted or unauthorized decisions are refused, a park-mode resume sweeps the decided gates and re-parks the rest, and the manifest records who decided what, when, over which bytes.</h2>
+
+  <p class="eyebrow">Cadora · walk-away review</p>
+  <h1>A review gate on your schedule, not the laptop's</h1>
+  <p class="lede">A blocking gate holds the conductor process hostage to the reviewer's calendar. Walk-away review inverts that: the run <strong>parks</strong> — agents' finished work archived, process ended cleanly — your phone buzzes, you decide from wherever you are, and a later <span class="mn">cadora resume</span> applies the decision without re-running or re-paying a thing.</p>
+  <div class="meta"><span>Surface · CLI + dashboard + phone</span><span>Role · operator / reviewer</span><span>Captured · fixture run, pipeline-1</span></div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">01</span><h2>Park the run, close the laptop</h2></div>
+    <p><span class="mn">--on-review park</span> changes what a review gate does with the process. When <strong>design</strong> reaches its gate, the run doesn't block — it lets the wave <strong>drain</strong> (the sibling <span class="mn">test-plan</span> finishes and records; nothing is stranded in memory), writes one self-contained park record with every pending gate, and terminates cleanly.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora run · --on-review park</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora run pipeline.yaml --executor claude --cwd ws --hitl \
+    --on-review park --reviewers "yves" \
+    --notify-url https://ntfy.sh/my-runs --yes</span>
+▶ wave · 2 independent nodes running concurrently (max 2)
+<span class="amber">⏸ 'design' awaits human review — parking after this wave</span>
+  <span class="ok">✓ test-plan</span>   $0.6100   integrity:ok
+<span class="amber">⏸ parked — 1 gate(s) awaiting review: design</span>
+  the agents' completed work is archived; nothing re-runs on resume.
+  decide from the dashboard while parked (it applies at resume), or live at resume.
+  continue with: cadora resume <span class="path">runs/pipeline-1</span>
+<span class="p">$</span> <span class="cmd">echo $?</span>
+<span class="verdict">75</span></div>
+      </div>
+    </div>
+    <p class="note">Exit code <strong>75</strong> is <span class="mn">EX_TEMPFAIL</span>: "waiting for a human" is not a failure, and wrappers and schedulers can tell the two apart. The park record (<span class="mn">runs/pipeline-1/park.json</span>) embeds the topology, the gate specs, and the execution contract — a resume depends on nothing but the archive. The manifest stays <span class="mn">"ok": null</span>; in flight is the truth. The laptop closes.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">02</span><h2>The phone buzzes</h2></div>
+    <p><span class="mn">--notify-url</span> is an ntfy-style webhook: <strong>one POST, the body is the message</strong>. Exactly two moments reach your pocket — a gate starts waiting for review, and the run parks. Everything else is dashboard material, not a buzz.</p>
+    <div class="screen phone">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">ntfy.sh/my-runs</span></div>
+      <div class="body">
+        <div class="notif"><div><div class="app">cadora</div><div class="txt">pipeline-1 — design awaits your review</div></div><span class="when">now</span></div>
+        <div class="notif"><div><div class="app">cadora</div><div class="txt">pipeline-1 parked — awaiting review: design</div></div><span class="when">now</span></div>
+      </div>
+    </div>
+    <p class="note">The webhook is fire-and-forget — a daemon thread with a short timeout that swallows every failure. A dead endpoint never delays a node, corrupts telemetry, or fails a run. The webhook is a courtesy; the archive is the record.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">03</span><h2>Triage from the phone</h2></div>
+    <p>The dashboard binds loopback (<span class="mn">127.0.0.1:8765</span>) and stays there — from the phone you reach it through a tunnel, e.g. <span class="mn">tailscale serve 8765</span>. The run wears a <strong>parked</strong> pill, and the run page opens the <strong>⏸ Parked</strong> triage panel: each pending gate as a card — node id, cost so far, and the changed documents as links.</p>
+    <div class="screen phone">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">mba.tailnet.ts.net/runs/pipeline-1</span></div>
+      <div class="body">
+        <div class="hero"><div><b>pipeline-1</b><small>claude · 4 nodes</small></div><span class="pill park">parked</span></div>
+        <div class="callout">
+          <div class="rhead"><span class="flag">⏸ Parked</span><span>1 gate(s) await review — decisions apply at <span class="mn">cadora resume</span></span></div>
+          <div class="inp" style="min-width:0">Your name — recorded in the evidence with this decision</div>
+          <div class="gate">
+            <div class="ghead"><b>design</b><span class="cost">$1.8342 so far</span></div>
+            <div class="docrow"><a href="#">aidlc-docs/inception/application-design/design.md</a><span class="kind">new</span></div>
+            <div class="ta">Comments — required to request changes</div>
+            <div class="acts"><span class="btn ok">Approve</span><span class="btn">Request changes</span><span class="btn no">Abort</span></div>
+            <div class="msg" style="margin:8px 0 0">✓ stored: approve — applies at resume</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Mobile is <strong>triage + decide</strong> — gates you already understand. Deep reading and annotation stay on desktop, where the full review surface lives. And the dashboard's staleness check knows the difference: parked is the one state where "untouched for days" is healthy, not a zombie.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">04</span><h2>The decision is stored, not lost</h2></div>
+    <p>A parked run has no live process to receive a verdict, so the dashboard stores it <strong>in the archive</strong>: <span class="mn">runs/pipeline-1/parked-decisions.json</span>. The binding is the point — the decision is tied to (a) that one node, (b) the <strong>SHA-256 of the exact bytes the reviewer saw</strong>, hashed at decision time, and (c) the declared identity, re-checked at resume against the recorded allowlist.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">runs/pipeline-1/parked-decisions.json</span></div>
+      <div class="body">
+        <div class="term">{
+  <span class="jk">"design"</span>: {
+    <span class="jk">"decision"</span>: <span class="js">"approve"</span>,
+    <span class="jk">"comments"</span>: <span class="js">"ship the API as drafted"</span>,
+    <span class="jk">"reviewer"</span>: <span class="js">"yves"</span>,
+    <span class="jk">"method"</span>: <span class="js">"dashboard"</span>,
+    <span class="jk">"decided_at"</span>: <span class="js">"2026-07-22T09:14:07+00:00"</span>,
+    <span class="jk">"documents"</span>: [
+      { <span class="jk">"path"</span>: <span class="js">"aidlc-docs/inception/application-design/design.md"</span>,
+        <span class="jk">"kind"</span>: <span class="js">"new"</span>,
+        <span class="jk">"sha256"</span>: <span class="js">"ff70…"</span> }
+    ]
+  }
+}</div>
+      </div>
+    </div>
+    <p class="note">Written atomically, one entry per node. A second decision for the same gate is refused with a conflict — one gate, one stored verdict.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">05</span><h2>Back at the laptop: <span class="mn">cadora resume</span></h2></div>
+    <p>Headless — no reviewer present, none needed. The resume rebuilds the run from the park record, applies the stored decision, and drives the downstream nodes to completion.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — cadora resume</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora resume runs/pipeline-1 --yes</span>
+resuming 'pipeline-1': 1 parked gate(s) — design
+<span class="ok">▸ applying the decision made while parked: approve by yves via dashboard</span>
+  <span class="ok">✓ design</span>   $1.8342   integrity:ok
+  <span class="ok">✓ construction</span>   $2.4031   gate:tests ok   integrity:ok
+<span class="verdict">✓ run complete</span> -> <span class="path">runs/pipeline-1</span></div>
+      </div>
+    </div>
+    <p class="note">What the resume does and does not repeat: the parked node's agent work is <strong>not re-run and not re-paid</strong> — $1.8342 is the same dollar, recorded once. The deterministic gate <strong>is</strong> re-checked, and the workspace fingerprint is verified (drift refused unless <span class="mn">--allow-drift</span>, and recorded in the evidence either way). Completed outputs reload verbatim from the archive, so downstream prompts render <strong>byte-identical</strong> to a never-parked run. And the parked downtime lands in <span class="mn">review_wait_seconds</span> — never in the node's signed <span class="mn">duration_seconds</span>.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">06</span><h2>The rails, shown</h2></div>
+    <p>A stored decision is honored only if it still describes reality. Edit a document after the decision and the SHA binding shows its teeth — the verdict is <strong>discarded loudly</strong> (telemetry event <span class="mn">parked_decision_discarded</span>) and the gate re-asks rather than certify bytes nobody reviewed.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — a document changed after the decision</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora resume runs/pipeline-1 --yes</span>
+resuming 'pipeline-1': 1 parked gate(s) — design
+<span class="bad">✗ discarding the decision made while parked for 'design': document
+  'aidlc-docs/inception/application-design/design.md' changed after the
+  decision was made — the gate re-asks</span></div>
+      </div>
+    </div>
+    <p>Identity faces the same wall. A stored decision whose reviewer is not in <span class="mn">--reviewers</span> is rejected at resume exactly like a live impostor — <strong>including abort</strong>: an unlisted abort cannot kill a run. A rejection never re-runs the agent and never consumes a revision; the gate simply remains open.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — an identity outside the allowlist</span></div>
+      <div class="body">
+        <div class="term"><span class="bad">✗ decision by mallory via dashboard rejected — not in the --reviewers
+  allowlist; the gate remains open</span></div>
+      </div>
+    </div>
+    <p class="note">Every stored decision is <strong>consume-once</strong>: it is taken from the file before it is judged, so a rejected verdict cannot lurk and retry forever. And the allowlist itself is not overridable at resume — the policy recorded when the run parked is the policy that governs it.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">07</span><h2>The triage sweep</h2></div>
+    <p>Waves can park more than one gate — two reviewed siblings park <strong>once, together</strong>, in a single record. When only some are decided by morning, resume in park mode: <span class="mn">--on-review park</span> applies whatever was decided and <strong>re-parks the rest</strong>.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">zsh — the sweep, when a park holds two gates</span></div>
+      <div class="body">
+        <div class="term"><span class="p">$</span> <span class="cmd">cadora resume runs/pipeline-1 --on-review park</span>
+resuming 'pipeline-1': 2 parked gate(s) — design, threat-model
+<span class="ok">▸ applying the decision made while parked: approve by yves via dashboard</span>
+  <span class="ok">✓ design</span>   $1.8342   integrity:ok
+<span class="amber">⏸ 'threat-model' awaits human review — parking after this wave</span>
+<span class="amber">⏸ parked — 1 gate(s) awaiting review: threat-model</span>
+  the agents' completed work is archived; nothing re-runs on resume.
+  decide from the dashboard while parked (it applies at resume), or live at resume.
+  continue with: cadora resume <span class="path">runs/pipeline-1</span>
+<span class="p">$</span> <span class="cmd">echo $?</span>
+<span class="verdict">75</span></div>
+      </div>
+    </div>
+    <p class="note">Exit 75 again, and <span class="mn">park.json</span> now holds only the undecided gates. Re-parking is stable: an undecided gate parks again with nothing executed and nothing re-charged — a park is idempotent until a human actually decides.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="num">08</span><h2>The evidence remembers</h2></div>
+    <p>The manifest's <span class="mn">human_reviews</span> carries the whole story: who decided, through which surface, over exactly which bytes — and <strong>when the human decided</strong>, not when the resume got around to applying it. <span class="mn">review_policy</span> records the allowlist that was in force.</p>
+    <div class="screen">
+      <div class="chrome"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">runs/pipeline-1/manifest.json — the design node</span></div>
+      <div class="body">
+        <div class="term"><span class="jk">"human_reviews"</span>: [
+  { <span class="jk">"decision"</span>: <span class="js">"approve"</span>,
+    <span class="jk">"comments"</span>: <span class="js">"ship the API as drafted"</span>,
+    <span class="jk">"timestamp"</span>: <span class="js">"2026-07-22T09:14:07+00:00"</span>,   <span class="cmt">// the moment the human decided</span>
+    <span class="jk">"reviewer"</span>: <span class="js">"yves"</span>,
+    <span class="jk">"method"</span>: <span class="js">"dashboard"</span>,
+    <span class="jk">"documents"</span>: [
+      { <span class="jk">"path"</span>: <span class="js">"aidlc-docs/inception/application-design/design.md"</span>,
+        <span class="jk">"kind"</span>: <span class="js">"new"</span>, <span class="jk">"sha256"</span>: <span class="js">"ff70…"</span> }
+    ] }
+],
+…
+<span class="jk">"review_policy"</span>: { <span class="jk">"reviewers"</span>: [<span class="js">"yves"</span>] }</div>
+      </div>
+    </div>
+    <p class="note">Both <span class="mn">duration_seconds</span> and <span class="mn">review_wait_seconds</span> flow into the signed evidence pack — the agent's work and the human's deliberation, each honestly its own number. The pack itself is the <a href="https://yeychenne.github.io/cadora/docs/user-journeys/evidence-pack/user-journey.html">evidence-pack journey</a>.</p>
+  </div>
+
+  <div class="foot">
+    <p>The frames above reproduce real <span class="mn">cadora run / resume</span> output and the live dashboard's parked triage panel — rendered as editable HTML rather than raster captures, so they can be lifted into Figma or iterated directly. Walk-away review is the durable form of the <a href="https://yeychenne.github.io/cadora/docs/user-journeys/human-review/user-journey.html">human-in-the-loop gate</a>: same decisions, same evidence, no laptop held hostage. Flags and file formats are detailed in the <a href="https://github.com/yeychenne/cadora/blob/main/docs/user-journeys/walk-away-review/user-manual.md">user manual</a>.</p>
+  </div>
+</div>
+</body>
+</html>
