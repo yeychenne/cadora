@@ -116,6 +116,27 @@ def cmd_run(args) -> int:
         raise SystemExit(
             "--on-budget/--failover-to need at least one --budget BACKEND=USD to measure against"
         )
+    on_review = getattr(args, "on_review", "wait")
+    if on_review == "park" and not args.hitl:
+        raise SystemExit("--on-review park needs --hitl — without review gates there is nothing to park at")
+    # Everything a `cadora resume` needs to rebuild THIS command's execution environment. Stored
+    # verbatim in the park record so a resume depends on nothing but the archive.
+    park_contract = {
+        "executor": args.executor,
+        "model": args.model,
+        "funding": args.funding,
+        "timeout": args.timeout,
+        "construction_executor": getattr(args, "construction_executor", None),
+        "construction_model": getattr(args, "construction_model", None),
+        "integrity_mode": args.integrity_mode,
+        "max_parallel": args.max_parallel,
+        "review_timeout": args.review_timeout,
+        "review_file": bool(getattr(args, "review_file", False)),
+        "budget": list(getattr(args, "budget", None) or []),
+        "on_budget": getattr(args, "on_budget", "warn"),
+        "budget_warn_at": getattr(args, "budget_warn_at", 0.9),
+        "failover_to": getattr(args, "failover_to", None),
+    }
     run_id = args.run_id or _default_run_id()
     review_fn = None
     if getattr(args, "review_file", False):
@@ -149,6 +170,123 @@ def cmd_run(args) -> int:
         allow_drift=getattr(args, "allow_drift", False),
         budget_policy=budget_policy,
         failover_executor=failover_executor,
+        on_review=on_review,
+        park_contract=park_contract,
+    )
+    print(f"run complete: {out}")
+    return 0
+
+
+def cmd_resume(args) -> int:
+    """Continue a parked run from its self-contained park record.
+
+    The parked nodes' agent work is NOT re-run and not re-paid — only the pending reviews happen,
+    then the run proceeds downstream exactly as if it had never stopped. The workspace is
+    fingerprint-verified against the state the run parked over (drift refused unless
+    --allow-drift), and each pending gate is deterministically re-checked.
+    """
+    from pathlib import Path as _Path
+
+    from cadora.budget import BudgetPolicy, parse_budgets
+    from cadora.park import gates_from_dict, load_park_record, topology_from_dict
+    from cadora.preflight import preflight_autonomous
+
+    run_dir = _Path(args.run_dir)
+    record = load_park_record(run_dir)
+    contract = record["contract"]
+    run_id = record["run_id"]
+    if run_dir.name != run_id:
+        raise SystemExit(
+            f"park record says run_id {run_id!r} but the directory is {run_dir.name!r} — "
+            "refusing a mismatched resume"
+        )
+    archive_root = str(run_dir.parent)
+    cwd = record.get("cwd") or "."
+
+    if not preflight_autonomous(
+        cwd=cwd,
+        executor=contract.get("executor", "claude"),
+        autonomous=True,
+        assume_yes=getattr(args, "yes", False),
+    ):
+        return 1
+
+    executor = get_executor(
+        contract.get("executor", "claude"),
+        funding=contract.get("funding", "subscription"),
+        timeout=contract.get("timeout", 1800),
+        model=contract.get("model"),
+    )
+    construction_executor = None
+    if contract.get("construction_executor"):
+        construction_executor = get_executor(
+            contract["construction_executor"],
+            funding=contract.get("funding", "subscription"),
+            timeout=contract.get("timeout", 1800),
+            model=contract.get("construction_model"),
+        )
+    budget_policy = None
+    failover_executor = None
+    if contract.get("budget"):
+        budget_policy = BudgetPolicy(
+            budgets=parse_budgets(contract["budget"]),
+            warn_at=contract.get("budget_warn_at", 0.9),
+            action=contract.get("on_budget", "warn"),
+            failover_to=contract.get("failover_to"),
+        )
+        if budget_policy.failover_to:
+            failover_executor = get_executor(
+                budget_policy.failover_to,
+                funding=contract.get("funding", "subscription"),
+                timeout=contract.get("timeout", 1800),
+                model=None,
+            )
+    review_fn = None
+    if getattr(args, "review_file", False) or contract.get("review_file"):
+        from cadora.review import file_review_fn
+
+        review_fn = file_review_fn(
+            timeout=args.review_timeout,
+            executor=executor,
+            spend_journal=run_dir / "review-spend.jsonl",
+        )
+
+    # Completed nodes' outputs come back VERBATIM from the archive (output.txt is result.text,
+    # byte for byte) so downstream prompts render identically to a never-parked run.
+    initial_outputs: dict[str, str] = {}
+    for node_id in record.get("completed", []):
+        output_file = run_dir / node_id / "output.txt"
+        if output_file.is_file():
+            initial_outputs[node_id] = output_file.read_text()
+    pending = {
+        p["node_id"]: {**p, "parked_at": record.get("parked_at")}
+        for p in record["pending"]
+    }
+    skip = sorted(set(record.get("completed", [])) | set(record.get("skipped_pointer", [])))
+
+    names = ", ".join(pending)
+    print(f"resuming {run_id!r}: {len(pending)} parked gate(s) — {names}")
+    out = run_topology(
+        topology_from_dict(record["topology"]),
+        executor,
+        run_id=run_id,
+        cwd=cwd,
+        archive_root=archive_root,
+        gates=gates_from_dict(record.get("gates", {})),
+        integrity_mode=contract.get("integrity_mode", "audit"),
+        hitl=True,
+        review_fn=review_fn,
+        construction_executor=construction_executor,
+        max_parallel=contract.get("max_parallel", 1),
+        skip=skip or None,
+        allow_drift=getattr(args, "allow_drift", False),
+        budget_policy=budget_policy,
+        failover_executor=failover_executor,
+        on_review=getattr(args, "on_review", "wait"),
+        park_contract=contract,
+        park_pending=pending,
+        initial_outputs=initial_outputs,
+        initial_reviews=record.get("reviews", {}),
     )
     print(f"run complete: {out}")
     return 0
@@ -882,7 +1020,49 @@ def main(argv=None) -> int:
         "skip-permissions agents in --cwd and audits their output, not their execution — point "
         "it only at a trusted or throwaway workspace.",
     )
+    r.add_argument(
+        "--on-review",
+        choices=["wait", "park"],
+        default="wait",
+        help="what a --hitl review gate does with the process: wait (default) blocks until a "
+        "decision; park lets the wave drain, writes runs/<id>/park.json with every pending "
+        "gate, and exits cleanly with code 75 — the laptop can sleep; `cadora resume` "
+        "continues later without re-running (or re-paying for) the agents' work",
+    )
     r.set_defaults(func=cmd_run)
+
+    res = sub.add_parser(
+        "resume",
+        help="continue a parked run from runs/<run_id>/park.json — reviews happen, agents don't re-run",
+    )
+    res.add_argument("run_dir", help="the parked run's archive directory, e.g. runs/my-run-1")
+    res.add_argument(
+        "--review-file",
+        action="store_true",
+        help="collect the pending decisions via the file surface (dashboard-compatible) instead "
+        "of stdin; the park record's own setting is honored if it used --review-file",
+    )
+    res.add_argument(
+        "--review-timeout",
+        type=float,
+        default=3600,
+        metavar="SECONDS",
+        help="how long --review-file waits per gate before aborting (0 = indefinitely)",
+    )
+    res.add_argument(
+        "--on-review",
+        choices=["wait", "park"],
+        default="wait",
+        help="if the reviewer steps away again: wait (default) or park again",
+    )
+    res.add_argument(
+        "--allow-drift",
+        action="store_true",
+        help="proceed even if the workspace changed while parked (default: refuse; the drift is "
+        "recorded in the evidence pack either way)",
+    )
+    res.add_argument("--yes", "-y", action="store_true", help="skip the autonomous-run confirmation")
+    res.set_defaults(func=cmd_resume)
 
     gc = sub.add_parser(
         "gate-check",

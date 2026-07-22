@@ -94,6 +94,36 @@ class RunTelemetry:
         self.emit("run_completed" if ok else "run_failed", error=error)
         self._write_status()
 
+    def run_parked(self, pending_nodes: list[str]) -> None:
+        """The run terminated cleanly at review gate(s); a resume will continue it.
+
+        Distinct from failed AND from completed: nothing broke, and nothing is done. The
+        dashboard's staleness check must not call a parked run a zombie — parked is the one
+        state where 'untouched for days' is healthy.
+        """
+        self.status["status"] = "parked"
+        self.status["parked_pending"] = list(pending_nodes)
+        self.status["completed_at"] = None
+        self.emit("run_parked", pending=list(pending_nodes))
+        self._write_status()
+
+    def seed_review_interval(self, node_id: str, start_iso: str | None, end_iso: str | None) -> None:
+        """Count the parked downtime as review wait, not agent work.
+
+        A node parked on Friday and resumed on Monday did not work for a weekend — without this,
+        its ``duration_seconds`` (which feeds the signed evidence pack) would silently include
+        the whole park. Same honesty rule as W5, extended across the process boundary.
+        """
+        if not start_iso or not end_iso:
+            return
+        wait = _duration(start_iso, end_iso)
+        if wait is None or wait <= 0:
+            return
+        self._review_intervals.append((start_iso, end_iso))
+        node = self._node(node_id)
+        node["review_wait_seconds"] = round((node.get("review_wait_seconds") or 0.0) + wait, 3)
+        self._write_status()
+
     def mark_resume(self, resume_from: str | None, skipped_nodes: list[str]) -> None:
         """Record run-level resume metadata: which node the run resumed from and what it skipped."""
         self.status["resumed_from"] = resume_from

@@ -205,6 +205,9 @@ class RunArchive:
                 pass
         self.manifest["ok"] = ok
         self._write_manifest()
+        # A finished run has no pending gates: a stale park record left behind would let
+        # `cadora resume` replay reviews that were already decided.
+        (self.dir / "park.json").unlink(missing_ok=True)
         return self.dir
 
     def _write_manifest(self) -> None:

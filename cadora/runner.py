@@ -32,10 +32,19 @@ from cadora.budget import (
 from cadora.executors.base import ExecutionResult, NodeExecutor
 from cadora.gates import GATE_BLOCKED_PREREQUISITE, GateResult, ShellGate
 from cadora.integrity import IntegrityReport, repair_prompt, scan_toolchain_integrity
+from cadora.park import (
+    PARK_EXIT_CODE,
+    deserialize_result,
+    gates_to_dict,
+    serialize_result,
+    topology_to_dict,
+    write_park_record,
+)
 from cadora.provenance import (
     diff_fingerprints,
     fingerprint_workspace,
     latest_prior_fingerprint,
+    write_workspace_manifest,
 )
 from cadora.remediation import (
     STATE_COMPLETED_GREEN,
@@ -110,9 +119,16 @@ def run_topology(
     allow_drift: bool = False,
     budget_policy: BudgetPolicy | None = None,
     failover_executor: NodeExecutor | None = None,
+    on_review: str = "wait",
+    park_contract: dict | None = None,
+    park_pending: dict | None = None,
+    initial_outputs: dict[str, str] | None = None,
+    initial_reviews: dict[str, str] | None = None,
 ) -> Path:
     if integrity_mode not in {"off", "audit", "enforce", "repair"}:
         raise ValueError(f"invalid integrity mode: {integrity_mode!r}")
+    if on_review not in {"wait", "park"}:
+        raise ValueError(f"invalid on_review mode: {on_review!r} (expected 'wait' or 'park')")
     max_parallel = max(1, max_parallel)
     gates = gates or {}
     review_fn = review_fn or _stdin_review
@@ -148,7 +164,15 @@ def run_topology(
             "allow_drift": allow_drift,
             "workspace_drift": resume_drift.as_dict() if resume_drift else None,
         }
-    outputs: dict[str, str] = {}
+    outputs: dict[str, str] = dict(initial_outputs or {})
+    reviews.update(initial_reviews or {})
+    park_pending = dict(park_pending or {})
+    if park_pending:
+        # The park downtime is review wait, not agent work — seed it before any node records so
+        # duration_seconds (which feeds the signed pack) subtracts it, and review_wait_seconds
+        # owns it honestly.
+        for pending_id, state in park_pending.items():
+            telemetry.seed_review_interval(pending_id, state.get("parked_at"), _now())
     funding = getattr(executor, "funding", None)
     _log(
         f"cadora · executor={executor.name}"
@@ -246,14 +270,33 @@ def run_topology(
         # and deterministic in the per-node loop below, so the manifest order and all fail-closed
         # semantics are unchanged; only wall-clock improves.
         runnable = [n for n in wave if n.id not in skip_ids]
+        # Nodes resumed from a park record already ran their agent — inject the serialized result
+        # exactly as a concurrently pre-executed wave node would arrive, so the standard loop
+        # (gate re-check, integrity re-scan, review, record) treats them identically and never
+        # re-runs (or re-pays for) the agent work.
+        injected = {
+            n.id: (
+                (park_pending[n.id].get("pre_review_docs") or None),
+                deserialize_result(park_pending[n.id]["result"]),
+                park_pending[n.id].get("started_at") or _now(),
+            )
+            for n in runnable
+            if n.id in park_pending
+        }
+        fresh = [n for n in runnable if n.id not in injected]
         prepared = (
             _execute_wave_concurrently(
-                runnable, outputs, reviews, executor, construction_executor, cwd, hitl,
+                fresh, outputs, reviews, executor, construction_executor, cwd, hitl,
                 max_parallel, skip_ids,
             )
-            if max_parallel > 1 and len(runnable) > 1 and not _under_budget_pressure(runnable)
+            if max_parallel > 1 and len(fresh) > 1 and not _under_budget_pressure(fresh)
             else {}
         )
+        prepared.update(injected)
+        # Wave-drain parking: when a review gate parks under on_review="park", its siblings still
+        # finish and record first, then the wave parks ONCE with every pending gate collected —
+        # one park record, one resume, and no sibling's completed work stranded in memory.
+        wave_parked: list[dict] = []
         for node in wave:
             if node.id in skip_ids:
                 telemetry.node_skipped(
@@ -280,6 +323,17 @@ def run_topology(
             # Conversation spend a KILLED earlier invocation journaled but never got to commit.
             # Read once per node (None = not yet read), charged with the first review round.
             journal_carried: float | None = None
+            node_parked = False
+            restore = park_pending.get(node.id)
+            if restore:
+                # Rebuild the revision-loop history exactly as the parking process held it: the
+                # attempts before the pending one (the loop appends the injected result itself),
+                # and the review verdicts so MAX_REVIEW_REVISIONS cannot reset across a park.
+                attempt_results = [deserialize_result(a) for a in restore.get("prior_attempts", [])]
+                review_history = [
+                    ReviewResult(r["decision"], r.get("comments", ""))
+                    for r in restore.get("review_history", [])
+                ]
 
             while True:
                 prompt = base_prompt
@@ -415,6 +469,34 @@ def run_topology(
                     raise SystemExit(f"node {node.id!r}: {reason}")
 
                 if hitl and node.review:
+                    if on_review == "park":
+                        # Do not wait — collect everything a resume needs to continue this node
+                        # from EXACTLY here (the agent already ran and is already accounted), let
+                        # the wave drain, and park after it. The gate itself is decided at resume.
+                        telemetry.review_waiting(node.id)
+                        wave_parked.append(
+                            {
+                                "node_id": node.id,
+                                "started_at": telemetry.status["nodes"][node.id].get("started_at"),
+                                "result": serialize_result(result),
+                                "prior_attempts": [
+                                    serialize_result(a) for a in attempt_results[:-1]
+                                ],
+                                "review_history": [
+                                    {"decision": r.decision, "comments": r.comments}
+                                    for r in review_history
+                                ],
+                                # The free win from _doc_snapshot: these SHA-256s say exactly
+                                # which bytes were pending review when the run parked.
+                                "pre_review_docs": pre_review_docs or {},
+                                "gate": asdict(gate_result) if gate_result else None,
+                                "integrity": asdict(integrity) if integrity else None,
+                                "cost_so_far": node_cost,
+                            }
+                        )
+                        _log(f"⏸ {node.id!r} awaits human review — parking after this wave")
+                        node_parked = True
+                        break
                     telemetry.review_waiting(node.id)
                     documents = _changed_docs(node_cwd, pre_review_docs or {})
                     if journal_carried is None:
@@ -554,12 +636,78 @@ def run_topology(
                 _log(_node_line(node, result, gate_result, integrity, repair_result, remediation_outcome))
                 break
 
+            if node_parked:
+                continue  # drain: the wave's remaining nodes still process and record
+
+        if wave_parked:
+            _park_and_exit(
+                archive,
+                telemetry,
+                wave_parked,
+                topology=topology,
+                gates=gates,
+                contract=park_contract or {},
+                run_id=run_id,
+                cwd=cwd,
+                archive_root=archive_root,
+                outputs=outputs,
+                reviews=reviews,
+                skip_ids=skip_ids,
+            )
+
     # The workspace fingerprint (provenance + the baseline a future --resume-from verifies against)
     # is captured inside archive.finalize(), so it covers the failure exits too — see track_workspace.
     out = archive.finalize(True)
     telemetry.run_completed(True)
     _log(f"✓ run complete -> {out}")
     return out
+
+
+def _park_and_exit(
+    archive, telemetry, pending, *, topology, gates, contract, run_id, cwd, archive_root,
+    outputs, reviews, skip_ids,
+) -> None:
+    """Write the self-contained park record, fingerprint the workspace, and terminate cleanly.
+
+    Exit code 75 (EX_TEMPFAIL): "waiting for a human" must never read as "the run broke" to a
+    wrapper or scheduler. The manifest stays ``"ok": null`` — in flight is the truth.
+    """
+    from datetime import datetime, timezone
+
+    record = {
+        "schema": 1,
+        "run_id": run_id,
+        "parked_at": datetime.now(timezone.utc).isoformat(),
+        "conductor": archive.manifest.get("conductor"),
+        "contract": contract,
+        "topology": topology_to_dict(topology),
+        "gates": gates_to_dict(gates),
+        "cwd": str(cwd),
+        "archive_root": str(archive_root),
+        # Nodes whose outputs exist verbatim in the archive (output.txt) — a resume reloads them
+        # so downstream prompts render BYTE-IDENTICAL to a never-parked run.
+        "completed": sorted(outputs),
+        # Nodes skipped by an earlier --resume-from: they have no piped output anywhere and must
+        # keep rendering as workspace pointers — same as they did in this very process.
+        "skipped_pointer": sorted(skip_ids),
+        "reviews": dict(reviews),
+        "pending": pending,
+    }
+    write_park_record(archive.dir, record)
+    # The fingerprint a resume verifies against — without it, a park resumed over a mutated
+    # workspace would certify gates over source the run never saw.
+    try:
+        write_workspace_manifest(
+            archive.dir, fingerprint_workspace(cwd, archive_root=archive_root)
+        )
+    except OSError:
+        pass
+    telemetry.run_parked([p["node_id"] for p in pending])
+    names = ", ".join(p["node_id"] for p in pending)
+    _log(f"⏸ parked — {len(pending)} gate(s) awaiting review: {names}")
+    _log("  the agents' completed work is archived; nothing re-runs on resume.")
+    _log(f"  continue with: cadora resume {Path(archive_root) / run_id}")
+    raise SystemExit(PARK_EXIT_CODE)
 
 
 def _execute_wave_concurrently(
@@ -745,7 +893,13 @@ def _render(
     skipped = skipped or set()
     parts: list[str] = []
     for dep in node.depends_on:
-        if dep in skipped:
+        if dep in outputs:
+            # The real output is known — a park-resumed run reloads completed nodes' outputs from
+            # the archive precisely so this branch wins and downstream prompts stay BYTE-IDENTICAL
+            # to a never-parked run. (--resume-from never populates outputs for skipped deps, so
+            # its workspace-pointer behaviour below is unchanged.)
+            parts.append(f"## Output of upstream node `{dep}`\n{outputs[dep]}")
+        elif dep in skipped:
             # Resumed run: the upstream node did not execute here, so there is no piped output —
             # its artifacts already live in the workspace from an earlier run. Point the agent at
             # them rather than injecting an empty section.
