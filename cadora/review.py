@@ -81,6 +81,20 @@ def file_review_fn(timeout: float = 3600.0, interval: float = 2.0, executor=None
     """
 
     indefinite = timeout <= 0
+    # Conversational review spends real money: every Ask and every Revise is a full executor call,
+    # and a reviewer may send unlimited messages while a gate is parked. Accumulate it here so the
+    # runner can charge it to the budget ledger and the archive — otherwise it is spend that no
+    # ceiling can see and no evidence records. Shared across review_fn calls; the runner reads the
+    # delta around each gate.
+    spend: dict = {"cost_usd": 0.0, "usage": {}}
+
+    def _record_spend(result) -> None:
+        cost = getattr(result, "cost_usd", None)
+        if cost:
+            spend["cost_usd"] += cost
+        for key, value in (getattr(result, "usage", None) or {}).items():
+            if isinstance(value, (int, float)):
+                spend["usage"][key] = spend["usage"].get(key, 0) + value
 
     def review_fn(node, node_cwd: str, documents=None) -> ReviewResult:
         base = Path(node_cwd)
@@ -104,7 +118,11 @@ def file_review_fn(timeout: float = 3600.0, interval: float = 2.0, executor=None
             },
             indent=2,
         )
-        responder = _review_responder(executor, node, node_cwd) if executor is not None else None
+        responder = (
+            _review_responder(executor, node, node_cwd, on_spend=_record_spend)
+            if executor is not None
+            else None
+        )
         deadline = time.monotonic() + timeout
         while indefinite or time.monotonic() < deadline:
             if responder is not None and message.is_file():
@@ -130,6 +148,9 @@ def file_review_fn(timeout: float = 3600.0, interval: float = 2.0, executor=None
         request.unlink(missing_ok=True)
         return ReviewResult(REVIEW_ABORT, f"file review timed out after {int(timeout)}s")
 
+    # Published so the runner can charge what the conversation cost. An attribute rather than a
+    # changed return type keeps every other review_fn (stdin, MCP, test doubles) working untouched.
+    review_fn.review_spend = spend
     return review_fn
 
 
@@ -172,10 +193,13 @@ def _service_review_message(message_path: Path, reply_path: Path, responder) -> 
     _write_json_atomic(reply_path, payload)
 
 
-def _review_responder(executor, node, node_cwd: str):
+def _review_responder(executor, node, node_cwd: str, on_spend=None):
     """Answer a reviewer's question, or produce a revised draft, via the node's executor scoped to a
     document. A question returns the executor's answer (no file changes); a revision rewrites the
     document in place so the gate re-surfaces it. The executor is asked to reply in its response text.
+
+    ``on_spend`` receives each execution result so its cost and usage reach the ledger and the
+    archive. Without it the reply text is kept and the price of producing it is thrown away.
     """
 
     def responder(kind: str, message: str, path: str) -> str:
@@ -191,6 +215,8 @@ def _review_responder(executor, node, node_cwd: str):
                 "Return the COMPLETE revised document as your response, and nothing else."
             )
             result = executor.run(node, prompt, cwd=node_cwd)
+            if on_spend is not None:
+                on_spend(result)
             revised = (getattr(result, "text", "") or "").strip()
             if revised and target is not None:
                 target.write_text(revised, encoding="utf-8")
@@ -201,6 +227,8 @@ def _review_responder(executor, node, node_cwd: str):
             "Answer concisely from the document. Do not modify any files."
         )
         result = executor.run(node, prompt, cwd=node_cwd)
+        if on_spend is not None:
+            on_spend(result)
         return (getattr(result, "text", "") or "").strip() or "(no answer)"
 
     return responder

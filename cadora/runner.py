@@ -274,6 +274,7 @@ def run_topology(
             revision_comments = ""
             review_history: list[ReviewResult] = []
             attempt_results: list[ExecutionResult] = []
+            review_cost = 0.0  # what this node's review conversation spent, across revisions
 
             while True:
                 prompt = base_prompt
@@ -406,9 +407,20 @@ def run_topology(
                 if hitl and node.review:
                     telemetry.review_waiting(node.id)
                     documents = _changed_docs(node_cwd, pre_review_docs or {})
+                    spent_before = _review_spend(review_fn)
                     review = _invoke_review(review_fn, node, node_cwd, documents)
                     if not isinstance(review, ReviewResult):
                         raise TypeError("review_fn must return ReviewResult")
+                    # A parked gate answers questions and produces revisions on the node's
+                    # executor — real spend, and unbounded, since a reviewer may send any number
+                    # of messages. Charge it here, before any branch below exits, so no path can
+                    # record a node without it.
+                    conversation_cost = _review_spend(review_fn) - spent_before
+                    if conversation_cost:
+                        review_cost += conversation_cost
+                        node_cost = (node_cost or 0.0) + conversation_cost
+                        if ledger is not None:
+                            ledger.record(node_executor.name, conversation_cost)
                     review_history.append(review)
                     telemetry.review_resolved(node.id, review.decision)
                     if review.decision == REVIEW_REQUEST_CHANGES:
@@ -426,6 +438,7 @@ def run_topology(
                                 reviews=review_history,
                                 attempts=attempt_results,
                                 remediation=remediation_outcome,
+                                review_cost_usd=review_cost,
                             )
                             out = archive.finalize(False)
                             telemetry.node_recorded(
@@ -459,6 +472,7 @@ def run_topology(
                             reviews=review_history,
                             attempts=attempt_results,
                             remediation=remediation_outcome,
+                            review_cost_usd=review_cost,
                         )
                         out = archive.finalize(False)
                         telemetry.node_recorded(
@@ -491,6 +505,7 @@ def run_topology(
                     reviews=review_history,
                     attempts=attempt_results,
                     remediation=remediation_outcome,
+                    review_cost_usd=review_cost,
                 )
                 telemetry.node_recorded(
                     node.id,
@@ -845,6 +860,16 @@ def _changed_docs(node_cwd: str, before: dict[str, str]) -> list[tuple[str, str]
         elif after[relpath] != before[relpath]:
             changed.append((relpath, "modified"))
     return changed
+
+
+def _review_spend(review_fn) -> float:
+    """Dollars the review surface has spent answering reviewers so far (0.0 if it doesn't track).
+
+    Conversational review is optional and surface-specific — stdin and MCP review functions have
+    no executor and never spend — so this reads an attribute rather than demanding one.
+    """
+    spend = getattr(review_fn, "review_spend", None)
+    return float(spend.get("cost_usd") or 0.0) if isinstance(spend, dict) else 0.0
 
 
 def _invoke_review(review_fn, node: Node, node_cwd: str, documents: list[tuple[str, str]]):

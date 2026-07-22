@@ -162,7 +162,12 @@ class RunTelemetry:
         node["duration_seconds"] = None if raw is None else round(max(0.0, raw - review_overlap), 3)
         node["review_wait_seconds"] = round(node.get("review_wait_seconds") or 0.0, 3)
         node["model"] = model or node.get("model")
-        node["cost_usd"] = cost_usd
+        # A node re-run after a resume spent the earlier invocation's money too — report the run
+        # total, matching the manifest, so the dashboard and the evidence never disagree.
+        prior_cost = (self._prior_nodes.get(node_id) or {}).get("cost_usd")
+        node["cost_usd"] = (
+            cost_usd if prior_cost is None else round((cost_usd or 0.0) + prior_cost, 6)
+        )
         node["credits"] = (usage or {}).get("credits")
         node["gate"] = gate
         node["integrity"] = integrity

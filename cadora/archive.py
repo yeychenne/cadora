@@ -67,6 +67,7 @@ class RunArchive:
         reviews: list[ReviewResult] | None = None,
         attempts: list[ExecutionResult] | None = None,
         remediation: RemediationOutcome | None = None,
+        review_cost_usd: float | None = None,
     ) -> None:
         node_dir = self.dir / result.node_id
         node_dir.mkdir(exist_ok=True)
@@ -168,13 +169,20 @@ class RunArchive:
             }
             if result.cost_usd is not None or remediation_cost is not None:
                 entry["cost_usd"] = (result.cost_usd or 0.0) + (remediation_cost or 0.0)
-        # Replace, don't append: on a resume (or a re-run under the same id) this node may already
-        # be carried forward from an earlier invocation, and the manifest must hold one entry per
-        # node, showing its latest outcome — never a duplicate pair.
+        # What the reviewer's questions and revisions cost at this node's parked gate. Applied last
+        # so it survives the attempts/remediation branches above, which each recompute cost_usd,
+        # and kept as its own field so the conversation's price stays visible in the evidence.
+        if review_cost_usd:
+            entry["cost_usd"] = (entry.get("cost_usd") or 0.0) + review_cost_usd
+            entry["review_conversation_cost_usd"] = review_cost_usd
+        # One entry per node. On a resume (or a re-run under the same id) this node may already be
+        # carried forward from an earlier invocation — merge into it rather than appending a
+        # duplicate, and rather than replacing it: a replace would drop the earlier attempt's cost,
+        # which is the same under-reporting this carry-forward exists to prevent.
         nodes = self.manifest["nodes"]
         for index, existing in enumerate(nodes):
             if existing.get("node_id") == entry.get("node_id"):
-                nodes[index] = entry
+                nodes[index] = _merge_invocations(existing, entry)
                 break
         else:
             nodes.append(entry)
@@ -191,6 +199,44 @@ class RunArchive:
         self.manifest["ok"] = ok
         (self.dir / "manifest.json").write_text(json.dumps(self.manifest, indent=2))
         return self.dir
+
+
+def _sum_usage(prior: dict | None, current: dict | None) -> dict:
+    """Add two usage dicts key-wise, keeping non-numeric values from the later one."""
+    merged = dict(prior or {})
+    for key, value in (current or {}).items():
+        earlier = merged.get(key)
+        if isinstance(value, (int, float)) and isinstance(earlier, (int, float)):
+            merged[key] = earlier + value
+        else:
+            merged[key] = value
+    return merged
+
+
+def _merge_invocations(prior: dict, current: dict) -> dict:
+    """Fold an earlier invocation of a node into the entry for its latest one.
+
+    ``cost_usd`` and ``usage`` become the node's total **across the whole run**, because that is
+    what every reader means by "what did this node cost" — a node re-run after a resume spent the
+    earlier money too, and the budget ledger has to see it. The earlier figures are kept in
+    ``prior_invocations`` so accumulating never destroys the detail it summed.
+    """
+    merged = dict(current)
+    costs = [c for c in (prior.get("cost_usd"), current.get("cost_usd")) if c is not None]
+    merged["cost_usd"] = sum(costs) if costs else None
+    merged["usage"] = _sum_usage(prior.get("usage"), current.get("usage"))
+    trail = list(prior.get("prior_invocations") or [])
+    trail.append(
+        {
+            "cost_usd": prior.get("cost_usd"),
+            "usage": prior.get("usage") or {},
+            "ok": prior.get("ok"),
+            "model": prior.get("model"),
+        }
+    )
+    merged["prior_invocations"] = trail
+    merged["invocations"] = len(trail) + 1
+    return merged
 
 
 def _carry_forward_nodes(run_dir: Path) -> list[dict]:

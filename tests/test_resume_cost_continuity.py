@@ -82,7 +82,8 @@ def test_resume_keeps_the_earlier_invocations_cost_in_the_manifest(tmp_path):
 
     nodes = _manifest(tmp_path)["nodes"]
     assert [n["node_id"] for n in nodes] == ["a", "b", "c"]  # all three survive, in order
-    assert sum(n["cost_usd"] for n in nodes) == pytest.approx(3.0)
+    # $3 for the first pass plus $1 for c's second run — the money actually spent, not $3.
+    assert sum(n["cost_usd"] for n in nodes) == pytest.approx(4.0)
 
 
 def test_every_archive_reader_sees_the_whole_run_after_a_resume(tmp_path):
@@ -91,25 +92,43 @@ def test_every_archive_reader_sees_the_whole_run_after_a_resume(tmp_path):
     _run(tmp_path, CostedExecutor(cost=1.0), resume_from="c")
 
     archive = str(tmp_path / "runs")
-    assert summarize_usage(archive).cost_usd == pytest.approx(3.0)
-    assert load_baseline(archive)["fake"] == pytest.approx(3.0)
+    assert summarize_usage(archive).cost_usd == pytest.approx(4.0)  # 3 + c's re-run
+    assert load_baseline(archive)["fake"] == pytest.approx(4.0)
 
     # The failure that motivated this: a budget guard trusting a truncated baseline.
     ledger = BudgetLedger(baseline=load_baseline(archive))
     assert evaluate(ledger, BudgetPolicy(budgets={"fake": 3.0}), "fake").tripped
 
 
-def test_a_resumed_node_replaces_its_entry_rather_than_duplicating_it(tmp_path):
-    """Re-running a node under the same id must leave one entry showing the latest outcome."""
-    _run(tmp_path, CostedExecutor(cost=1.0))
-    _run(tmp_path, CostedExecutor(cost=2.0), resume_from="b")  # b and c run again
+def test_a_re_run_node_accumulates_its_invocations_rather_than_replacing_them(tmp_path):
+    """One entry per node, but its cost is the node's total across the whole run.
+
+    Replacing would drop the first attempt's money — the same under-reporting the carry-forward
+    exists to prevent, just one level down. Measured before this was fixed: $7 spent, $5 reported.
+    """
+    _run(tmp_path, CostedExecutor(cost=1.0))  # a, b, c at $1 = $3
+    _run(tmp_path, CostedExecutor(cost=2.0), resume_from="b")  # b, c again at $2 = $4
 
     nodes = _manifest(tmp_path)["nodes"]
     assert [n["node_id"] for n in nodes] == ["a", "b", "c"]  # no duplicates
     by_id = {n["node_id"]: n for n in nodes}
-    assert by_id["a"]["cost_usd"] == pytest.approx(1.0)  # untouched first invocation
-    assert by_id["b"]["cost_usd"] == pytest.approx(2.0)  # replaced, not appended
-    assert summarize_usage(str(tmp_path / "runs")).cost_usd == pytest.approx(5.0)
+    assert by_id["a"]["cost_usd"] == pytest.approx(1.0)  # ran once, untouched
+    assert by_id["b"]["cost_usd"] == pytest.approx(3.0)  # $1 + $2, not $2
+    assert summarize_usage(str(tmp_path / "runs")).cost_usd == pytest.approx(7.0)
+
+
+def test_accumulating_keeps_the_earlier_invocations_detail(tmp_path):
+    """Summing must not destroy what it summed — the trail is the evidence."""
+    _run(tmp_path, CostedExecutor(cost=1.0))
+    _run(tmp_path, CostedExecutor(cost=2.0), resume_from="b")
+
+    b = next(n for n in _manifest(tmp_path)["nodes"] if n["node_id"] == "b")
+    assert b["invocations"] == 2
+    assert [p["cost_usd"] for p in b["prior_invocations"]] == [pytest.approx(1.0)]
+    # Tokens accumulate the same way, so usage reporting matches the dollars.
+    assert b["usage"]["input_tokens"] == 200  # 100 per invocation
+    a = next(n for n in _manifest(tmp_path)["nodes"] if n["node_id"] == "a")
+    assert "prior_invocations" not in a  # a single-invocation node stays clean
 
 
 def test_status_json_reports_a_skipped_nodes_real_cost(tmp_path):
@@ -120,7 +139,19 @@ def test_status_json_reports_a_skipped_nodes_real_cost(tmp_path):
     nodes = _status(tmp_path)["nodes"]
     assert nodes["a"]["status"] == "skipped"
     assert nodes["a"]["cost_usd"] == pytest.approx(1.0)  # not 0, not None
-    assert sum(n["cost_usd"] or 0 for n in nodes.values()) == pytest.approx(3.0)
+    assert sum(n["cost_usd"] or 0 for n in nodes.values()) == pytest.approx(4.0)
+
+
+def test_the_dashboard_and_the_manifest_never_disagree_on_cost(tmp_path):
+    """status.json feeds the dashboard; the manifest feeds usage/accounts/budget. A run whose two
+    records tell different stories is worse than one that is merely wrong."""
+    _run(tmp_path, CostedExecutor(cost=1.0))
+    _run(tmp_path, CostedExecutor(cost=2.0), resume_from="b")
+
+    manifest_total = sum(n["cost_usd"] or 0 for n in _manifest(tmp_path)["nodes"])
+    status_total = sum(n["cost_usd"] or 0 for n in _status(tmp_path)["nodes"].values())
+    assert manifest_total == pytest.approx(7.0)
+    assert status_total == pytest.approx(manifest_total)
 
 
 def test_a_fresh_run_id_is_unaffected(tmp_path):
@@ -167,4 +198,6 @@ def test_a_failed_run_resumed_to_green_keeps_the_failed_attempts_cost(tmp_path):
     )
     nodes = _manifest(tmp_path)["nodes"]
     assert [n["node_id"] for n in nodes] == ["a", "b"]
-    assert sum(n["cost_usd"] for n in nodes) == pytest.approx(2.0)  # a kept + b's retry
+    # a ($1) + b's failed attempt ($1) + b's successful retry ($1). The failed attempt cost real
+    # money and stays counted — that is the whole point of resuming a failed run honestly.
+    assert sum(n["cost_usd"] for n in nodes) == pytest.approx(3.0)
