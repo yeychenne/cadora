@@ -244,7 +244,7 @@ New to Cadora, or bringing it to a hackathon? Start with the
 
 ## Status
 
-**v0.12.0** — review gates run on the reviewer's schedule, not the laptop's. A run **parks and
+**v0.12.1** — review gates run on the reviewer's schedule, not the laptop's. A run **parks and
 exits** at its human gates (`--on-review park`, exit 75 — waiting is not failure), you **decide
 from a phone**
 on the dashboard's triage panel while no process is alive, and **`cadora resume`** applies the
@@ -259,7 +259,7 @@ health in four layers (present / credentialed / live-probe / budget), `--budget`
 conversations**, every spend path — resumed nodes, review turns, killed processes — reaches the
 ledger and the archive, and `--notify-url` pings your phone the moment a gate starts waiting.
 A thirteen-capability **documentation library** pairs a user journey, a manual, and a design spec
-for everything above (see the guided tour). 407 tests, `ruff` clean, CI on Python 3.10–3.12.
+for everything above (see the guided tour). 413 tests, `ruff` clean, CI on Python 3.10–3.12.
 
 **Roadmap:** dependency lockfile hardening, a
 backend contract matrix, a container sandbox wrapper, and additional backend/method packs as they

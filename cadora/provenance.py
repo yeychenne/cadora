@@ -146,6 +146,24 @@ def write_workspace_manifest(run_dir: str | Path, fingerprint: dict[str, str]) -
     return out
 
 
+def read_workspace_fingerprint(run_dir: str | Path) -> dict[str, str] | None:
+    """The fingerprint a run recorded for ITS OWN workspace, or ``None`` if it has none.
+
+    This is the correct resume baseline for a run resumed under its own id (a parked run writes
+    its fingerprint at park time): it says exactly what source THIS run's earlier stages ran over.
+    ``latest_prior_fingerprint`` — which deliberately excludes the current run — is for the other
+    case, a fresh run verifying against a *different* prior run.
+    """
+    mf = Path(run_dir) / MANIFEST_NAME
+    if not mf.is_file():
+        return None
+    try:
+        files = json.loads(mf.read_text()).get("files")
+    except (OSError, json.JSONDecodeError):
+        return None
+    return files if isinstance(files, dict) else None
+
+
 def latest_prior_fingerprint(
     archive_root: str | Path, *, exclude_run_id: str
 ) -> tuple[str, dict[str, str]] | None:

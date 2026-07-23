@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.12.1 — 2026-07-23
+
+### Fixed
+- **A parked run resumes against its own workspace fingerprint.** `cadora resume` verified a parked
+  run's workspace against `latest_prior_fingerprint(exclude_run_id=…)` — the newest *other* run in
+  the archive — so it refused with spurious "workspace drifted" whenever the archive held more than
+  one run (the common case), forcing `--allow-drift`. A parked run records its own fingerprint at
+  park time; the resume now verifies against that (`read_workspace_fingerprint`), and falls back to
+  the prior-run baseline only for the fresh `--resume-from` case. It always failed *closed* — refused
+  rather than certifying over real drift — so no evidence was ever mis-certified. Found while driving
+  a live human-review build; regression test covers the multi-run archive.
+
 ## v0.12.0 — 2026-07-22
 
 The walk-away release. A review gate no longer holds the conductor hostage to the reviewer's

@@ -379,6 +379,39 @@ def test_cli_park_then_resume_end_to_end(tmp_path, monkeypatch):
     assert {n["node_id"] for n in manifest["nodes"]} == {"a", "b"}
 
 
+def test_resume_verifies_against_the_parked_runs_OWN_fingerprint_not_a_sibling(tmp_path):
+    """Regression for the F3 field bug: a park-resume must check the parked run's OWN workspace
+    fingerprint, not the newest OTHER run in the archive. Before the fix, any archive holding a
+    second run made `cadora resume` refuse on spurious drift — the common case.
+
+    Reproduces the live failure: park run 'r', drop a later sibling run with a DIFFERENT
+    fingerprint into the same archive, then resume 'r' with the drift check ON (allow_drift=False).
+    It must NOT refuse — 'r's own workspace is unchanged.
+    """
+    import json as _json
+
+    parker = RecordingExecutor()
+    _park(tmp_path, parker)  # parks run 'r', writes runs/r/workspace-manifest.json for its ws
+
+    # A later sibling run (sorts after 'r') with a divergent fingerprint — exactly what
+    # latest_prior_fingerprint(exclude_run_id='r') would wrongly pick as the baseline.
+    sibling = tmp_path / "runs" / "zzz-later-run"
+    sibling.mkdir()
+    (sibling / "workspace-manifest.json").write_text(
+        _json.dumps({"file_count": 1, "tree_sha256": "deadbeef",
+                     "files": {"totally/different.py": "deadbeef"}})
+    )
+
+    resumer = RecordingExecutor()
+    # allow_drift=False: the drift check is ON. With the bug this raises SystemExit("drifted
+    # since zzz-later-run"). Fixed, it verifies against runs/r's own manifest and proceeds.
+    _resume(tmp_path, resumer, _scripted((REVIEW_APPROVE, "ok")), allow_drift=False)
+
+    manifest = _manifest(tmp_path)
+    assert manifest["ok"] is True
+    assert [n for n, _ in resumer.calls] == ["c"]  # parked node not re-run; only downstream ran
+
+
 def test_park_record_carries_the_doc_shas(tmp_path):
     """The replayability gap, closed as a side effect: the record says exactly which bytes
     were pending review."""

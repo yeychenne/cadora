@@ -45,6 +45,7 @@ from cadora.provenance import (
     diff_fingerprints,
     fingerprint_workspace,
     latest_prior_fingerprint,
+    read_workspace_fingerprint,
     write_workspace_manifest,
 )
 from cadora.remediation import (
@@ -878,11 +879,21 @@ def _verify_resume_workspace(cwd, archive_root, run_id, allow_drift):
     not silently certify gates over source that never matched the run it claims to continue. When
     drift is allowed, it is logged and recorded in the run manifest so the evidence stays honest.
     """
-    prior = latest_prior_fingerprint(archive_root, exclude_run_id=run_id)
-    if prior is None:
-        _log("  ↳ no prior workspace manifest to verify against — resuming on trust")
-        return None
-    baseline_run, baseline = prior
+    # Prefer THIS run's OWN recorded fingerprint. A parked run writes its workspace manifest at
+    # park time, and that — not some unrelated newest run in the archive — is the state the resume
+    # must match. Using latest_prior_fingerprint here compared a parked run against the newest
+    # OTHER run and refused on spurious drift whenever the archive held more than one run.
+    own = read_workspace_fingerprint(Path(archive_root) / run_id)
+    if own is not None:
+        baseline_run, baseline = run_id, own
+    else:
+        # No own fingerprint: this is a fresh run resumed via --resume-from, whose baseline is the
+        # last run of the same workspace.
+        prior = latest_prior_fingerprint(archive_root, exclude_run_id=run_id)
+        if prior is None:
+            _log("  ↳ no prior workspace manifest to verify against — resuming on trust")
+            return None
+        baseline_run, baseline = prior
     drift = diff_fingerprints(
         baseline, fingerprint_workspace(cwd, archive_root=archive_root), baseline_run=baseline_run
     )
